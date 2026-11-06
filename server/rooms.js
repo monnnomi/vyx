@@ -1,3 +1,4 @@
+import {hiddenBy} from './social.js';
 import {fail,text,uuid} from './http.js';
 import {mediaProjection,mediaIds,attachMedia,checkMediaRetry} from './media.js';
 import {recordContribution,voidContribution} from './farming.js';
@@ -9,19 +10,19 @@ const pageNumber=value=>{
  return Number(value);
 };
 const requireX=user=>{if(!user?.x_id||user.is_system)fail(401,'Sign in with X to use rooms.');};
-const roomColumns=`r.id,r.name,r.description,r.created_at,r.owner_id,
+const roomColumns=`r.id,r.name,r.description,r.language,r.topic,r.featured,r.created_at,r.owner_id,
  u.name AS owner_name,u.handle AS owner_handle,
  (SELECT count(*)::int FROM room_members WHERE room_id=r.id) AS member_count,
  own.user_id IS NOT NULL AS joined,
  CASE WHEN own.user_id IS NOT NULL THEN (SELECT count(*)::int FROM room_messages m
-  WHERE m.room_id=r.id AND m.deleted_at IS NULL AND m.sender_id<>$1 AND m.seq>own.last_read_seq) ELSE 0 END AS unread_count,
+  WHERE m.room_id=r.id AND m.deleted_at IS NULL AND m.sender_id<>$1 AND m.seq>own.last_read_seq AND NOT ${hiddenBy('$1','m.sender_id')}) ELSE 0 END AS unread_count,
  CASE WHEN own.user_id IS NOT NULL THEN (SELECT count(*)::int FROM room_mentions n JOIN room_messages m ON m.id=n.message_id
-  WHERE n.user_id=$1 AND m.room_id=r.id AND m.deleted_at IS NULL AND m.seq>own.last_read_seq) ELSE 0 END AS mention_count,
+  WHERE n.user_id=$1 AND m.room_id=r.id AND m.deleted_at IS NULL AND m.seq>own.last_read_seq AND NOT ${hiddenBy('$1','m.sender_id')}) ELSE 0 END AS mention_count,
  (SELECT jsonb_build_object('id',m.id,'seq',m.seq::text,'body',CASE WHEN m.body='' THEN 'Attachment' ELSE left(m.body,180) END,'created_at',m.created_at,'sender_id',m.sender_id,'name',sender.name)
   FROM room_messages m JOIN users sender ON sender.id=m.sender_id
-  WHERE own.user_id IS NOT NULL AND m.room_id=r.id AND m.deleted_at IS NULL ORDER BY m.seq DESC LIMIT 1) AS last_message`;
+  WHERE own.user_id IS NOT NULL AND m.room_id=r.id AND m.deleted_at IS NULL AND NOT ${hiddenBy('$1','m.sender_id')} ORDER BY m.seq DESC LIMIT 1) AS last_message`;
 const roomJoins=`JOIN users u ON u.id=r.owner_id LEFT JOIN room_members own ON own.room_id=r.id AND own.user_id=$1`;
-const messageColumns=`m.id,m.seq::text,m.body,m.created_at,m.sender_id,u.name,u.handle,u.avatar_url,${mediaProjection('m','room_message_id')},
+const messageColumns=`m.id,m.seq::text,m.body,m.created_at,m.sender_id,u.name,u.handle,u.avatar_url,parent.sender_id AS reply_sender_id,${mediaProjection('m','room_message_id')},
  CASE WHEN m.reply_to IS NOT NULL THEN jsonb_build_object('id',m.reply_to,'removed',parent.id IS NULL,
   'name',pu.name,'body',CASE WHEN parent.body='' THEN 'Attachment' ELSE left(parent.body,180) END) ELSE NULL END AS reply,
  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',mu.id,'name',mu.name,'handle',mu.handle))
@@ -45,7 +46,7 @@ export async function listRooms(db,user,{filter='all',search='',page=0}={}){
  SELECT ${roomColumns} FROM rooms r ${roomJoins}
  LEFT JOIN room_activity activity ON activity.room_id=r.id
  WHERE r.archived_at IS NULL AND ($2='all' OR EXISTS(SELECT 1 FROM room_members WHERE room_id=r.id AND user_id=$1))
- AND ($3='' OR strpos(lower(r.name||' '||r.description),lower($3))>0)
+ AND ($3='' OR strpos(lower(r.name||' '||r.description||' '||r.topic||' '||r.language),lower($3))>0)
  ORDER BY COALESCE(activity.score,0) DESC,r.id ASC LIMIT 25 OFFSET $4`,[user?.id||null,filter,search,page*24]);
  return {rooms:rows.slice(0,24),nextPage:rows.length>24?page+1:null};
 }
@@ -73,28 +74,28 @@ export async function roomThread(db,user,id,before=null){
   if(before!=null)before=cursor(before);
   const rows=await tx.q(`SELECT ${messageColumns}
    FROM room_messages m ${messageJoins}
-   WHERE m.room_id=$1 AND m.deleted_at IS NULL AND ($2::bigint IS NULL OR m.seq<$2)
-   ORDER BY m.seq DESC LIMIT 61`,[id,before]);
+   WHERE m.room_id=$1 AND m.deleted_at IS NULL AND ($2::bigint IS NULL OR m.seq<$2) AND NOT ${hiddenBy('$3','m.sender_id')}
+   ORDER BY m.seq DESC LIMIT 61`,[id,before,user.id]);
   const [count]=await tx.q('SELECT count(*)::int AS n FROM room_members WHERE room_id=$1',[id]);
   const [read]=await tx.q('SELECT last_read_seq::text FROM room_members WHERE room_id=$1 AND user_id=$2',[id,user.id]);
-  const [pinned]=room.pinned_message_id?await tx.q(`SELECT ${messageColumns} FROM room_messages m ${messageJoins} WHERE m.id=$1 AND m.room_id=$2 AND m.deleted_at IS NULL`,[room.pinned_message_id,id]):[];
-  return {lastReadSeq:read.last_read_seq,pinned:pinned||null,room:{id:room.id,name:room.name,description:room.description,owner_id:room.owner_id,member_count:count.n,joined:true},
-   messages:rows.slice(0,60).reverse(),nextBefore:rows.length>60?rows[59].seq:null};
+  const [pinned]=room.pinned_message_id?await tx.q(`SELECT ${messageColumns} FROM room_messages m ${messageJoins} WHERE m.id=$1 AND m.room_id=$2 AND m.deleted_at IS NULL AND NOT ${hiddenBy('$3','m.sender_id')}`,[room.pinned_message_id,id,user.id]):[];
+  return {lastReadSeq:read.last_read_seq,pinned:pinned?(await maskQuotes(tx,user,[pinned]))[0]:null,room:{id:room.id,name:room.name,description:room.description,language:room.language,topic:room.topic,owner_id:room.owner_id,member_count:count.n,joined:true},
+   messages:await maskQuotes(tx,user,rows.slice(0,60).reverse()),nextBefore:rows.length>60?rows[59].seq:null};
  });
 }
 export async function roomMessage(db,user,id,messageId){
  return db.tx(async tx=>{
   await getRoom(tx,user,id,'share');await requireMember(tx,user,id);uuid(messageId);
   const [message]=await tx.q(`SELECT ${messageColumns} FROM room_messages m ${messageJoins}
-   WHERE m.id=$1 AND m.room_id=$2 AND m.deleted_at IS NULL`,[messageId,id]);
-  if(!message)fail(404,'This message is no longer available.');return {message};
+   WHERE m.id=$1 AND m.room_id=$2 AND m.deleted_at IS NULL AND NOT ${hiddenBy('$3','m.sender_id')}`,[messageId,id,user.id]);
+  if(!message)fail(404,'This message is no longer available.');return {message:(await maskQuotes(tx,user,[message]))[0]};
  });
 }
 export async function roomMentionCandidates(db,user,id,search=''){
  return db.tx(async tx=>{
   await getRoom(tx,user,id,'share');await requireMember(tx,user,id);search=text(search,0,24).toLowerCase();
   const members=await tx.q(`SELECT u.id,u.name,u.handle FROM room_members m JOIN users u ON u.id=m.user_id
-   WHERE m.room_id=$1 AND u.id<>$2 AND ($3='' OR strpos(lower(u.handle),$3)=1)
+   WHERE m.room_id=$1 AND u.id<>$2 AND NOT ${hiddenBy('$2','u.id')} AND ($3='' OR strpos(lower(u.handle),$3)=1)
    ORDER BY u.handle LIMIT 6`,[id,user.id,search]);return {members};
  });
 }
@@ -116,7 +117,7 @@ export async function mutateRoom(tx,user,action,input){
   if(recent.n>=5)fail(429,'You can create up to 5 rooms in 24 hours.');
   await membershipLimit(tx,user);
   const [room]=await tx.q('INSERT INTO rooms(owner_id,name,description,request_id) VALUES($1,$2,$3,$4) RETURNING id',[user.id,name,description,requestId]);
-  await tx.q('INSERT INTO room_members(room_id,user_id) VALUES($1,$2)',[room.id,user.id]);return room;
+  await tx.q('UPDATE rooms SET language=$2,topic=$3 WHERE id=$1',[room.id,text(input.language??'',0,40),text(input.topic??'',0,120)]);await tx.q('INSERT INTO room_members(room_id,user_id) VALUES($1,$2)',[room.id,user.id]);return room;
  }
  const id=uuid(input.id),room=await getRoom(tx,user,id,true);
  const [member]=await tx.q('SELECT 1 FROM room_members WHERE room_id=$1 AND user_id=$2',[id,user.id]);
@@ -128,6 +129,7 @@ export async function mutateRoom(tx,user,action,input){
   await tx.q('INSERT INTO room_members(room_id,user_id,last_read_seq) SELECT $1,$2,COALESCE(max(seq),0) FROM room_messages WHERE room_id=$1 ON CONFLICT DO NOTHING',[id,user.id]);return {id,joined:true};
  }
  if(!member)fail(403,'Join this room to read and send messages.');
+ if(action==='room-edit'){if(room.owner_id!==user.id)fail(403,'Only the host can edit this room.');await tx.q('UPDATE rooms SET name=$2,description=$3,language=$4,topic=$5 WHERE id=$1',[id,text(input.name,3,48),text(input.description??'',0,240),text(input.language??'',0,40),text(input.topic??'',0,120)]);return {ok:true};}
  if(action==='room-leave'){
   if(room.owner_id===user.id)fail(409,'As the owner, you can close this room instead of leaving.');
   await tx.q('DELETE FROM room_members WHERE room_id=$1 AND user_id=$2',[id,user.id]);return {id,joined:false};
@@ -177,4 +179,9 @@ export async function mutateRoom(tx,user,action,input){
 async function membershipLimit(tx,user){
  const [count]=await tx.q('SELECT count(*)::int AS n FROM room_members m JOIN rooms r ON r.id=m.room_id WHERE m.user_id=$1 AND r.archived_at IS NULL',[user.id]);
  if(count.n>=50)fail(409,'You can join up to 50 rooms. Leave a room to join another.');
+}
+
+async function maskQuotes(db,user,rows){
+ const controls=await db.q('SELECT target_id AS id FROM member_controls WHERE user_id=$1 AND (blocked OR muted) UNION SELECT user_id AS id FROM member_controls WHERE target_id=$1 AND blocked',[user.id]);
+ const hidden=new Set(controls.map(c=>c.id));return rows.map(({reply_sender_id,...m})=>({...m,reply:m.reply&&hidden.has(reply_sender_id)?{id:m.reply.id,removed:true}:m.reply}));
 }

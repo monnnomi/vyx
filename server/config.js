@@ -10,6 +10,6 @@ export function calendar(now=new Date()) {
 }
 export function publicUser(u) {
  if(!u)return null;
- return {id:u.id,name:u.name,handle:u.handle,bio:u.bio,avatar_url:u.avatar_url,is_system:u.is_system,
+ return {id:u.id,name:u.name,handle:u.handle,bio:u.bio,interests:u.interests||'',avatar_url:u.avatar_url,is_system:u.is_system,
  x_username:u.x_username,created_at:u.created_at,profile_completed:u.profile_completed};
 }

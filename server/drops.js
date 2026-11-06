@@ -1,3 +1,4 @@
+import {hiddenBy} from './social.js';
 import {fail} from './http.js';
 import {settleDueWindows,farmingOverview,currentActivity} from './farming.js';
 
@@ -68,18 +69,18 @@ export async function notifications(db,user){
  SELECT 'drop:'||w.starts_at::text AS id,'system' AS category,'drop' AS kind,
   'Your room drop is ready' AS title,sum(a.amount)::text||' VP recorded across '||count(*)::text||' room(s).' AS body,
   w.settled_at AS created_at,w.starts_at::text AS target FROM farm_awards a JOIN farm_windows w ON w.starts_at=a.window_start
-  WHERE a.user_id=$1 AND w.settled_at IS NOT NULL GROUP BY w.starts_at
+  WHERE a.user_id=$1 AND w.settled_at IS NOT NULL AND COALESCE((SELECT drops FROM notification_preferences WHERE user_id=$1),true) GROUP BY w.starts_at
  UNION ALL
  SELECT 'follow:'||f.follower_id::text,'social','follow',u.name||' followed you','A new connection in your circle.',f.created_at,u.id::text
- FROM follows f JOIN users u ON u.id=f.follower_id WHERE f.following_id=$1 AND NOT u.is_system
+ FROM follows f JOIN users u ON u.id=f.follower_id WHERE f.following_id=$1 AND NOT u.is_system AND NOT ${hiddenBy('$1','u.id')} AND COALESCE((SELECT follows FROM notification_preferences WHERE user_id=$1),true)
  UNION ALL
  SELECT 'comment:'||c.id::text,'social','comment',u.name||' commented on your post',left(c.body,160),c.created_at,c.post_id::text
- FROM comments c JOIN posts p ON p.id=c.post_id JOIN users u ON u.id=c.user_id WHERE p.user_id=$1 AND c.user_id<>$1
+ FROM comments c JOIN posts p ON p.id=c.post_id JOIN users u ON u.id=c.user_id WHERE p.user_id=$1 AND c.user_id<>$1 AND NOT ${hiddenBy('$1','u.id')} AND COALESCE((SELECT comments FROM notification_preferences WHERE user_id=$1),true)
  UNION ALL
  SELECT 'mention:'||m.id::text,'social','room-mention',u.name||' mentioned you in '||r.name,left(m.body,160),m.created_at,r.id::text
  FROM room_mentions n JOIN room_messages m ON m.id=n.message_id JOIN rooms r ON r.id=m.room_id
  JOIN users u ON u.id=m.sender_id JOIN room_members rm ON rm.room_id=r.id AND rm.user_id=n.user_id
- WHERE n.user_id=$1 AND m.deleted_at IS NULL AND r.archived_at IS NULL
+ WHERE n.user_id=$1 AND m.deleted_at IS NULL AND r.archived_at IS NULL AND NOT ${hiddenBy('$1','u.id')} AND NOT EXISTS(SELECT 1 FROM room_mutes WHERE user_id=$1 AND room_id=r.id) AND COALESCE((SELECT mentions FROM notification_preferences WHERE user_id=$1),true)
  ) n ORDER BY created_at DESC,id LIMIT 50`,[user.id]);
  return {items:items.map(n=>({...n,created_at:iso(n.created_at),unread:!state||new Date(n.created_at)>new Date(state.seen_at)})),limit:50};
 }

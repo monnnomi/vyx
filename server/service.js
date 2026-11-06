@@ -1,3 +1,4 @@
+import {mutateSocial,assertInteraction,hiddenBy} from './social.js';
 import {randomInt} from 'node:crypto';
 import {calendar,tiers,publicUser} from './config.js';
 import {fail,text,uuid} from './http.js';
@@ -13,10 +14,10 @@ export async function members(db,viewer,season) {
  EXISTS(SELECT 1 FROM follows WHERE follower_id=$1 AND following_id=u.id) AS following,
  EXISTS(SELECT 1 FROM follows WHERE following_id=$1 AND follower_id=u.id) AS follows_you
  FROM users u LEFT JOIN (SELECT user_id,sum(amount) AS points FROM reward_ledger WHERE season=$2 GROUP BY user_id) p ON p.user_id=u.id
- WHERE NOT u.is_system ORDER BY points DESC,u.created_at ASC LIMIT 200`,[viewer?.id||null,season]);
+ WHERE NOT u.is_system AND NOT ${hiddenBy('$1','u.id')} ORDER BY points DESC,u.created_at ASC LIMIT 200`,[viewer?.id||null,season]);
  return rows.map(u=>({...publicUser(u),points:u.points,following:u.following,follows_you:u.follows_you}));
 }
-export async function feed(db,viewer,{filter='all',author=null,cursor=null}={}) {
+export async function feed(db,viewer,{filter='all',author=null,cursor=null,query='',postId=null}={}) {
  if(!['all','following','saved'].includes(filter))fail(400,'Choose a feed filter.');
  if(cursor&&(typeof cursor!=='string'||cursor.length>40||Number.isNaN(Date.parse(cursor))))fail(400,'Invalid page cursor.');
  const rows=await db.q(`SELECT p.*,u.name,u.handle,u.avatar_url,u.is_system,${mediaProjection('p','post_id')},
@@ -26,10 +27,12 @@ export async function feed(db,viewer,{filter='all',author=null,cursor=null}={}) 
  EXISTS(SELECT 1 FROM saved_posts WHERE post_id=p.id AND user_id=$1) AS saved
  FROM posts p JOIN users u ON u.id=p.user_id
  WHERE ($2::uuid IS NULL OR p.user_id=$2)
- AND ($3<>'following' OR p.user_id=$1 OR EXISTS(SELECT 1 FROM follows WHERE follower_id=$1 AND following_id=p.user_id))
+ AND ($3<>'following' OR EXISTS(SELECT 1 FROM follows WHERE follower_id=$1 AND following_id=p.user_id))
  AND ($3<>'saved' OR EXISTS(SELECT 1 FROM saved_posts WHERE user_id=$1 AND post_id=p.id))
+ AND NOT ${hiddenBy('$1','p.user_id')}
  AND ($4::timestamptz IS NULL OR p.created_at<$4)
- ORDER BY p.created_at DESC LIMIT 30`,[viewer?.id||null,author,filter,cursor]);
+ AND ($5='' OR strpos(lower(p.body),lower($5))>0) AND ($6::uuid IS NULL OR p.id=$6)
+ ORDER BY p.created_at DESC LIMIT 30`,[viewer?.id||null,author,filter,cursor,query,postId]);
  return rows.map(p=>({id:p.id,user_id:p.user_id,body:p.body,media:p.media,created_at:p.created_at,likes:p.likes,comments:p.comments,liked:p.liked,saved:p.saved,author:{id:p.user_id,name:p.name,handle:p.handle,avatar_url:p.avatar_url,is_system:p.is_system}}));
 }
 export async function state(db,user,now=null) {
@@ -48,18 +51,18 @@ export async function state(db,user,now=null) {
  }
  return {calendar:c,mediaReady:mediaAvailable(),mediaLimits,user:account,members:people,posts,quests:tasks,event,farming:await farmingOverview(db,user),authReady:Boolean(process.env.X_CLIENT_ID&&process.env.X_CLIENT_SECRET&&process.env.VYX_APP_SECRET)};
 }
-export async function comments(db,post){
- uuid(post);return db.q(`SELECT c.id,c.body,c.created_at,u.id AS user_id,u.name,u.handle,${mediaProjection('c','comment_id')} FROM comments c JOIN users u ON u.id=c.user_id WHERE c.post_id=$1 ORDER BY c.created_at ASC LIMIT 100`,[post]);
+export async function comments(db,post,viewer=null){
+ uuid(post);return db.q(`SELECT c.id,c.body,c.created_at,u.id AS user_id,u.name,u.handle,${mediaProjection('c','comment_id')} FROM comments c JOIN users u ON u.id=c.user_id WHERE c.post_id=$1 AND NOT ${hiddenBy('$2','c.user_id')} ORDER BY c.created_at ASC LIMIT 100`,[post,viewer?.id||null]);
 }
 export async function conversations(db,user) {
  return db.q(`SELECT u.id,u.name,u.handle,u.avatar_url,CASE WHEN m.body='' THEN 'Attachment' ELSE m.body END AS body,m.created_at,
  EXISTS(SELECT 1 FROM follows WHERE follower_id=$1 AND following_id=u.id) AS following,
  EXISTS(SELECT 1 FROM follows WHERE following_id=$1 AND follower_id=u.id) AS follows_you FROM users u
  JOIN LATERAL (SELECT body,created_at FROM messages WHERE (sender_id=$1 AND recipient_id=u.id) OR (recipient_id=$1 AND sender_id=u.id) ORDER BY created_at DESC LIMIT 1) m ON true
- WHERE u.id<>$1 ORDER BY m.created_at DESC LIMIT 50`,[user.id]);
+ WHERE u.id<>$1 AND NOT ${hiddenBy('$1','u.id')} ORDER BY m.created_at DESC LIMIT 50`,[user.id]);
 }
 export async function messages(db,user,peer) {
- uuid(peer);
+ uuid(peer);await assertInteraction(db,user.id,peer);
  return db.q(`SELECT m.id,m.sender_id,m.recipient_id,m.body,m.created_at,${mediaProjection('m','message_id')} FROM (SELECT * FROM messages WHERE (sender_id=$1 AND recipient_id=$2) OR (sender_id=$2 AND recipient_id=$1) ORDER BY created_at DESC LIMIT 100) m ORDER BY created_at ASC`,[user.id,peer]);
 }
 async function activity(db,user,c,kind,target){
@@ -70,15 +73,16 @@ export async function mutate(db,user,action,input,now=new Date()) {
  return db.tx(async tx=>{
   const [fresh]=await tx.q('SELECT * FROM users WHERE id=$1 AND NOT is_system FOR UPDATE',[user.id]);
   if(!fresh)fail(401,'Please sign in again.');user=fresh;
-  if(['room-create','room-join','room-leave','room-close','room-send','room-delete-message','room-read','room-pin'].includes(action))return mutateRoom(tx,user,action,input);
+  if(['room-create','room-join','room-leave','room-close','room-send','room-delete-message','room-read','room-pin','room-edit'].includes(action))return mutateRoom(tx,user,action,input);
+  const social=await mutateSocial(tx,user,action,input);if(social!==undefined)return social;
   const c=calendar(now);
   if(action==='mint-event'||action==='claim-event')return claimHalloween(tx,user);
   if(action==='open-event')fail(410,'The Halloween chest is a collectible and does not award points.');
   if(action==='profile'){
-   const name=text(input.name,2,32),bio=text(input.bio,5,180),handle=text(input.handle,3,24).toLowerCase();
+   const name=text(input.name,2,32),bio=text(input.bio??'',0,180),handle=text(input.handle,3,24).toLowerCase();
    if(!/^[a-z0-9_][a-z0-9_.]{2,23}$/.test(handle)||handle.startsWith('vyx.')||(/^x_\d+$/.test(handle)&&handle!==user.handle))fail(400,'Choose a username with 3–24 letters, numbers, dots or underscores.');
    const [taken]=await tx.q('SELECT id FROM users WHERE handle=$1 AND id<>$2',[handle,user.id]);if(taken)fail(409,'This username is already taken.');
-   await tx.q('UPDATE users SET name=$2,bio=$3,handle=$4,profile_completed=true WHERE id=$1',[user.id,name,bio,handle]);return {ok:true};
+   await tx.q('UPDATE users SET name=$2,bio=$3,handle=$4,profile_completed=true,interests=$5 WHERE id=$1',[user.id,name,bio,handle,text(input.interests??user.interests??'',0,120)]);return {ok:true};
   }
   if(action==='post'){
    const ids=mediaIds(input.mediaIds),content=text(input.body??'',ids.length?0:20,1500),requestId=input.requestId==null?null:uuid(input.requestId);
@@ -90,7 +94,7 @@ export async function mutate(db,user,action,input,now=new Date()) {
    return post;
   }
   if(action==='react'||action==='save'||action==='comment'){
-   const id=uuid(input.id),[post]=await tx.q('SELECT p.user_id,u.is_system FROM posts p JOIN users u ON u.id=p.user_id WHERE p.id=$1',[id]);if(!post)fail(404,'This story could not be found.');
+   const id=uuid(input.id),[post]=await tx.q('SELECT p.user_id,u.is_system FROM posts p JOIN users u ON u.id=p.user_id WHERE p.id=$1',[id]);if(!post)fail(404,'This story could not be found.');await assertInteraction(tx,user.id,post.user_id);
    if(action==='comment'){
     const ids=mediaIds(input.mediaIds),content=text(input.body??'',ids.length?0:1,500),requestId=input.requestId==null?null:uuid(input.requestId);
     if(requestId){const [old]=await tx.q('SELECT id,post_id,body FROM comments WHERE user_id=$1 AND request_id=$2',[user.id,requestId]);if(old){if(old.post_id!==id||old.body!==content)fail(409,'Please start a new comment request.');await checkMediaRetry(tx,'comment',old.id,ids);return {ok:true,id:old.id};}}
@@ -110,7 +114,7 @@ export async function mutate(db,user,action,input,now=new Date()) {
    }return {liked:!existing.length};
   }
   if(action==='follow'){
-   const id=uuid(input.id);if(id===user.id)fail(400,'Choose another member.');
+   const id=uuid(input.id);await assertInteraction(tx,user.id,id);if(id===user.id)fail(400,'Choose another member.');
    const [person]=await tx.q('SELECT id FROM users WHERE id=$1 AND NOT is_system',[id]);if(!person)fail(404,'Member not found.');
    const existing=await tx.q('DELETE FROM follows WHERE follower_id=$1 AND following_id=$2 RETURNING following_id',[user.id,id]);
    if(!existing.length)await tx.q('INSERT INTO follows(follower_id,following_id) VALUES($1,$2)',[user.id,id]);return {following:!existing.length};
@@ -131,6 +135,7 @@ export async function mutate(db,user,action,input,now=new Date()) {
    const peer=uuid(input.id),requestId=uuid(input.requestId),ids=mediaIds(input.mediaIds),content=text(input.body??'',ids.length?0:1,2000);
    const [old]=await tx.q('SELECT id,recipient_id,body FROM messages WHERE sender_id=$1 AND request_id=$2',[user.id,requestId]);
    if(old){if(old.recipient_id!==peer||old.body!==content)fail(409,'Please start a new message request.');await checkMediaRetry(tx,'message',old.id,ids);return {id:old.id};}
+   await assertInteraction(tx,user.id,peer);
    const [mutual]=await tx.q('SELECT 1 AS ok FROM follows a JOIN follows b ON a.follower_id=b.following_id AND a.following_id=b.follower_id WHERE a.follower_id=$1 AND a.following_id=$2',[user.id,peer]);
    if(!mutual)fail(403,'Direct messages are available when you follow each other.');
    const [m]=await tx.q('INSERT INTO messages(sender_id,recipient_id,body,request_id) VALUES($1,$2,$3,$4) ON CONFLICT(sender_id,request_id) DO UPDATE SET request_id=EXCLUDED.request_id RETURNING id',[user.id,peer,content,requestId]);await attachMedia(tx,user,'message',peer,m.id,ids);return m;

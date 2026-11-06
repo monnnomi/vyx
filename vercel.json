@@ -36,7 +36,7 @@
       ]
     },
     {
-      "source": "/(message-reactions.js|social-quality.js|social-quality.css|admin-community.js|media.js|media.css|media-upload-sdk.js|analytics-config.js|analytics.js|analytics.css|app.js|social-shell.js|social-shell.css|app.webmanifest|wonder.js|wonder.css|club.js|club.css|product.js|product.css|drop-scene.js|drop-scene.css|drop-lab.html|drop-lab.js|fonts.css|community.js|rooms.js|rooms.css|room-messenger.js|room-messenger.css|farming.js|farming.css|halloween.js|styles.css|halloween.css|presence.js|admin.js|admin.css|admin|admin.html|index.html)",
+      "source": "/(referrals.js|message-reactions.js|social-quality.js|social-quality.css|admin-community.js|media.js|media.css|media-upload-sdk.js|analytics-config.js|analytics.js|analytics.css|app.js|social-shell.js|social-shell.css|app.webmanifest|wonder.js|wonder.css|club.js|club.css|product.js|product.css|drop-scene.js|drop-scene.css|drop-lab.html|drop-lab.js|fonts.css|community.js|rooms.js|rooms.css|room-messenger.js|room-messenger.css|farming.js|farming.css|halloween.js|styles.css|halloween.css|presence.js|admin.js|admin.css|admin|admin.html|index.html)",
       "headers": [
         {
           "key": "Cache-Control",

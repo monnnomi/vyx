@@ -8,7 +8,7 @@ export default async function handler(req,res){
   await withDB(async db=>{
    await limit(db,'oauth:'+ipKey(req),12,600);
    const binding=token(),returnTo=new URL(req.url,'https://vyx.local').searchParams.get('returnTo');
-   const url=await startOAuth(db,binding,new Date(),returnTo);
+   const url=await startOAuth(db,binding,new Date(),returnTo,new URL(req.url,'https://vyx.local').searchParams.get('ref'));
    setCookie(res,'vyx_oauth',binding,600);redirect(res,url);
   });
  }catch(e){handleError(res,e);}

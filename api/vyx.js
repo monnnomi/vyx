@@ -1,3 +1,4 @@
+import {referralBoard} from '../server/referrals.js';
 import {searchCommunity,memberProfile,postDetail,handleAvailability,memberPreferences,recordProductEvent} from '../server/social.js';
 import {withDB} from '../server/db.js';
 import {body,sameOrigin,session,fail,handleError,json,limit,ipKey,setCookie,cookie,hash,uuid} from '../server/http.js';
@@ -12,6 +13,7 @@ export function createHandler(useDB=withDB){return async function handler(req,re
   await useDB(async db=>{
    const user=await session(db,req);
    if(req.method==='GET'){
+    if(action==='referrals')return json(res,200,await referralBoard(db,user));
     if(action==='search')return json(res,200,await searchCommunity(db,user,url.searchParams.get('q')||''));
     if(action==='member-profile')return json(res,200,await memberProfile(db,user,url.searchParams.get('id')));
     if(action==='post-detail')return json(res,200,await postDetail(db,user,url.searchParams.get('id')));

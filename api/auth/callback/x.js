@@ -13,7 +13,7 @@ export default async function handler(req,res){
    if(params.get('error'))fail(400,'Sign-in was cancelled.');
    const code=params.get('code');if(!code||code.length>2000)fail(400,'Missing sign-in code.');
    const identity=await xIdentity(code,attempt.verifier);
-   const result=await db.tx(tx=>login(tx,identity));
+   const result=await db.tx(tx=>login(tx,identity,attempt.inviter_id));
    setCookie(res,'vyx_session',result.sessionToken,30*86400);redirect(res,returnTo==='/admin'?'/admin?auth=success':'/?auth=success#feed');
   });
  }catch(e){

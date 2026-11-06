@@ -378,3 +378,11 @@ CREATE TABLE IF NOT EXISTS message_reactions (
 );
 CREATE INDEX IF NOT EXISTS message_reactions_room_idx ON message_reactions(room_message_id);
 CREATE INDEX IF NOT EXISTS message_reactions_dm_idx ON message_reactions(message_id);
+
+ALTER TABLE oauth_attempts ADD COLUMN IF NOT EXISTS inviter_id uuid REFERENCES users(id);
+CREATE TABLE IF NOT EXISTS referrals (
+ invitee_id uuid PRIMARY KEY REFERENCES users(id),
+ inviter_id uuid NOT NULL REFERENCES users(id),
+ created_at timestamptz NOT NULL DEFAULT now(), CHECK(invitee_id<>inviter_id)
+);
+CREATE INDEX IF NOT EXISTS referrals_inviter_idx ON referrals(inviter_id,created_at);

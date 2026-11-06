@@ -4,6 +4,8 @@ A community-focused SocialFi application built around conversations, shared room
 
 **Live beta:** https://joinvyx.com · **X:** https://x.com/vyxsocial
 
+squeekchain-project: cd878942-a1fa-40cd-909a-ca45385a6f1d
+
 This repository contains the web client, server endpoints, database schema, migration scripts and isolated tests. VP are application points; they do not guarantee token eligibility, conversion or monetary value. Wallet binding, transferable NFT boosts and token distribution remain planned features. The proposed Squeekchain integration is not implemented in this beta.
 
 ## Repository map

@@ -1,0 +1,72 @@
+/* VYX's reveal is a presentation of a finalized receipt, never an allocator. */
+.sky-scene.wonder-scene{position:relative;isolation:isolate;overflow:hidden;min-width:0;height:330px;border-radius:14px;background:#1c1426;color:#e4c8a0;perspective:1000px}
+.wonder-environment{position:absolute;inset:0;background:url('/assets/wonder/drop-sanctuary.webp') center center/cover no-repeat;opacity:.83;transform:scale(1.025)}
+.wonder-vignette{position:absolute;inset:0;z-index:1;background:linear-gradient(0deg,#140f20a6,transparent 40%,#190e2815 80%),linear-gradient(90deg,#160c2638,transparent 35%,transparent 65%,#160c2638)}
+.wonder-halo{position:absolute;z-index:2;left:calc(50% - 88px);top:16%;width:176px;height:37px;border:1px solid #ffe0aa55;border-radius:50%;transform:rotate(-7deg);box-shadow:0 0 30px #ffd8a21a;opacity:.4}.wonder-halo i{position:absolute;inset:-6px -18px;border:1px solid #edbc7d33;border-radius:50%;transform:rotate(7deg)}.wonder-halo i+i{inset:8px 22px;transform:rotate(-3deg)}
+.wonder-shaft{position:absolute;z-index:2;top:17%;left:calc(50% - 100px);width:200px;height:60%;clip-path:polygon(20% 0,80% 0,100% 100%,0 100%);background:linear-gradient(#f6d79d18,#eabf8a03);filter:blur(5px)}
+.wonder-floor{position:absolute;z-index:2;left:calc(50% - 100px);top:77%;width:200px;height:28px;background:#f1b95f18;border:1px solid #f2c88950;border-radius:50%;box-shadow:0 0 26px #e9ac5833;transform:rotate(-3deg)}
+.wonder-object{position:absolute;z-index:4;width:74%;max-width:550px;aspect-ratio:3/2;left:50%;top:36%;transform:translate(-50%,-6%) rotate(-5deg);transform-origin:50% 65%;filter:drop-shadow(0 20px 15px #05020c70)}
+.wonder-object>img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;max-width:none;pointer-events:none}.wonder-chest-closed{opacity:1}.wonder-object>.wonder-chest-open{opacity:0;transform:translateY(-3%) scale(1.01)}
+.wonder-object-glow{position:absolute;z-index:-1;inset:10% 9%;border-radius:50%;background:#d58c512a;filter:blur(25px);transform:scale(1.04)}
+.wonder-dust{position:absolute;z-index:3;inset:0;pointer-events:none;overflow:hidden}.wonder-dust>i{position:absolute;left:var(--x);top:var(--y);height:var(--size);width:var(--size);border-radius:50%;background:#ffe8b5;box-shadow:0 0 7px #f4d29a;opacity:.1;animation:wonder-drift var(--duration) var(--delay) ease-in-out infinite}
+.wonder-release{position:absolute;z-index:5;inset:20% 14% 10%;border-radius:50%;background:radial-gradient(ellipse,#ffe9bb50,transparent 65%);opacity:0;transform:scale(.4);pointer-events:none}.wonder-wave{position:absolute;z-index:3;left:20%;width:60%;top:74%;height:15%;border:1px solid #f9d7a5;border-radius:50%;opacity:0;pointer-events:none}
+.scene-coordinate,.scene-serial{position:absolute;z-index:6;bottom:16px;font:7px/1.3 'DM Sans',sans-serif;font-weight:500;letter-spacing:1.7px;color:#e5cead88}.scene-coordinate{left:19px}.scene-serial{right:19px}
+[data-sky-state=arriving] .wonder-object{animation:wonder-descent 2.3s cubic-bezier(.2,.65,.3,1) both}[data-sky-state=arriving] .wonder-environment{animation:wonder-room-light 2.3s ease-out both}[data-sky-state=arriving] .wonder-wave{animation:wonder-arrival-wave 1s 1.25s ease-out both}[data-sky-state=arriving] .wonder-shaft{animation:wonder-light-fall 2s both}
+[data-sky-state=opening] .wonder-chest-closed{animation:wonder-close-out 1.4s both}[data-sky-state=opening] .wonder-chest-open{animation:wonder-open-in 1.8s both}[data-sky-state=opening] .wonder-release{animation:wonder-release-light 2.1s both}[data-sky-state=opening] .wonder-wave{animation:wonder-arrival-wave 1.5s .2s both}[data-sky-state=opening] .wonder-shaft{animation:wonder-light-open 2.1s both}[data-sky-state=opening] .wonder-object-glow{animation:wonder-aura-open 2s both}
+[data-sky-state=materialize] .wonder-object{animation:wonder-materialize 2.3s ease both}[data-sky-state=energy] .wonder-object{animation:wonder-energy 2.3s ease both}
+@keyframes wonder-drift{0%,100%{opacity:.04;transform:translate3d(0,7px,0)}45%{opacity:.6;transform:translate3d(5px,-18px,0)}70%{opacity:.15;transform:translate3d(-4px,-26px,0)}}
+@keyframes wonder-descent{0%{opacity:0;transform:translate(-50%,-145%) scale(.5) rotate(5deg);filter:blur(6px)}23%{opacity:.5}65%{opacity:1;filter:blur(0);transform:translate(-50%,-3%) scale(1.01) rotate(-6deg)}85%{transform:translate(-50%,-9%) scale(1) rotate(-5deg)}100%{opacity:1;transform:translate(-50%,-6%) rotate(-5deg)}}
+@keyframes wonder-room-light{from{opacity:.25;transform:scale(1.055)}to{opacity:.83;transform:scale(1.025)}}
+@keyframes wonder-arrival-wave{from{opacity:.7;transform:scale(.4)}to{opacity:0;transform:scale(1.85)}}
+@keyframes wonder-light-fall{0%{opacity:0;transform:scaleX(.2)}35%{opacity:.7}100%{opacity:1;transform:scaleX(1)}}
+@keyframes wonder-close-out{0%,20%{opacity:1}70%,100%{opacity:0}}
+@keyframes wonder-open-in{0%,12%{opacity:0;transform:translateY(0) scale(.99)}65%,100%{opacity:1;transform:translateY(-3%) scale(1.01)}}
+@keyframes wonder-release-light{0%{opacity:0;transform:scale(.4)}45%{opacity:.85;transform:scale(1.2)}100%{opacity:.2;transform:scale(1.65)}}
+@keyframes wonder-light-open{0%{opacity:1}45%{opacity:.85;transform:scaleX(1.5)}100%{opacity:.55;transform:scaleX(1.1)}}
+@keyframes wonder-aura-open{to{background:#f3bb7655;transform:scale(1.3)}}
+@keyframes wonder-materialize{from{opacity:0;filter:blur(18px);transform:translate(-50%,7%) scale(.88)}to{opacity:1;filter:blur(0);transform:translate(-50%,-6%) rotate(-5deg)}}
+@keyframes wonder-energy{from{opacity:0;filter:brightness(2);transform:translate(-50%,-6%) scale(.25)}65%{opacity:1;filter:brightness(1.3);transform:translate(-50%,-6%) scale(1.04)}to{filter:brightness(1);transform:translate(-50%,-6%) rotate(-5deg)}}
+body.wonder-paused .wonder-scene *{animation-play-state:paused!important}
+body[data-motion=reduced] .wonder-scene *{animation:none!important;transition:none!important}body[data-motion=reduced] [data-sky-state=opening] .wonder-chest-closed{opacity:0}body[data-motion=reduced] [data-sky-state=opening] .wonder-chest-open{opacity:1}
+@media(max-width:760px){.wonder-dust>i:nth-child(n+13){display:none}.scene-coordinate,.scene-serial{font-size:6px;letter-spacing:1.3px}.scene-coordinate{left:14px}.scene-serial{right:14px}.wonder-object{width:89%;top:39%}.wonder-halo{width:145px;left:calc(50% - 72px)}}
+@media(prefers-reduced-motion:reduce){.wonder-scene *{animation:none!important;transition:none!important}[data-sky-state=opening] .wonder-chest-closed{opacity:0}[data-sky-state=opening] .wonder-chest-open{opacity:1}}
+
+/* A single reveal: anticipation, release at 1280 ms, then a quiet afterglow. */
+.wonder-rays{position:absolute;z-index:3;inset:-40% -15%;pointer-events:none;opacity:0;background:repeating-conic-gradient(from -8deg at 50% 67%,transparent 0deg 16deg,#ffe0a838 18deg 20deg,transparent 24deg 42deg);mask-image:radial-gradient(ellipse at 50% 67%,#000 5%,transparent 64%);filter:blur(3px);transform-origin:50% 67%}
+.wonder-seam{position:absolute;inset:45% 18% auto;height:3px;background:#fff1c5;border-radius:50%;box-shadow:0 0 10px 3px #ffdb86,0 0 36px 9px #caa3f1;opacity:0}
+.wonder-flare{position:absolute;z-index:8;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at 50% 58%,#fff4d7bd, #ffd99b38 25%,transparent 65%);mix-blend-mode:screen}
+.wonder-sparks{position:absolute;z-index:7;inset:0;pointer-events:none;overflow:hidden}.wonder-sparks i{position:absolute;left:50%;top:56%;height:3px;width:3px;border-radius:50%;background:var(--spark-color);box-shadow:0 0 8px var(--spark-color);opacity:0}
+.wonder-collectible-body{clip-path:polygon(0 40%,72% 52%,100% 38%,100% 100%,0 100%)}
+.wonder-collectible-lid{clip-path:polygon(0 0,100% 0,100% 38%,72% 52%,0 40%);transform-origin:50% 40%;backface-visibility:visible}
+.wonder-scene[data-sky-state=opening] .wonder-object{animation:vyx-chest-anticipation 3.4s both;will-change:transform}
+.wonder-scene[data-sky-state=opening] .wonder-chest-closed{animation:vyx-chest-unseal 3.4s both}
+.wonder-scene[data-sky-state=opening] .wonder-chest-open{animation:vyx-chest-lift 3.4s both}
+.wonder-scene[data-sky-state=opening] .wonder-collectible-lid{animation:vyx-collectible-lift 3.4s both}
+.wonder-scene[data-sky-state=opening] .wonder-seam{animation:vyx-seam 3.4s both}
+.wonder-scene[data-sky-state=opening] .wonder-rays{animation:vyx-rays 3.4s both}
+.wonder-scene[data-sky-state=opening] .wonder-release{animation:vyx-release 3.4s both}
+.wonder-scene[data-sky-state=opening] .wonder-flare{animation:vyx-flare 3.4s both}
+.wonder-scene[data-sky-state=opening] .wonder-wave{animation:wonder-arrival-wave 1.5s 1.28s both}
+.wonder-scene[data-sky-state=opening] .wonder-shaft{animation:vyx-shaft 3.4s both}
+.wonder-scene[data-sky-state=opening] .wonder-object-glow{animation:vyx-aura 3.4s both}
+.wonder-scene[data-sky-state=opening] .wonder-sparks i{animation:vyx-spark var(--flight) var(--spark-delay) cubic-bezier(.12,.68,.25,1) both}
+.drop-arrival .wonder-scene.wonder-scene{height:350px}
+.drop-arrival .wonder-scene .wonder-object{width:76%;max-width:510px;top:9%}
+.is-wonder .wonder-sound{min-height:36px;padding:7px 10px;border:1px solid #d6b99938;border-radius:24px;font-size:10px;letter-spacing:.1px;background:#261c3380}
+.settings-panel .wonder-sound{min-height:44px;font-size:12px;padding:10px 15px;border:1px solid var(--line);border-radius:8px;color:var(--text)}
+.settings-panel .wonder-sound svg{height:18px;width:18px}
+@keyframes vyx-chest-anticipation{0%,8%{transform:translate(-50%,-6%) rotate(-5deg)}12%{transform:translate(-50%,-6%) rotate(-6deg)}17%{transform:translate(-50%,-6%) rotate(-4deg)}23%{transform:translate(-50%,-6%) scale(1.025) rotate(-5.8deg)}29%{transform:translate(-50%,-6%) scale(1.025) rotate(-4.2deg)}35%{transform:translate(-50%,-6%) scale(.98) rotate(-5deg)}44%{transform:translate(-50%,-13%) scale(1.07) rotate(-4deg)}62%{transform:translate(-50%,-7%) scale(1.02) rotate(-5deg)}100%{transform:translate(-50%,-9%) scale(1.035) rotate(-5deg)}}
+@keyframes vyx-chest-unseal{0%,36%{opacity:1}44%,100%{opacity:0}}
+@keyframes vyx-chest-lift{0%,36%{opacity:0;transform:translateY(5%) rotateX(-16deg) scale(.94)}48%{opacity:1;transform:translateY(-5%) rotateX(4deg) scale(1.025)}68%,100%{opacity:1;transform:translateY(-3%) rotateX(0) scale(1.01)}}
+@keyframes vyx-collectible-lift{0%,36%{transform:rotateX(0) translateY(0)}55%,100%{transform:translateY(-12%) rotateX(-58deg)}}
+@keyframes vyx-seam{0%,10%{opacity:0;transform:scaleX(.2)}34%{opacity:.9;transform:scaleX(1)}40%{opacity:1;transform:scaleX(1.12)}55%,100%{opacity:0;transform:scaleX(1.3)}}
+@keyframes vyx-rays{0%,30%{opacity:0;transform:scale(.5) rotate(-12deg)}43%{opacity:.85;transform:scale(1.08) rotate(0deg)}100%{opacity:.25;transform:scale(1.17) rotate(13deg)}}
+@keyframes vyx-release{0%,30%{opacity:0;transform:scale(.3)}44%{opacity:.95;transform:scale(1.4)}100%{opacity:.24;transform:scale(1.7)}}
+@keyframes vyx-flare{0%,35%{opacity:0}40%{opacity:.85}54%,100%{opacity:0}}
+@keyframes vyx-shaft{0%{opacity:.65}34%{opacity:.9;transform:scaleX(.65)}44%{opacity:1;transform:scaleX(1.65)}100%{opacity:.75;transform:scaleX(1.15)}}
+@keyframes vyx-aura{0%{opacity:.5;transform:scale(1)}38%{opacity:1;transform:scale(.9)}48%{background:#ffd39088;transform:scale(1.4)}100%{background:#dab1ee55;transform:scale(1.25)}}
+@keyframes vyx-spark{0%{opacity:0;transform:translate3d(0,0,0) scale(.4)}12%{opacity:1}65%{opacity:.75}100%{opacity:0;transform:translate3d(var(--dx),var(--dy),0) scale(.1)}}
+@media(max-width:760px){.drop-arrival .wonder-scene.wonder-scene{height:300px}.drop-arrival .wonder-scene .wonder-object{width:104%;max-width:none;top:16%}.wonder-sparks i:nth-child(n+19){display:none}.is-wonder .wonder-sound{min-height:40px;padding:7px 9px;font-size:9px}.wonder-rays{filter:none}}
+@media(max-height:750px) and (min-width:761px){.drop-arrival .wonder-scene.wonder-scene{height:270px}.drop-arrival .wonder-scene .wonder-object{width:58%;max-width:400px;top:6%}}
+@media(prefers-reduced-motion:reduce){.wonder-scene[data-sky-state=opening] *{animation:none!important;transition:none!important;will-change:auto!important}.wonder-scene[data-sky-state=opening] .wonder-chest-open{opacity:1;transform:translateY(-3%)}.wonder-scene[data-sky-state=opening] .wonder-chest-closed{opacity:0}.wonder-scene[data-sky-state=opening] .wonder-collectible-lid{transform:translateY(-12%) rotateX(-58deg)}}
+body[data-motion=reduced] .wonder-scene[data-sky-state=opening] *{animation:none!important;transition:none!important;will-change:auto!important}body[data-motion=reduced] .wonder-scene[data-sky-state=opening] .wonder-chest-closed{opacity:0}body[data-motion=reduced] .wonder-scene[data-sky-state=opening] .wonder-chest-open{opacity:1}body[data-motion=reduced] .wonder-collectible-lid{transform:translateY(-12%) rotateX(-58deg)}

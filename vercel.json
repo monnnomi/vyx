@@ -1,0 +1,161 @@
+{
+  "version": 2,
+  "framework": null,
+  "outputDirectory": "public",
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/admin",
+      "destination": "/admin.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://www.googletagmanager.com https://mc.yandex.ru; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob: https://pbs.twimg.com https://www.google-analytics.com https://*.google-analytics.com https://mc.yandex.ru data:; connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://mc.yandex.ru; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+        }
+      ]
+    },
+    {
+      "source": "/(media.js|media.css|media-upload-sdk.js|analytics-config.js|analytics.js|analytics.css|app.js|social-shell.js|social-shell.css|app.webmanifest|wonder.js|wonder.css|club.js|club.css|product.js|product.css|drop-scene.js|drop-scene.css|drop-lab.html|drop-lab.js|fonts.css|community.js|rooms.js|rooms.css|room-messenger.js|room-messenger.css|farming.js|farming.css|halloween.js|styles.css|halloween.css|presence.js|admin.js|admin.css|admin|admin.html|index.html)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public,max-age=0,must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/app.webmanifest",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        }
+      ]
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/farm-cron/00",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/farm-cron/04",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/farm-cron/08",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/farm-cron/12",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/farm-cron/16",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/farm-cron/20",
+      "schedule": "0 20 * * *"
+    }
+  ],
+  "buildCommand": "node scripts/build-analytics.mjs && node scripts/build-media.mjs && node scripts/build-drop-audio.mjs",
+  "redirects": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "vyx-social.vercel.app"
+        }
+      ],
+      "destination": "https://joinvyx.com/",
+      "permanent": true
+    },
+    {
+      "source": "/index.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "vyx-social.vercel.app"
+        }
+      ],
+      "destination": "https://joinvyx.com/",
+      "permanent": true
+    },
+    {
+      "source": "/admin",
+      "has": [
+        {
+          "type": "host",
+          "value": "vyx-social.vercel.app"
+        }
+      ],
+      "destination": "https://joinvyx.com/admin",
+      "permanent": true
+    },
+    {
+      "source": "/admin.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "vyx-social.vercel.app"
+        }
+      ],
+      "destination": "https://joinvyx.com/admin",
+      "permanent": true
+    },
+    {
+      "source": "/privacy.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "vyx-social.vercel.app"
+        }
+      ],
+      "destination": "https://joinvyx.com/privacy.html",
+      "permanent": true
+    },
+    {
+      "source": "/api/auth/x",
+      "has": [
+        {
+          "type": "host",
+          "value": "vyx-social.vercel.app"
+        }
+      ],
+      "destination": "https://joinvyx.com/api/auth/x",
+      "permanent": true
+    }
+  ]
+}

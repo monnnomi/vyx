@@ -1,0 +1,49 @@
+/* A conversation should feel easy to return to. */
+.room-row-preview{display:block;font-size:12px;color:var(--muted);line-height:1.65;margin-top:5px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.room-row-preview b{font-weight:500;color:var(--text)}
+.room-row.has-unread .room-row-name{color:var(--accent);font-weight:600}
+.room-row.has-unread .room-row-preview{color:var(--text)}
+.room-row-tail{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;flex:0 0 auto;gap:10px;min-width:35px}
+.room-row-tail time{color:var(--muted);font-size:10px;white-space:nowrap}
+.room-row-indicators{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-height:23px}
+.room-unread-badge,.room-mention-badge{display:inline-flex;align-items:center;justify-content:center;min-width:23px;height:23px;padding:0 6px;border-radius:20px;background:var(--accent);color:var(--bg);font-size:10px;font-weight:600;line-height:1}
+.room-mention-badge{background:var(--blue-soft);color:var(--accent);font-size:12px}
+.room-row-compact .room-row-preview{font-size:11px;margin-top:4px}.room-row-compact .room-row-tail time{font-size:9px}
+.room-message-content{min-width:0;flex:1}
+.room-message-actions{display:flex;gap:13px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.room-message-actions button,.room-message-actions .room-remove{position:static;background:none;padding:2px 0;color:var(--muted);font-size:10px;line-height:1.6;min-height:26px;width:auto;opacity:1;visibility:visible}
+.room-message-actions button:hover{color:var(--accent)}
+.room-message-actions .room-remove{margin-left:auto;font-size:9px;opacity:.7}
+.room-message.mentions-you{background:var(--gold-soft);border-radius:8px;border-left:2px solid var(--accent)}
+.room-mention{color:var(--accent);font-weight:600;background:var(--blue-soft);padding:1px 3px;border-radius:3px;overflow-wrap:anywhere}
+.room-quote{display:flex;flex-direction:column;gap:4px;max-width:100%;width:100%;text-align:left;border-left:2px solid var(--accent);border-radius:0 6px 6px 0;background:var(--soft);color:var(--muted);padding:9px 11px;margin:9px 0;font-size:11px;line-height:1.5}
+.room-quote strong{font-size:10px;font-weight:500;color:var(--accent)}
+.room-quote span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+.room-quote:disabled{opacity:.6;cursor:default}
+.room-pinned-note{display:flex;align-items:center;gap:12px;padding:12px 24px;background:var(--soft);border-bottom:1px solid var(--line)}
+.room-pinned-note>button:first-child{background:none;color:var(--muted);display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;min-width:0;flex:1;padding:0}
+.room-pinned-note>button:first-child>span:last-child{max-width:100%;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font-size:11px}
+.room-pin-label{font-size:8px;letter-spacing:1px;color:var(--accent);line-height:1.5}.room-pin-label b{margin-left:10px;font-size:10px;letter-spacing:0;font-weight:500;color:var(--text)}
+.room-unpin{background:none;color:var(--muted);padding:7px;font-size:20px}
+.room-compose-area{position:relative}
+.room-reply-draft{display:flex;align-items:center;gap:12px;border-left:2px solid var(--accent);background:var(--soft);border-radius:0 6px 6px 0;padding:9px 12px;margin-bottom:10px}
+.room-reply-draft>span{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.room-reply-draft strong{font-size:10px;font-weight:500;color:var(--accent)}.room-reply-draft>span>span{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5}
+.room-reply-draft button{padding:4px;background:none;color:var(--muted);font-size:20px}
+.room-mention-menu{position:absolute;bottom:calc(100% - 10px);left:24px;right:24px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:5px;box-shadow:0 12px 40px #0003;z-index:5;max-height:240px;overflow:auto}
+.room-mention-menu[hidden]{display:none}.room-mention-menu button{width:100%;text-align:left;background:none;color:var(--text);border-radius:5px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.room-mention-menu button[aria-selected=true],.room-mention-menu button:hover{background:var(--blue-soft)}
+.room-mention-menu span{font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.room-mention-menu small{font-size:10px;color:var(--muted)}
+.room-unread-divider{display:flex;align-items:center;gap:12px;color:var(--accent);font-size:9px;letter-spacing:.6px;margin:15px 0}
+.room-unread-divider:before,.room-unread-divider:after{content:'';height:1px;background:var(--line);flex:1}
+.room-message-highlight{outline:1px solid var(--accent);border-radius:8px;background:var(--soft)}
+.room-message-detail{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.9;margin:20px 0 25px}
+@media(max-width:760px){
+ .room-row-preview{font-size:11px;line-height:1.6}.room-row-tail{min-width:26px;gap:9px}.room-row-tail time{font-size:8px}
+ .room-row-compact .room-row-preview{font-size:10px}.room-row-compact .room-row-tail time{font-size:8px}
+ .room-unread-badge,.room-mention-badge{min-width:20px;height:20px;font-size:9px;padding:0 5px}.room-mention-badge{font-size:11px}
+ .room-pinned-note{padding:11px 16px;gap:8px}.room-pin-label{font-size:7px}.room-pin-label b{font-size:9px}.room-pinned-note>button:first-child>span:last-child{font-size:10px}
+ .room-message-actions{gap:12px;margin-top:6px}.room-message-actions button{font-size:10px;min-height:28px}
+ .room-message-actions .room-remove{font-size:8px}.room-quote{font-size:10px;padding:8px 10px}.room-quote strong{font-size:9px}
+ .room-reply-draft{padding:9px 10px}.room-reply-draft>span>span{font-size:10px}.room-mention-menu{left:12px;right:12px}
+}

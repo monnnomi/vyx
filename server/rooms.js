@@ -1,3 +1,4 @@
+import {reactionProjection} from './message-reactions.js';
 import {hiddenBy} from './social.js';
 import {fail,text,uuid} from './http.js';
 import {mediaProjection,mediaIds,attachMedia,checkMediaRetry} from './media.js';
@@ -22,7 +23,7 @@ const roomColumns=`r.id,r.name,r.description,r.language,r.topic,r.featured,r.cre
   FROM room_messages m JOIN users sender ON sender.id=m.sender_id
   WHERE own.user_id IS NOT NULL AND m.room_id=r.id AND m.deleted_at IS NULL AND NOT ${hiddenBy('$1','m.sender_id')} ORDER BY m.seq DESC LIMIT 1) AS last_message`;
 const roomJoins=`JOIN users u ON u.id=r.owner_id LEFT JOIN room_members own ON own.room_id=r.id AND own.user_id=$1`;
-const messageColumns=`m.id,m.seq::text,m.body,m.created_at,m.sender_id,u.name,u.handle,u.avatar_url,parent.sender_id AS reply_sender_id,${mediaProjection('m','room_message_id')},
+const messageColumns=`${reactionProjection('room_message_id','$3')},m.id,m.seq::text,m.body,m.created_at,m.sender_id,u.name,u.handle,u.avatar_url,parent.sender_id AS reply_sender_id,${mediaProjection('m','room_message_id')},
  CASE WHEN m.reply_to IS NOT NULL THEN jsonb_build_object('id',m.reply_to,'removed',parent.id IS NULL,
   'name',pu.name,'body',CASE WHEN parent.body='' THEN 'Attachment' ELSE left(parent.body,180) END) ELSE NULL END AS reply,
  COALESCE((SELECT jsonb_agg(jsonb_build_object('id',mu.id,'name',mu.name,'handle',mu.handle))

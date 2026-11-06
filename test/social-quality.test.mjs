@@ -83,3 +83,21 @@ test('product metrics require consent and drop unapproved text or identifiers',a
  await recordProductEvent(db,{event:'search',consent:true,section:'explore',outcome:'empty',query:'SECRET',userId:alice.id});
  const rows=await db.q('SELECT * FROM product_events');assert.equal(rows.length,1);assert.ok(!JSON.stringify(rows).includes('SECRET'));assert.ok(!JSON.stringify(rows).includes(alice.id));
 });
+
+test('message reactions are idempotent, replaceable and limited to participants',async()=>{
+ await mutate(db,alice,'message-react',{kind:'room',id:msg.id,emoji:'❤️',enabled:true});
+ await mutate(db,alice,'message-react',{kind:'room',id:msg.id,emoji:'❤️',enabled:true});
+ let r=(await roomThread(db,alice,room.id)).messages.find(m=>m.id===msg.id).reactions;
+ assert.deepEqual(r,[{emoji:'❤️',count:1,mine:true}]);
+ await assert.rejects(mutate(db,outsider,'message-react',{kind:'room',id:msg.id,emoji:'🔥',enabled:true}),e=>e.status===404);
+ await mutate(db,alice,'message-react',{kind:'room',id:msg.id,emoji:'🔥',enabled:true});
+ await mutate(db,bob,'message-react',{kind:'room',id:msg.id,emoji:'🔥',enabled:true});
+ r=(await roomThread(db,alice,room.id)).messages.find(m=>m.id===msg.id).reactions;assert.equal(r[0].count,2);
+ await mutate(db,alice,'message-react',{kind:'room',id:msg.id,emoji:'🔥',enabled:false});
+ const [dm]=await db.q('INSERT INTO messages(sender_id,recipient_id,body,request_id) VALUES($1,$2,$3,gen_random_uuid()) RETURNING id',[alice.id,bob.id,'Reaction test']);
+ await mutate(db,bob,'message-react',{kind:'dm',id:dm.id,emoji:'👍',enabled:true});
+ assert.equal((await messages(db,alice,bob.id)).find(m=>m.id===dm.id).reactions[0].mine,false);
+ await assert.rejects(mutate(db,outsider,'message-react',{kind:'dm',id:dm.id,emoji:'👍',enabled:true}),e=>e.status===404);
+ await mutate(db,alice,'member-control',{id:bob.id,control:'blocked',enabled:true});
+ await assert.rejects(mutate(db,bob,'message-react',{kind:'dm',id:dm.id,emoji:'👍',enabled:true}),e=>e.status===403);
+});

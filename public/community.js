@@ -57,7 +57,7 @@ function renderLeaderboard(){return socialLeaderboard();}
 function guestPage(title){return `<div class="page-intro"><div class="eyebrow">MAKE YOURSELF AT HOME</div><h1>${title}</h1></div><div class="info-panel"><h3>Your people are waiting.</h3><p>Sign in with X to join VYX and make this space yours.</p><button class="primary" data-action="signin">Continue with X ↗</button></div>`;}
 function renderProfile(){return socialProfile();}
 
-function bubbles(){return chatMessages.map(m=>`<div class="bubble ${m.sender_id===data.user?.id?'mine':''}" data-dm-message="${m.id}">${m.media?.length?mediaHTML(m.media):''}<p>${e(m.body)}</p><small>${date(m.created_at)}</small>${m.sender_id!==data.user?.id?`<button class="text-link" data-report-kind="message" data-report-id="${m.id}">Report</button>`:''}</div>`).join('')||'<div class="chat-date">The start of your story</div>';}
+function bubbles(){return chatMessages.map(m=>`<div class="bubble ${m.sender_id===data.user?.id?'mine':''}" data-dm-message="${m.id}">${m.media?.length?mediaHTML(m.media):''}<p>${e(m.body)}</p><small>${date(m.created_at)}</small>${messageReactionsHTML(m,'dm')}${m.sender_id!==data.user?.id?`<button class="text-link" data-report-kind="message" data-report-id="${m.id}">Report</button>`:''}</div>`).join('')||'<div class="chat-date">The start of your story</div>';}
 function renderMessages(){return socialDirect();}
 
 function renderRail(){$('#right-rail').innerHTML=socialRail();}

@@ -77,6 +77,7 @@ async function loadPage(){
   if(page==='profile'&&data.user){profileStatus='loading';try{profilePosts=(await api('feed',undefined,{author:data.user.id})).posts;profileStatus='ready';}catch(err){profileStatus='error';throw err;}}
   if(page==='messages'&&data.user){chats=(await api('conversations')).conversations;if(!activeChat&&chats.length)activeChat=chats[0].id;if(activeChat)chatMessages=(await api('messages',undefined,{id:activeChat})).messages;}
   if(['profile','leaderboard'].includes(page))await loadReferrals();
+  if(page==='profile'&&data.user)await loadNftSelection();
   if(page==='settings'&&data.user){await loadMemberPreferences();}
   if(page==='explore')await searchExplore();
   if(page==='rooms'){await loadRooms();return;}

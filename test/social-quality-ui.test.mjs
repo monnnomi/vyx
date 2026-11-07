@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
-const names=['app','halloween','farming','rooms','room-messenger','drop-scene','product','wonder','club','social-shell','social-quality','message-reactions','referrals','community'];
+const names=['app','halloween','farming','rooms','room-messenger','drop-scene','product','wonder','club','social-shell','social-quality','message-reactions','referrals','nft-selection','community'];
 const sources=await Promise.all(names.map(n=>readFile(new URL('../public/'+n+'.js',import.meta.url),'utf8')));
 function setup(){
  const node={classList:{add(){},remove(){},toggle(){}},dataset:{},style:{},value:'',hidden:true,setAttribute(){},addEventListener(){},querySelectorAll(){return []},querySelector(){return node},insertAdjacentHTML(){},remove(){},focus(){}};
@@ -40,4 +40,21 @@ test('confirmed balance and current round precede the decorative chest; own post
 test('apostrophes are not interpreted as hashtags and links remain safe',()=>{
  const c=setup();const html=c.socialText("It&#39;s a #VYX story with https://example.com/?a=1&b=2 and <img src=x onerror=alert(1)>");
  assert.match(html,/It&#39;s/);assert.doesNotMatch(html,/>#39</);assert.match(html,/<span class="hashtag">#VYX<\/span>/);assert.doesNotMatch(html,/<img/);assert.match(html,/rel="noopener noreferrer"/);
+});
+
+test('NFT status explains missing requirements and appears only on the owner profile',()=>{
+ const c=setup();
+ assert.match(c.nftEligibilityHTML(),/Checking your confirmed VP/);
+ vm.runInContext(`nftSelectionOwner='alice';nftSelectionState='ready';nftSelectionData={tier:'full-price',confirmedVP:49000,invitedReferrals:1,vpRemaining:1000,referralsRemaining:2,rules:{vp:50000,referrals:3}}`,c);
+ assert.match(c.socialProfile(),/Your NFT eligibility/);assert.match(c.nftEligibilityHTML(),/Earn 1,000 more confirmed VP/);assert.match(c.nftEligibilityHTML(),/2 more invitations/);
+ const other=c.memberProfileHTML({person:{id:'bob',name:'Bob',handle:'bob',bio:'',followers:0,post_count:0},posts:[],rooms:[],controls:{}});assert.doesNotMatch(other,/Your NFT eligibility|Full price|50% off|Free NFT/);
+ vm.runInContext(`nftSelectionData.tier='half-price';nftSelectionData.vpRemaining=0`,c);assert.match(c.nftEligibilityHTML(),/You qualify for 50% off/);
+ vm.runInContext(`nftSelectionData.tier='free';nftSelectionData.referralsRemaining=0`,c);assert.match(c.nftEligibilityHTML(),/meet both requirements/);
+ vm.runInContext(`data.user={id:'bob'}`,c);assert.match(c.nftEligibilityHTML(),/Checking your confirmed VP/);assert.doesNotMatch(c.nftEligibilityHTML(),/meet both requirements/);
+});
+
+test('late private eligibility responses are discarded after an account change',async()=>{
+ const c=setup();let finish;c.api=()=>new Promise(resolve=>finish=resolve);
+ const pending=c.loadNftSelection();vm.runInContext(`data.user={id:'bob'}`,c);finish({tier:'free'});await pending;
+ assert.equal(vm.runInContext('nftSelectionData',c),null);assert.doesNotMatch(c.nftEligibilityHTML(),/meet both requirements/);
 });

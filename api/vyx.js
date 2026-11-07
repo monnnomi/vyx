@@ -1,3 +1,4 @@
+import {ownNftSelection} from '../server/nft-selection.js';
 import {referralBoard} from '../server/referrals.js';
 import {searchCommunity,memberProfile,postDetail,handleAvailability,memberPreferences,recordProductEvent} from '../server/social.js';
 import {withDB} from '../server/db.js';
@@ -24,6 +25,7 @@ export function createHandler(useDB=withDB){return async function handler(req,re
     if(action==='rooms')return json(res,200,await listRooms(db,user,{filter:url.searchParams.get('filter')||'all',search:url.searchParams.get('search')||'',page:url.searchParams.get('page')||0}));
     if(action==='room-info')return json(res,200,await roomSummary(db,user,url.searchParams.get('id')));
     if(!user)fail(401,'Sign in with X to continue.');
+    if(action==='nft-selection')return json(res,200,await ownNftSelection(db,user));
     if(action==='preferences')return json(res,200,await memberPreferences(db,user));
     if(action==='drops')return json(res,200,await dropResults(db,user,{before:url.searchParams.get('before')}));
     if(action==='drop-result')return json(res,200,await dropResult(db,user,url.searchParams.get('id')));

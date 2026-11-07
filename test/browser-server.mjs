@@ -44,6 +44,16 @@ if(process.env.VYX_QA_PROFILE==='1'){
  await db.q("UPDATE users SET name='QA Alice',bio='A place for ideas, conversations and good company.',avatar_url='/assets/app-icon-192.png' WHERE id=$1",[a.user.id]);
  await db.q("INSERT INTO event_mints(campaign_id,user_id,x_id,minted_at) VALUES('halloween-2026',$1,'1001','2026-10-31T12:00:00Z') ON CONFLICT DO NOTHING",[a.user.id]);
 }
+let nftQaMember=null;
+if(process.env.VYX_QA_NFT_SELECTION==='1'){
+ nftQaMember=await db.tx(tx=>login(tx,{id:'1003',name:'QA Carol',username:'qa_carol',avatar:''}));
+ const room=await mutate(db,a.user,'room-create',{name:'NFT selection QA',description:'Isolated eligibility fixtures.',requestId:randomUUID()});
+ for(const [user,amount] of [[a.user,50000],[b.user,50000],[nftQaMember.user,49999]])await db.q("INSERT INTO farm_awards(user_id,room_id,window_start,season,amount,activity,units) VALUES($1,$2,'2026-11-01T00:00Z','season-1',$3,1,1)",[user.id,room.id,amount]);
+ for(let i=0;i<3;i++){
+  const member=await db.tx(tx=>login(tx,{id:String(1100+i),name:'QA Invite '+i,username:'qa_invite_'+i,avatar:''}));
+  await db.q('INSERT INTO referrals(invitee_id,inviter_id) VALUES($1,$2)',[member.user.id,a.user.id]);
+ }
+}
 const qaMediaFiles=new Map();
 if(process.env.VYX_QA_MEDIA==='1')process.env.BLOB_READ_WRITE_TOKEN='qa-private-media';
 const qaMediaStorage={
@@ -60,6 +70,7 @@ const api=createHandler(fn=>fn(db)),admin=createAdminHandler(fn=>fn(db)),presenc
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.webp':'image/webp','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'};
 http.createServer(async(req,res)=>{
  const path=new URL(req.url,process.env.PUBLIC_APP_URL).pathname;
+ if(path==='/test-login-carol'&&nftQaMember){res.setHeader('Set-Cookie',`vyx_session=${nftQaMember.sessionToken}; HttpOnly; SameSite=Lax; Path=/`);res.writeHead(302,{Location:'/#profile'});res.end();return;}
  if(path==='/test-login'||path==='/test-login-bob'){
   res.setHeader('Set-Cookie',`vyx_session=${path==='/test-login-bob'?b.sessionToken:a.sessionToken}; HttpOnly; SameSite=Lax; Path=/`);res.writeHead(302,{Location:'/'});res.end();return;
  }

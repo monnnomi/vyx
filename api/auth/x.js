@@ -1,5 +1,5 @@
 import {withDB} from '../../server/db.js';
-import {fail,handleError,ipKey,limit,redirect,setCookie,token} from '../../server/http.js';
+import {fail,handleError,ipKey,limit,redirect,setCookie,token,session} from '../../server/http.js';
 import {startOAuth} from '../../server/oauth.js';
 export default async function handler(req,res){
  try{
@@ -8,7 +8,8 @@ export default async function handler(req,res){
   await withDB(async db=>{
    await limit(db,'oauth:'+ipKey(req),12,600);
    const binding=token(),returnTo=new URL(req.url,'https://vyx.local').searchParams.get('returnTo');
-   const url=await startOAuth(db,binding,new Date(),returnTo,new URL(req.url,'https://vyx.local').searchParams.get('ref'));
+   const actor=returnTo==='/tasks'?await session(db,req):null;
+   const url=await startOAuth(db,binding,new Date(),returnTo,new URL(req.url,'https://vyx.local').searchParams.get('ref'),actor?.x_id||null);
    setCookie(res,'vyx_oauth',binding,600);redirect(res,url);
   });
  }catch(e){handleError(res,e);}

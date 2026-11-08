@@ -33,7 +33,7 @@ async function claimHalloweenChest(){
  mintReceiptModal();
 }
 function openHalloweenChest(){mintReceiptModal();}
-function rewardName(record){return record.source==='room-drop'?'Room drop · '+escapeHTML(record.room_name||'Your circle'):tiers[record.tier]?.name||'Reward';}
+function rewardName(record){return record.source==='x-task'?'X task reward':record.source==='room-drop'?'Room drop · '+escapeHTML(record.room_name||'Your circle'):tiers[record.tier]?.name||'Reward';}
 function chestCount(){return inventory().reduce((a,b)=>a+b,0);}
 let previousHalloweenStage=null;
 setInterval(()=>{

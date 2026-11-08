@@ -1,0 +1,11 @@
+/* VYX conversation emblem, generated identity v1. */
+body[data-interface=social] .brand{display:flex;align-items:center;justify-content:center;gap:0}
+.brand .brand-emblem,.admin-brand .brand-emblem{display:block;width:42px;height:42px;flex:0 0 42px;object-fit:contain;border-radius:10px}
+.admin-brand .brand-emblem{margin-right:10px}
+@media(max-width:640px){.brand .brand-emblem{width:34px;height:34px;flex-basis:34px;border-radius:8px}}
+
+body[data-interface=social] .brand>span{display:none}
+@media(max-width:760px){
+ .chat-directory-heading>h1,.feed-heading>h1{display:flex;align-items:center;gap:10px}
+ .chat-directory-heading>h1::before,.feed-heading>h1::before{content:"";display:block;width:32px;height:32px;flex:0 0 32px;background:url('/assets/vyx-mark-v1.png') center/contain no-repeat;border-radius:8px}
+}

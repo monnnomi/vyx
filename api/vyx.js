@@ -1,3 +1,4 @@
+import {taskState,verifyTasks} from '../server/x-tasks.js';
 import {ownNftSelection} from '../server/nft-selection.js';
 import {referralBoard} from '../server/referrals.js';
 import {searchCommunity,memberProfile,postDetail,handleAvailability,memberPreferences,recordProductEvent} from '../server/social.js';
@@ -6,7 +7,7 @@ import {body,sameOrigin,session,fail,handleError,json,limit,ipKey,setCookie,cook
 import {state,feed,comments,conversations,messages,mutate} from '../server/service.js';
 import {listRooms,roomSummary,roomThread,roomMembers,roomMessage,roomMentionCandidates} from '../server/rooms.js';
 import {dropResults,dropResult,revealDrop,notifications,readNotifications} from '../server/drops.js';
-export function createHandler(useDB=withDB){return async function handler(req,res){
+export function createHandler(useDB=withDB,taskFetcher=fetch){return async function handler(req,res){
  try{
   const url=new URL(req.url,'https://vyx.local'),action=url.searchParams.get('action')||'state';
   if(!['GET','POST'].includes(req.method))fail(405,'Method not allowed.');
@@ -14,6 +15,7 @@ export function createHandler(useDB=withDB){return async function handler(req,re
   await useDB(async db=>{
    const user=await session(db,req);
    if(req.method==='GET'){
+    if(action==='tasks')return json(res,200,await taskState(db,user));
     if(action==='referrals')return json(res,200,await referralBoard(db,user));
     if(action==='search')return json(res,200,await searchCommunity(db,user,url.searchParams.get('q')||''));
     if(action==='member-profile')return json(res,200,await memberProfile(db,user,url.searchParams.get('id')));
@@ -46,6 +48,8 @@ export function createHandler(useDB=withDB){return async function handler(req,re
     await db.q('DELETE FROM sessions WHERE token_hash=$1',[hash(cookie(req,'vyx_session'))]);setCookie(res,'vyx_session','',0);return json(res,200,{ok:true});
    }
    const data=await body(req);
+   if(action==='verify-tasks'){await limit(db,'x-task-checks:'+user.id,20,86400);return json(res,200,await verifyTasks(db,user,data,taskFetcher));}
+   if(action==='disconnect-task-x'){await db.q('DELETE FROM x_task_access WHERE user_id=$1',[user.id]);return json(res,200,{ok:true});}
    if(action==='drop-reveal')return json(res,200,await revealDrop(db,user,data.id));
    if(action==='notifications-read')return json(res,200,await readNotifications(db,user));
    json(res,200,await mutate(db,user,action,data));

@@ -13,6 +13,8 @@ import {createMediaHandler} from '../api/media.js';
 import {session} from '../server/http.js';
 import {createFarmHandler} from '../api/farm.js';
 import {login} from '../server/oauth.js';
+import {saveTaskAccess,taskScopes} from '../server/x-task-access.js';
+import {campaignPost} from '../server/x-tasks.js';
 const pg=new PGlite();
 await pg.exec(await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'));
 if(process.env.VYX_QA_RULES_V2==='1'){await pg.exec("UPDATE farm_rule_versions SET starts_at='2026-11-01T00:00:00Z' WHERE version=1; UPDATE farm_rule_versions SET starts_at='2026-11-01T00:00:01Z' WHERE version=2; UPDATE farm_windows SET rule_version=2");}
@@ -66,7 +68,19 @@ const qaMediaStorage={
 };
 const qaMedia=createMediaHandler(fn=>fn(db),qaMediaStorage);
 const qaPort=Number(process.env.VYX_QA_PORT||4174);process.env.PUBLIC_APP_URL='http://127.0.0.1:'+qaPort;process.env.VYX_ADMIN_X_IDS='1001';process.env.VYX_APP_SECRET=randomBytes(32).toString('base64url');
-const api=createHandler(fn=>fn(db)),admin=createAdminHandler(fn=>fn(db)),presence=createPresenceHandler(fn=>fn(db)),farm=createFarmHandler(fn=>fn(db)),root=resolve('public');
+let qaTaskFetcher=fetch;
+if(process.env.VYX_QA_X_TASKS==='1'){
+ await saveTaskAccess(db,a.user,{access_token:'isolated-qa-token',scope:taskScopes.join(' '),expires_in:7200});
+ qaTaskFetcher=async url=>{
+  let data;
+  if(url.includes('/by/username/'))data={data:{id:'7000',connection_status:['following']}};
+  else if(url.includes('/liked_tweets'))data={data:[{id:campaignPost}],meta:{}};
+  else if(url.includes('/tweets?'))data={data:['retweeted','replied_to','quoted'].map((type,i)=>({id:String(BigInt(campaignPost)+BigInt(i+1)),author_id:a.user.x_id,referenced_tweets:[{type,id:campaignPost}]})),meta:{}};
+  else throw new Error('Unexpected QA X request');
+  return {ok:true,status:200,json:async()=>data};
+ };
+}
+const api=createHandler(fn=>fn(db),qaTaskFetcher),admin=createAdminHandler(fn=>fn(db)),presence=createPresenceHandler(fn=>fn(db)),farm=createFarmHandler(fn=>fn(db)),root=resolve('public');
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.webp':'image/webp','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'};
 http.createServer(async(req,res)=>{
  const path=new URL(req.url,process.env.PUBLIC_APP_URL).pathname;

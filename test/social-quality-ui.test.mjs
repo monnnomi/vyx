@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
-const names=['app','halloween','farming','rooms','room-messenger','drop-scene','product','wonder','club','social-shell','social-quality','message-reactions','referrals','nft-selection','community'];
+const names=['app','halloween','farming','rooms','room-messenger','drop-scene','product','wonder','club','social-shell','social-quality','message-reactions','referrals','nft-selection','x-tasks','community'];
 const sources=await Promise.all(names.map(n=>readFile(new URL('../public/'+n+'.js',import.meta.url),'utf8')));
 function setup(){
  const node={classList:{add(){},remove(){},toggle(){}},dataset:{},style:{},value:'',hidden:true,setAttribute(){},addEventListener(){},querySelectorAll(){return []},querySelector(){return node},insertAdjacentHTML(){},remove(){},focus(){}};
@@ -57,4 +57,13 @@ test('late private eligibility responses are discarded after an account change',
  const c=setup();let finish;c.api=()=>new Promise(resolve=>finish=resolve);
  const pending=c.loadNftSelection();vm.runInContext(`data.user={id:'bob'}`,c);finish({tier:'free'});await pending;
  assert.equal(vm.runInContext('nftSelectionData',c),null);assert.doesNotMatch(c.nftEligibilityHTML(),/meet both requirements/);
+});
+
+test('X quests show the fixed 8500 VP campaign, verified state and explicit read-only connection',()=>{
+ const c=setup();
+ vm.runInContext(`xTaskOwner='alice';xTaskData={connected:false,earned:0,tasks:[{id:'test-task',title:'Follow VYX',amount:1000,url:'https://x.com/vyxsocial',status:'not-verified',detail:'Complete the action on X.'}]}`,c);
+ const pending=c.renderTasks();assert.match(pending,/8,500 VP/);assert.match(pending,/Connect X for verification/);assert.match(pending,/read your follows, likes and posts/);assert.match(pending,/\/api\/auth\/x\?returnTo=%2Ftasks/);assert.match(pending,/disabled>Check/);
+ vm.runInContext(`xTaskData.connected=true;xTaskData.earned=1000;xTaskData.tasks[0].status='awarded'`,c);
+ const done=c.renderTasks();assert.match(done,/Verified · VP added/);assert.doesNotMatch(done,/data-x-task-open/);
+ vm.runInContext(`data.user={id:'bob'}`,c);assert.doesNotMatch(c.renderTasks(),/Verified · VP added/);
 });

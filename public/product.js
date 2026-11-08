@@ -81,7 +81,7 @@ document.addEventListener('click',async ev=>{
   if(d.dropReveal)await revealResult(d.dropReveal);
   if(d.dropSkip)await revealResult(d.dropSkip,true);
   if(d.dropMore)await loadProduct(d.dropMore);
-  if(d.productAction==='menu')showModal(`<h2 id="modal-title">Your VYX</h2><div class="more-menu">${nav.filter(n=>!['tasks'].includes(n[0])).map(([id,i,label])=>`<button data-action="${id}">${icon(i)} ${label} ${icon('arrowup')}</button>`).join('')}${data.user?.is_admin?'<a href="/admin">Admin dashboard ↗</a>':''}</div>`);
+  if(d.productAction==='menu')showModal(`<h2 id="modal-title">Your VYX</h2><div class="more-menu">${nav.map(([id,i,label])=>`<button data-action="${id}">${icon(i)} ${label} ${icon('arrowup')}</button>`).join('')}${data.user?.is_admin?'<a href="/admin">Admin dashboard ↗</a>':''}</div>`);
   if(d.productAction==='reload'){await loadProduct();render();}
   if(d.productAction==='read'&&requireUser()){await api('notifications-read',{});await loadProduct();}
   if(d.inboxFilter){inboxFilter=d.inboxFilter;render();}

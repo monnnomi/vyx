@@ -101,3 +101,13 @@ test('message reactions are idempotent, replaceable and limited to participants'
  await mutate(db,alice,'member-control',{id:bob.id,control:'blocked',enabled:true});
  await assert.rejects(mutate(db,bob,'message-react',{kind:'dm',id:dm.id,emoji:'👍',enabled:true}),e=>e.status===403);
 });
+
+test('first-step metrics accept only named actions and reject identifiers or unconsented tracking',async()=>{
+ for(const event of ['visit_started','visit_from_x','signed_in_visit','first_room_join','first_room_message','first_vp_contribution','return_next_day','first_reward_seen']){
+  await assert.rejects(recordProductEvent(db,{event,consent:false}),e=>e.status===400);
+  await recordProductEvent(db,{event,consent:true,section:'rooms',userId:alice.id,roomId:room.id,text:'PRIVATE-MESSAGE'});
+ }
+ await assert.rejects(recordProductEvent(db,{event:'PRIVATE-MESSAGE',consent:true}),e=>e.status===400);
+ const rows=await db.q("SELECT event,section,outcome FROM product_events WHERE event='first_room_message'");
+ assert.equal(rows.length,1);assert.equal(rows[0].section,'rooms');assert.ok(!JSON.stringify(rows).includes(alice.id));assert.ok(!JSON.stringify(rows).includes(room.id));assert.ok(!JSON.stringify(rows).includes('PRIVATE-MESSAGE'));
+});

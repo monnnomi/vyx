@@ -11,13 +11,13 @@
   "theme_color": "#fcfbf8",
   "icons": [
     {
-      "src": "/assets/app-icon-192.png",
+      "src": "/assets/vyx-icon-192-v1.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/assets/app-icon-512.png",
+      "src": "/assets/vyx-icon-512-v1.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

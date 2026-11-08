@@ -9,11 +9,28 @@
  let choice='unset';try{choice=localStorage.getItem(key)||'unset';}catch{}
  if(!['granted','denied'].includes(choice))choice='unset';
  const loaded={},active={},last={};
+ const actionNames=new Set(['search','search_result','profile_view','follow','post_started','post_published','comment_sent','room_open','room_join','message_sent','signin_started','signin_returned','onboarding_saved','onboarding_skipped','getting_started','visit_started','visit_from_x','signed_in_visit','first_room_join','first_room_message','first_vp_contribution','return_next_day','first_reward_seen']);
+ const pending={vercel:[],google:[],yandex:[]};
  const ga=/^G-[A-Z0-9]{4,20}$/.test(config.googleMeasurementId||'')?config.googleMeasurementId:null;
  const ym=/^[1-9]\d{4,11}$/.test(String(config.yandexCounterId||''))?Number(config.yandexCounterId):null;
  const route=()=>sections.has(location.hash.slice(1))?location.hash.slice(1):'rooms';
  const pageURL=()=>location.origin+'/#'+route();
  const referer=()=>{try{return document.referrer?new URL(document.referrer).origin+'/':'';}catch{return '';}};
+ function source(){try{const q=(new URL(location.href||location.origin).searchParams.get('utm_source')||'').toLowerCase(),r=document.referrer?new URL(document.referrer).hostname:'';return ['x','twitter','t.co'].includes(q)||['x.com','twitter.com','t.co'].includes(r)?'x':['telegram','tg'].includes(q)||r==='t.me'?'telegram':q||r?'other':'direct';}catch{return 'other';}}
+ function flush(name){
+  if(choice!=='granted'||!active[name])return;
+  const queued=pending[name].splice(0);
+  for(const event of queued){
+   if(name==='vercel')window.va('event',{name:event.name,data:event.data});
+   if(name==='google')window.gtag('event',event.name,{send_to:ga,...event.data,page_location:pageURL(),page_referrer:referer()});
+   if(name==='yandex')window.ym(ym,'reachGoal',event.name,event.data);
+  }
+ }
+ function track(event,outcome='success'){
+  if(choice!=='granted'||!actionNames.has(event))return;
+  const item={name:event,data:{section:route(),outcome:['success','empty','error','cancelled','started'].includes(outcome)?outcome:'success',source:source()}};
+  for(const name of Object.keys(pending)){if(pending[name].length<40)pending[name].push(item);flush(name);}
+ }
  function script(name,src,ready){
   if(loaded[name]===true){ready();return;}
   if(loaded[name]==='loading')return;
@@ -25,6 +42,7 @@
  }
  function send(name){
   if(choice!=='granted'||!active[name])return;
+  flush(name);
   const url=pageURL();if(last[name]===url)return;
   const previous=last[name]||referer(),title='VYX · '+titles[route()];last[name]=url;
   if(name==='vercel')window.va('pageview',{route:'/#'+route(),path:'/#'+route()});
@@ -68,8 +86,10 @@
    if(ga)window['ga-disable-'+ga]=true;
    if(active.yandex){window.ym(ym,'destruct');active.yandex=false;}
    Object.keys(last).forEach(name=>delete last[name]);
+   Object.values(pending).forEach(queue=>queue.splice(0));
   }
   const label=document.getElementById('analytics-preference');if(label)label.textContent=preference();
+  if(typeof window.dispatchEvent==='function'&&typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('vyx-analytics-choice',{detail:value}));
  }
  function preference(){return choice==='granted'?'Allowed':choice==='denied'?'Off':'Not chosen';}
  function open(){
@@ -78,7 +98,7 @@
   box.innerHTML='<strong>Help us understand VYX.</strong><p>Allow Google Analytics, Yandex Metrica and Vercel Analytics to measure visits and app sections, plus anonymous VYX action counts to improve search and conversations. We do not send your messages or profile details. <a href="/privacy.html#analytics">Privacy</a></p><div><button class="secondary" data-analytics-choice="denied">No thanks</button><button class="primary" data-analytics-choice="granted">Allow analytics</button></div>';
   document.body.appendChild(box);
  }
- window.VYXAnalytics={open,preference};
+ window.VYXAnalytics={open,preference,track};
  document.addEventListener('click',ev=>{const button=ev.target.closest('[data-analytics-choice],[data-analytics-settings]');if(!button)return;if(button.hasAttribute('data-analytics-settings'))open();else choose(button.dataset.analyticsChoice);});
  window.addEventListener('hashchange',()=>Object.keys(active).forEach(send));
  window.addEventListener('storage',ev=>{if(ev.key===key)choose(ev.newValue==='granted'?'granted':'denied');});

@@ -44,3 +44,12 @@ test('Declining while vendor scripts load prevents late initialization and hits'
  for(const list of Object.values(b.views()))assert.equal(list.length,0);
  assert.equal((b.window.ym.a||[]).some(args=>args[1]==='init'),false);
 });
+test('journey goals are queued until ready, use only approved fields and stop after consent withdrawal',()=>{
+ const b=browser();b.window.VYXAnalytics.track('first_room_message');assert.equal(b.scripts.length,0);
+ b.choose('granted');b.window.VYXAnalytics.track('first_room_message','private-room-SECRET');b.window.VYXAnalytics.track('unapproved_SECRET');b.ready();
+ const ga=b.window.dataLayer.filter(a=>a[0]==='event'&&a[1]==='first_room_message');
+ assert.equal(ga.length,1);assert.equal(ga[0][2].outcome,'success');assert.equal(ga[0][2].page_location,'https://new-vyx.example/#rooms');
+ assert.ok(b.window.ym.a.some(a=>a[1]==='reachGoal'&&a[2]==='first_room_message'));
+ assert.ok(!JSON.stringify(ga).includes('SECRET'));assert.ok(!JSON.stringify(ga).includes('private-room'));
+ b.choose('denied');b.window.VYXAnalytics.track('first_vp_contribution');assert.ok(!b.window.dataLayer.some(a=>a[1]==='first_vp_contribution'));
+});

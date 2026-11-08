@@ -46,6 +46,7 @@ let globalSearchEpoch=0,handleTimer=null,globalSearchTimer=null;
 function globalCommunitySearch(query){clearTimeout(globalSearchTimer);const token=++globalSearchEpoch,box=$('#search-results');if(query.trim().length<2){box.hidden=true;return;}box.hidden=false;box.innerHTML=loadingPanel('Searching…');globalSearchTimer=setTimeout(async()=>{try{const r=await api('search',undefined,{q:query});if(token!==globalSearchEpoch)return;box.innerHTML=r.people.slice(0,4).map(p=>`<button class="search-result" data-person="${p.id}">${avatar(p)}<span>${e(p.name)}</span></button>`).join('')+r.rooms.slice(0,3).map(r=>`<button class="search-result" data-room-open="${r.id}">${e(r.name)}</button>`).join('')+r.posts.slice(0,3).map(p=>`<button class="search-result" data-comment="${p.id}">${e(p.body.slice(0,100))}</button>`).join('')||`<p>No matches for “${e(query)}”. Try another topic.</p>`;}catch(err){if(token===globalSearchEpoch)box.innerHTML=errorPanel(err.message,'data-action="explore"');}},250);}
 function trackProduct(event,outcome='success'){
  if(!event||!window.VYX_ANALYTICS?.enabled)return;try{if(localStorage.getItem('vyx-analytics-consent-v1')!=='granted')return;}catch{return;}
+ window.VYXAnalytics?.track?.(event,outcome);
  fetch('/api/vyx?action=product-event',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({consent:true,event,section:['rooms','feed','explore','profile','messages'].includes(page)?page:'other',outcome}),keepalive:true}).catch(()=>{});
 }
 document.addEventListener('click',async ev=>{

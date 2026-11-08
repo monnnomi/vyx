@@ -136,7 +136,7 @@ export async function moderate(db,user,input){
   await tx.q('UPDATE community_reports SET status=$2,resolution=$3,reviewed_by=$4,reviewed_at=now() WHERE id=$1',[r.id,input.status,resolution,user.id]);return {ok:true};
  });
 }
-const events=new Set(['search','search_result','profile_view','follow','post_started','post_published','comment_sent','room_open','room_join','message_sent','signin_started','signin_returned','onboarding_saved','onboarding_skipped']);
+const events=new Set(['search','search_result','profile_view','follow','post_started','post_published','comment_sent','room_open','room_join','message_sent','signin_started','signin_returned','onboarding_saved','onboarding_skipped','getting_started','visit_started','visit_from_x','signed_in_visit','first_room_join','first_room_message','first_vp_contribution','return_next_day','first_reward_seen']);
 export async function recordProductEvent(db,input){
  if(input.consent!==true||!events.has(input.event))fail(400,'Invalid analytics event.');
  const section=['rooms','feed','explore','profile','messages','other'].includes(input.section)?input.section:'other';

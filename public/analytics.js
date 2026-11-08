@@ -3,8 +3,8 @@
 (()=>{
  const config=window.VYX_ANALYTICS||{};
  if(!config.enabled||location.pathname!=='/'&&location.pathname!=='/index.html')return;
- const sections=new Set(['rooms','feed','explore','notifications','profile','messages','drops','rewards','leaderboard','settings','tasks']);
- const titles={rooms:'Chats',feed:'Feed',explore:'Explore',notifications:'Activity',profile:'Profile',messages:'Direct messages',drops:'Drops',rewards:'Collection',leaderboard:'Leaderboard',settings:'Settings',tasks:'Quests'};
+ const sections=new Set(['rooms','feed','explore','notifications','profile','messages','drops','rewards','leaderboard','settings','tasks','whitelist']);
+ const titles={rooms:'Chats',feed:'Feed',explore:'Explore',notifications:'Activity',profile:'Profile',messages:'Direct messages',drops:'Drops',rewards:'Collection',leaderboard:'Leaderboard',settings:'Settings',tasks:'Quests',whitelist:'Whitelist'};
  const key='vyx-analytics-consent-v1';
  let choice='unset';try{choice=localStorage.getItem(key)||'unset';}catch{}
  if(!['granted','denied'].includes(choice))choice='unset';

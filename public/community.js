@@ -51,7 +51,7 @@ function renderFeed(){return `<div class="edition-header"><span>THE VYX JOURNAL<
 
 function renderRewards(){return `<header class="collection-heading"><div class="eyebrow">OBJECTS OF A GOOD SEASON</div><h1>The <em>collection.</em></h1><p>Four chest editions, each with its own character.<br>Find your rarity. Keep your discoveries.</p><div class="collection-heading-meta"><span>04 CHEST EDITIONS</span><span>${chestCount()} IN YOUR INVENTORY</span></div></header><div class="collection-toolbar"><div class="subtabs"><button data-collection-filter="all" class="${collectionFilter==='all'?'active':''}">All editions</button><button data-collection-filter="owned" class="${collectionFilter==='owned'?'active':''}">My chests <span>${chestCount()}</span></button></div><button class="text-link" data-action="rules">Rarity & reward guide ${icon('arrowup')}</button></div>${chestCards()}<p class="collection-note">Chest distribution is coming soon. Previously earned chests remain available to open.</p>${data.event?.minted?`<div class="section-title"><div><span class="eyebrow">A MOMENT TO KEEP</span><h2>Seasonal keepsakes.</h2></div></div>${halloweenHTML(true)}`:''}<section class="history"><div class="section-title"><h2>Your reward journal.</h2><span class="history-balance">${fmt(points())} VP this season</span></div>${data.user?.history.length?data.user.history.map(h=>`<div class="history-row"><div><strong>${rewardName(h)}</strong><small>${date(h.created_at)} · ${e(h.season)}</small></div><b>+${fmt(h.amount)} VP</b></div>`).join(''):empty('Your room drops and chest rewards will be recorded here.')}</section>`;}
 
-function renderLeaderboard(){return socialLeaderboard()+referralLeaderboardHTML();}
+function renderLeaderboard(){return communityRankingsNav('leaderboard')+socialLeaderboard()+referralLeaderboardHTML();}
 
 function guestPage(title){return `<div class="page-intro"><div class="eyebrow">MAKE YOURSELF AT HOME</div><h1>${title}</h1></div><div class="info-panel"><h3>Your people are waiting.</h3><p>Sign in with X to join VYX and make this space yours.</p><button class="primary" data-action="signin">Continue with X ↗</button></div>`;}
 function renderProfile(){return socialProfile()+referralInviteHTML();}
@@ -66,7 +66,7 @@ function render(){
  const draft=$('#post-input')?.value,searchDraft=$('#room-search')?.value,searchFocused=document.activeElement?.id==='room-search';document.body.dataset.page=page;document.body.classList.toggle('in-room',page==='rooms'&&Boolean(activeRoom));document.body.classList.toggle('in-direct',page==='messages'&&Boolean(activeChat));applyTheme();renderNav();$('#header-points').textContent=fmt(points());
  $('.header-actions .me-avatar').textContent=data.user?data.user.name.slice(0,1):'X';
  $('#top-title').innerHTML=`${nav.find(n=>n[0]===page)?.[2]||'Feed'} `;
- $('#main-content').innerHTML=({feed:renderHome,explore:renderExplore,drops:renderDrops,notifications:renderNotifications,settings:renderSettings,tasks:renderTasks,rewards:renderRewards,leaderboard:renderLeaderboard,profile:renderProfile,messages:renderMessages,rooms:renderRooms}[page]||renderFeed)();
+ $('#main-content').innerHTML=({feed:renderHome,explore:renderExplore,drops:renderDrops,notifications:renderNotifications,settings:renderSettings,tasks:renderTasks,whitelist:renderWhitelist,rewards:renderRewards,leaderboard:renderLeaderboard,profile:renderProfile,messages:renderMessages,rooms:renderRooms}[page]||renderFeed)();
  renderProductBadge();if(draft&&$('#post-input'))$('#post-input').value=draft;if(searchDraft!==undefined&&$('#room-search')){$('#room-search').value=searchDraft;if(searchFocused)$('#room-search').focus();}renderRail();if(typeof restoreMediaComposers==='function')restoreMediaComposers();
  const box=$('.chat-bubbles');if(box)box.scrollTop=box.scrollHeight;
 }
@@ -80,6 +80,7 @@ async function loadPage(){
   if(page==='settings'&&data.user){await loadMemberPreferences();}
   if(page==='explore')await searchExplore();
   if(page==='tasks')await loadXTasks();
+  if(page==='whitelist')await Promise.all([loadWhitelist(),data.user?loadNftSelection():Promise.resolve()]);
   if(page==='rooms'){await loadRooms();return;}
   render();
  }catch(err){if(page==='profile')profileStatus='error';render();toast(err.message);}

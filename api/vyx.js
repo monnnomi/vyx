@@ -1,5 +1,5 @@
 import {taskState,verifyTasks} from '../server/x-tasks.js';
-import {ownNftSelection} from '../server/nft-selection.js';
+import {ownNftSelection,nftWhitelist} from '../server/nft-selection.js';
 import {referralBoard} from '../server/referrals.js';
 import {searchCommunity,memberProfile,postDetail,handleAvailability,memberPreferences,recordProductEvent} from '../server/social.js';
 import {withDB} from '../server/db.js';
@@ -16,6 +16,7 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
    const user=await session(db,req);
    if(req.method==='GET'){
     if(action==='tasks')return json(res,200,await taskState(db,user));
+    if(action==='whitelist')return json(res,200,await nftWhitelist(db,{tier:url.searchParams.get('tier')||'all',page:url.searchParams.get('page')||1}));
     if(action==='referrals')return json(res,200,await referralBoard(db,user));
     if(action==='search')return json(res,200,await searchCommunity(db,user,url.searchParams.get('q')||''));
     if(action==='member-profile')return json(res,200,await memberProfile(db,user,url.searchParams.get('id')));

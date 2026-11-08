@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {login} from '../server/oauth.js';
-import {nftSelectionStatus,ownNftSelection} from '../server/nft-selection.js';
+import {nftSelectionStatus,ownNftSelection,nftWhitelist} from '../server/nft-selection.js';
 import {adminOverview} from '../server/admin.js';
 import {createHandler} from '../api/vyx.js';
 import {createAdminHandler} from '../api/admin.js';
@@ -56,4 +56,35 @@ test('administrator sees per-member results and can filter all three tiers; ordi
   const result=await adminOverview(db,alice.user,{filter});assert.ok(result.users.some(u=>u.id===person.user.id));assert.ok(result.users.every(u=>u.nftSelection.tier===tier));
  }
  const result=await call(admin,'/api/admin?filter=nft-free',alice);assert.equal(result.statusCode,200);assert.equal(result.data.users[0].nftSelection.confirmedVP,50000);assert.equal(result.headers['cache-control'],'no-store');
+});
+
+test('public whitelist shows only qualified places and never private progress or full-price accounts',async()=>{
+ const app=createHandler(fn=>fn(db));
+ for(const user of [null,carol]){
+  const res=await call(app,'/api/vyx?action=whitelist',user);assert.equal(res.statusCode,200);assert.equal(res.headers['cache-control'],'no-store');
+  assert.deepEqual(res.data.counts,{free:1,halfPrice:1,total:2});
+  assert.deepEqual(res.data.members.map(m=>[m.id,m.tier]),[[alice.user.id,'free'],[bob.user.id,'half-price']]);
+  for(const member of res.data.members)assert.deepEqual(Object.keys(member).sort(),['avatar_url','handle','id','name','tier']);
+  assert.doesNotMatch(JSON.stringify(res.data),/confirmedVP|confirmed_vp|invitedReferrals|invited_referrals|vpRemaining|referralsRemaining|x_id|x_username|full-price/);
+ }
+ const discount=await nftWhitelist(db,{tier:'half-price'});assert.equal(discount.members.length,1);assert.equal(discount.members[0].id,bob.user.id);assert.equal(discount.pagination.total,1);assert.equal(discount.counts.total,2);
+ for(const params of [{tier:'full-price'},{tier:"free' OR true --"},{page:0},{page:1.5},{page:100001}])await assert.rejects(nftWhitelist(db,params),e=>e.status===400);
+});
+
+test('whitelist moves a member from 50 percent off to free automatically without a duplicate',async()=>{
+ for(let i=0;i<3;i++){const invitee=await make(String(9200+i));await db.q('INSERT INTO referrals(invitee_id,inviter_id) VALUES($1,$2)',[invitee.user.id,bob.user.id]);}
+ const list=await nftWhitelist(db);assert.deepEqual(list.counts,{free:2,halfPrice:0,total:2});assert.equal(list.members.filter(p=>p.id===bob.user.id).length,1);assert.equal(list.members.find(p=>p.id===bob.user.id).tier,'free');
+ assert.equal((await nftWhitelist(db,{tier:'half-price'})).members.length,0);
+ // A ledger update is reflected immediately; no separate public eligibility record can drift.
+ await award(carol.user,'season-2','2026-12-01T00:00Z',1);
+ assert.equal((await nftWhitelist(db)).members.find(p=>p.id===carol.user.id).tier,'half-price');
+ assert.equal((await ownNftSelection(db,carol.user)).tier,'half-price');
+});
+
+test('whitelist pagination remains bounded and keeps totals even on an empty page',async()=>{
+ const added=await db.q("INSERT INTO users(x_id,handle,name) SELECT 'whitelist-'||n,'whitelist_'||n,'Whitelist member '||n FROM generate_series(1,51) n RETURNING id");
+ for(const user of added)await award(user,'season-1','2026-11-01T00:00Z',50000);
+ const first=await nftWhitelist(db),second=await nftWhitelist(db,{page:2}),empty=await nftWhitelist(db,{page:999});
+ assert.equal(first.members.length,50);assert.equal(second.members.length,4);assert.equal(first.pagination.pages,2);assert.equal(empty.members.length,0);assert.equal(empty.pagination.total,54);
+ assert.equal(new Set([...first.members,...second.members].map(p=>p.id)).size,54);
 });

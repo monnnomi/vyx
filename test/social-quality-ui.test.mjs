@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
-const names=['app','halloween','farming','rooms','room-messenger','drop-scene','product','wonder','club','social-shell','social-quality','message-reactions','referrals','nft-selection','x-tasks','community'];
+const names=['app','halloween','farming','rooms','room-messenger','drop-scene','product','wonder','club','social-shell','social-quality','message-reactions','referrals','nft-selection','nft-whitelist','x-tasks','community'];
 const sources=await Promise.all(names.map(n=>readFile(new URL('../public/'+n+'.js',import.meta.url),'utf8')));
 function setup(){
  const node={classList:{add(){},remove(){},toggle(){}},dataset:{},style:{},value:'',hidden:true,setAttribute(){},addEventListener(){},querySelectorAll(){return []},querySelector(){return node},insertAdjacentHTML(){},remove(){},focus(){}};
@@ -66,4 +66,14 @@ test('X quests show the fixed 8500 VP campaign, verified state and explicit read
  vm.runInContext(`xTaskData.connected=true;xTaskData.earned=1000;xTaskData.tasks[0].status='awarded'`,c);
  const done=c.renderTasks();assert.match(done,/Verified · VP added/);assert.doesNotMatch(done,/data-x-task-open/);
  vm.runInContext(`data.user={id:'bob'}`,c);assert.doesNotMatch(c.renderTasks(),/Verified · VP added/);
+});
+
+test('whitelist shows qualified tiers with profile links and keeps personal progress owner-bound',()=>{
+ const c=setup();
+ vm.runInContext(`whitelistState='ready';whitelistData={counts:{free:1,halfPrice:1,total:2},pagination:{page:1,pages:1},members:[{id:'alice',name:'Alice',handle:'alice',tier:'free'},{id:'bob',name:'Bob',handle:'bob',tier:'half-price'}]};nftSelectionOwner='alice';nftSelectionState='ready';nftSelectionData={tier:'free'}`,c);
+ const html=c.renderWhitelist();assert.match(html,/You’re on the Free NFT list/);assert.match(html,/data-person="bob"/);assert.match(html,/data-whitelist-filter="half-price"/);assert.match(html,/NFT minting is not open yet/);assert.doesNotMatch(html,/vpRemaining|referralsRemaining/);
+ vm.runInContext(`data.user={id:'carol'};whitelistData.members=[];whitelistFilter='free'`,c);
+ const other=c.renderWhitelist();assert.doesNotMatch(other,/You’re on the Free NFT list/);assert.match(other,/The first free places are waiting/);
+ vm.runInContext(`whitelistState='error'`,c);assert.match(c.renderWhitelist(),/The whitelist could not be loaded/);
+ assert.match(c.communityRankingsNav('whitelist'),/href="#whitelist" aria-current="page"/);
 });

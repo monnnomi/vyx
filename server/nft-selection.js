@@ -21,3 +21,23 @@ export async function ownNftSelection(db,user){
  if(!row)fail(401,'Please sign in again.');
  return {...nftSelectionStatus(row.confirmed_vp,row.invited_referrals),checkedAt:new Date().toISOString()};
 }
+
+export async function nftWhitelist(db,{tier='all',page=1}={}){
+ if(!['all','free','half-price'].includes(tier))fail(400,'Choose a valid whitelist.');
+ page=Number(page);if(!Number.isInteger(page)||page<1||page>100000)fail(400,'Choose a valid page.');
+ const [row]=await db.q(`WITH eligible AS (
+  SELECT u.id,u.name,u.handle,u.avatar_url,u.created_at,
+   CASE WHEN nft.invited_referrals>=${nftSelectionRules.referrals} THEN 'free' ELSE 'half-price' END AS tier
+  FROM users u CROSS JOIN LATERAL (${nftSelectionTotalsSQL}) nft
+  WHERE u.x_id IS NOT NULL AND NOT u.is_system AND nft.confirmed_vp>=${nftSelectionRules.vp}
+ ), matching AS (SELECT * FROM eligible WHERE $1='all' OR tier=$1)
+ SELECT (SELECT count(*)::int FROM eligible WHERE tier='free') AS free,
+  (SELECT count(*)::int FROM eligible WHERE tier='half-price') AS half_price,
+  (SELECT count(*)::int FROM matching) AS total,
+  COALESCE((SELECT json_agg(p) FROM (
+   SELECT id,name,handle,avatar_url,tier FROM matching
+   ORDER BY (tier='free') DESC,created_at,id LIMIT 50 OFFSET $2
+  ) p),'[]'::json) AS members`,[tier,(page-1)*50]);
+ return {members:row.members,counts:{free:row.free,halfPrice:row.half_price,total:row.free+row.half_price},
+  pagination:{page,pageSize:50,total:row.total,pages:Math.max(1,Math.ceil(row.total/50))},checkedAt:new Date().toISOString()};
+}

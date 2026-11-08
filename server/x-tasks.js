@@ -7,7 +7,7 @@ export const xTasks=Object.freeze([
  {id:'x-vyx-like-2119014238463152187',kind:'like',title:'Like the VYX post',amount:1500,url:'https://x.com/vyxsocial/status/'+campaignPost},
  {id:'x-vyx-repost-2119014238463152187',kind:'repost',title:'Repost the VYX post',amount:2000,url:'https://x.com/vyxsocial/status/'+campaignPost},
  {id:'x-vyx-reply-2119014238463152187',kind:'reply',title:'Comment on the VYX post',amount:1500,url:'https://x.com/vyxsocial/status/'+campaignPost},
- {id:'x-vyx-quote-2119014238463152187',kind:'quote',title:'Quote the VYX post',amount:2500,url:'https://x.com/vyxsocial/status/'+campaignPost}
+ {id:'x-vyx-quote-2119014238463152187',kind:'quote',title:'Quote the VYX post',amount:2500,url:'https://x.com/intent/tweet?url='+encodeURIComponent('https://x.com/vyxsocial/status/'+campaignPost)}
 ]);
 export async function reserveXCheckRead(db,url){
  // Conservative upper bounds at current X read rates: one user or up to ten posts.

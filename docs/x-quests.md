@@ -24,7 +24,7 @@ Unique database constraints prevent duplicate claims. A transaction locks the me
 
 Ordinary sign-in retains its original scopes and does not store an X token. Quests separately request `tweet.read users.read follows.read like.read`, without write, DM or offline access. The OAuth attempt binds the expected X account, state cookie and PKCE verifier. The access token is AES-256-GCM encrypted with an app-secret-derived key and X ID as authenticated data; it is never returned to the browser or logged. It expires after at most two hours and can be disconnected from Quests. No refresh token is requested.
 
-Participants perform the actions themselves on X. Returning from a task link schedules a check while Quests is visible, with a one-minute interval. Check and Check all are also available. Successful checks credit VP automatically, without a second claim step.
+Participants perform the actions themselves on X. The quote task opens X’s post composer with the campaign post URL already filled in; participants add their own words and publish themselves. Returning from a task link schedules a check while Quests is visible, with a one-minute interval. Check and Check all are also available. Successful checks credit VP automatically, without a second claim step.
 
 ## Operations
 

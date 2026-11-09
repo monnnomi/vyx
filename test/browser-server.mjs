@@ -47,6 +47,12 @@ if(process.env.VYX_QA_PROFILE==='1'){
  await db.q("INSERT INTO event_mints(campaign_id,user_id,x_id,minted_at) VALUES('halloween-2026',$1,'1001','2026-10-31T12:00:00Z') ON CONFLICT DO NOTHING",[a.user.id]);
 }
 let nftQaMember=null;
+if(process.env.VYX_QA_ENGAGEMENT==='1'){
+ const r=await mutate(db,a.user,'room-create',{name:'Community conversation',description:'Isolated message-view and reaction checks.',requestId:randomUUID()});
+ await mutate(db,b.user,'room-join',{id:r.id});
+ for(let i=0;i<18;i++)await mutate(db,i%2?a.user:b.user,'room-send',{id:r.id,body:'Conversation '+(i+1)+': '+['What have you been working on this week? I would love to hear about your ideas.','I enjoy seeing the different things people are building and sharing in this community.','The view count helps us notice who has read the conversation, alongside the reactions.'][i%3],requestId:randomUUID()});
+ await db.q('INSERT INTO messages(sender_id,recipient_id,body,request_id) VALUES($1,$2,$3,gen_random_uuid())',[b.user.id,a.user.id,'A private conversation for checking one unique recipient view.']);
+}
 if(process.env.VYX_QA_NFT_SELECTION==='1'){
  nftQaMember=await db.tx(tx=>login(tx,{id:'1003',name:'QA Carol',username:'qa_carol',avatar:''}));
  const room=await mutate(db,a.user,'room-create',{name:'NFT selection QA',description:'Isolated eligibility fixtures.',requestId:randomUUID()});

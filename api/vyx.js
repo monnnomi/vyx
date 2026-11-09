@@ -1,4 +1,5 @@
 import {taskState,verifyTasks} from '../server/x-tasks.js';
+import {recordMessageViews} from '../server/message-views.js';
 import {ownNftSelection,nftWhitelist} from '../server/nft-selection.js';
 import {referralBoard} from '../server/referrals.js';
 import {searchCommunity,memberProfile,postDetail,handleAvailability,memberPreferences,recordProductEvent} from '../server/social.js';
@@ -43,6 +44,10 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
    }
    if(action==='product-event'){await limit(db,'event:'+ipKey(req),30);return json(res,200,await recordProductEvent(db,await body(req)));}
    if(!user)fail(401,'Sign in with X to continue.');
+   if(action==='message-views'){
+    await limit(db,'message-views:'+user.id,40);
+    const input=await body(req);return json(res,200,await db.tx(tx=>recordMessageViews(tx,user,input)));
+   }
    await limit(db,'write:'+user.id,60);
    await limit(db,'ip:'+ipKey(req),180);
    if(action==='logout'){

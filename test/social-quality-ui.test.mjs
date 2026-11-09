@@ -2,7 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
-const names=['app','halloween','farming','rooms','room-messenger','drop-scene','product','wonder','club','social-shell','social-quality','message-reactions','referrals','nft-selection','nft-whitelist','x-tasks','community'];
+import {messageReactionEmojis} from '../server/message-reactions.js';
+const names=['app','halloween','farming','rooms','room-messenger','drop-scene','product','wonder','club','social-shell','social-quality','message-reactions','message-views','referrals','nft-selection','nft-whitelist','x-tasks','community'];
 const sources=await Promise.all(names.map(n=>readFile(new URL('../public/'+n+'.js',import.meta.url),'utf8')));
 function setup(){
  const node={classList:{add(){},remove(){},toggle(){}},dataset:{},style:{},value:'',hidden:true,setAttribute(){},addEventListener(){},querySelectorAll(){return []},querySelector(){return node},insertAdjacentHTML(){},remove(){},focus(){}};
@@ -15,6 +16,12 @@ function setup(){
 test('all scripts initialize in page order and empty feeds explain the actual action',()=>{
  const c=setup();vm.runInContext("feedTab='saved'",c);assert.match(c.socialFeed(),/Tap the bookmark/);assert.doesNotMatch(c.socialFeed(),/Start a conversation with/);
  vm.runInContext("feedTab='following'",c);assert.match(c.socialFeed(),/Your feed starts with people/);
+});
+
+test('message counters sit next to reactions and all 24 picker options match the server',()=>{
+ const c=setup(),html=c.messageReactionsHTML({id:'message-fixture',view_count:12,reactions:[{emoji:'🚀',count:3,mine:true}]},'room');
+ assert.match(html,/12 unique views/);assert.match(html,/message-view-number">12/);assert.match(html,/data-emoji="🚀"/);assert.match(html,/aria-pressed="true"/);assert.doesNotMatch(html,/viewers-list|user_id/);
+ const options=vm.runInContext('messageReactionOptions.map(([emoji])=>emoji)',c);assert.deepEqual(Array.from(options),messageReactionEmojis);assert.equal(options.length,24);
 });
 test('loaded profiles and room threads do not flash false empty states while pending',()=>{
  const c=setup();assert.match(c.socialProfile(),/Loading your posts/);assert.doesNotMatch(c.socialProfile(),/Your first post starts/);

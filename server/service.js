@@ -1,4 +1,5 @@
 import {reactionProjection,reactToMessage} from './message-reactions.js';
+import {messageViewProjection} from './message-views.js';
 import {mutateSocial,assertInteraction,hiddenBy} from './social.js';
 import {randomInt} from 'node:crypto';
 import {calendar,tiers,publicUser} from './config.js';
@@ -64,7 +65,7 @@ export async function conversations(db,user) {
 }
 export async function messages(db,user,peer) {
  uuid(peer);await assertInteraction(db,user.id,peer);
- return db.q(`SELECT m.id,m.sender_id,m.recipient_id,m.body,m.created_at,${reactionProjection('message_id','$1')},${mediaProjection('m','message_id')} FROM (SELECT * FROM messages WHERE (sender_id=$1 AND recipient_id=$2) OR (sender_id=$2 AND recipient_id=$1) ORDER BY created_at DESC LIMIT 100) m ORDER BY created_at ASC`,[user.id,peer]);
+ return db.q(`SELECT m.id,m.sender_id,m.recipient_id,m.body,m.created_at,${reactionProjection('message_id','$1')},${messageViewProjection('message_id','$1')},${mediaProjection('m','message_id')} FROM (SELECT * FROM messages WHERE (sender_id=$1 AND recipient_id=$2) OR (sender_id=$2 AND recipient_id=$1) ORDER BY created_at DESC LIMIT 100) m ORDER BY created_at ASC`,[user.id,peer]);
 }
 async function activity(db,user,c,kind,target){
  await db.q('INSERT INTO activity_events(user_id,season,day,kind,target) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',[user.id,c.season,c.day,kind,target]);

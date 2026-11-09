@@ -438,3 +438,12 @@ CREATE INDEX IF NOT EXISTS message_views_dm_idx ON message_views(message_id);
 ALTER TABLE message_reactions DROP CONSTRAINT IF EXISTS message_reactions_emoji_check;
 ALTER TABLE message_reactions ADD CONSTRAINT message_reactions_emoji_check
  CHECK(emoji IN ('❤️','👍','🔥','😂','👏','😮','🎉','🚀','💯','👀','🙏','🤝','😍','🤔','😎','🤣','😢','😭','😡','👎','💪','🥳','✅','⚡'));
+
+-- Unique post views across feed, profiles and post details.
+CREATE TABLE IF NOT EXISTS post_views (
+ user_id uuid NOT NULL REFERENCES users(id),
+ post_id uuid NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+ viewed_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+ PRIMARY KEY(user_id,post_id)
+);
+CREATE INDEX IF NOT EXISTS post_views_post_idx ON post_views(post_id);

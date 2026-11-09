@@ -1,3 +1,4 @@
+import {postViewProjection} from './post-views.js';
 import {reactionProjection,reactToMessage} from './message-reactions.js';
 import {messageViewProjection} from './message-views.js';
 import {mutateSocial,assertInteraction,hiddenBy} from './social.js';
@@ -22,7 +23,7 @@ export async function members(db,viewer,season) {
 export async function feed(db,viewer,{filter='all',author=null,cursor=null,query='',postId=null}={}) {
  if(!['all','following','saved'].includes(filter))fail(400,'Choose a feed filter.');
  if(cursor&&(typeof cursor!=='string'||cursor.length>40||Number.isNaN(Date.parse(cursor))))fail(400,'Invalid page cursor.');
- const rows=await db.q(`SELECT p.*,u.name,u.handle,u.avatar_url,u.is_system,${mediaProjection('p','post_id')},
+ const rows=await db.q(`SELECT p.*,u.name,u.handle,u.avatar_url,u.is_system,${postViewProjection('$1')},${mediaProjection('p','post_id')},
  (SELECT count(*)::int FROM reactions WHERE post_id=p.id) AS likes,
  (SELECT count(*)::int FROM comments WHERE post_id=p.id) AS comments,
  EXISTS(SELECT 1 FROM reactions WHERE post_id=p.id AND user_id=$1) AS liked,
@@ -35,7 +36,7 @@ export async function feed(db,viewer,{filter='all',author=null,cursor=null,query
  AND ($4::timestamptz IS NULL OR p.created_at<$4)
  AND ($5='' OR strpos(lower(p.body),lower($5))>0) AND ($6::uuid IS NULL OR p.id=$6)
  ORDER BY p.created_at DESC LIMIT 30`,[viewer?.id||null,author,filter,cursor,query,postId]);
- return rows.map(p=>({id:p.id,user_id:p.user_id,body:p.body,media:p.media,created_at:p.created_at,likes:p.likes,comments:p.comments,liked:p.liked,saved:p.saved,author:{id:p.user_id,name:p.name,handle:p.handle,avatar_url:p.avatar_url,is_system:p.is_system}}));
+ return rows.map(p=>({id:p.id,user_id:p.user_id,body:p.body,media:p.media,created_at:p.created_at,likes:p.likes,comments:p.comments,liked:p.liked,saved:p.saved,view_count:p.view_count,viewed_by_me:p.viewed_by_me,author:{id:p.user_id,name:p.name,handle:p.handle,avatar_url:p.avatar_url,is_system:p.is_system}}));
 }
 export async function state(db,user,now=null) {
  await settleDueWindows(db);

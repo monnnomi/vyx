@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {messageReactionEmojis} from '../server/message-reactions.js';
-const names=['app','halloween','farming','rooms','room-messenger','drop-scene','product','wonder','club','social-shell','social-quality','message-reactions','message-views','referrals','nft-selection','nft-whitelist','x-tasks','community'];
+const names=['app','halloween','farming','rooms','room-messenger','drop-scene','product','wonder','club','social-shell','social-quality','message-reactions','message-views','post-views','referrals','nft-selection','nft-whitelist','x-tasks','community'];
 const sources=await Promise.all(names.map(n=>readFile(new URL('../public/'+n+'.js',import.meta.url),'utf8')));
 function setup(){
  const node={classList:{add(){},remove(){},toggle(){}},dataset:{},style:{},value:'',hidden:true,setAttribute(){},addEventListener(){},querySelectorAll(){return []},querySelector(){return node},insertAdjacentHTML(){},remove(){},focus(){}};
@@ -22,6 +22,12 @@ test('message counters sit next to reactions and all 24 picker options match the
  const c=setup(),html=c.messageReactionsHTML({id:'message-fixture',view_count:12,reactions:[{emoji:'🚀',count:3,mine:true}]},'room');
  assert.match(html,/12 unique views/);assert.match(html,/message-view-number">12/);assert.match(html,/data-emoji="🚀"/);assert.match(html,/aria-pressed="true"/);assert.doesNotMatch(html,/viewers-list|user_id/);
  const options=vm.runInContext('messageReactionOptions.map(([emoji])=>emoji)',c);assert.deepEqual(Array.from(options),messageReactionEmojis);assert.equal(options.length,24);
+});
+test('feed, profile and discussion post cards share one accessible view counter beside comments',()=>{
+ const c=setup(),p={id:'post-fixture',body:'A community story',created_at:'2026-11-09T10:00Z',view_count:14,viewed_by_me:false,likes:2,comments:1,liked:false,saved:false,author:{id:'bob',name:'Bob',handle:'bob'}};
+ const html=c.postHTML(p);assert.match(html,/data-post-view-id="post-fixture"/);assert.match(html,/14 unique views/);assert.ok(html.indexOf('data-post-view-count')>html.indexOf('aria-label="Comments"'));assert.doesNotMatch(html,/viewer-names|user_ids/);
+ c.applyPostView({id:p.id,view_count:15,viewed_by_me:true});assert.match(c.postHTML(p),/15 unique views/);
+ vm.runInContext("data.user={id:'carol'}",c);assert.match(c.postHTML(p),/14 unique views/);
 });
 test('loaded profiles and room threads do not flash false empty states while pending',()=>{
  const c=setup();assert.match(c.socialProfile(),/Loading your posts/);assert.doesNotMatch(c.socialProfile(),/Your first post starts/);

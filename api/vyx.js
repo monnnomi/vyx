@@ -1,3 +1,4 @@
+import {recordPostViews} from '../server/post-views.js';
 import {taskState,verifyTasks} from '../server/x-tasks.js';
 import {recordMessageViews} from '../server/message-views.js';
 import {ownNftSelection,nftWhitelist} from '../server/nft-selection.js';
@@ -47,6 +48,10 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
    if(action==='message-views'){
     await limit(db,'message-views:'+user.id,40);
     const input=await body(req);return json(res,200,await db.tx(tx=>recordMessageViews(tx,user,input)));
+   }
+   if(action==='post-views'){
+    await limit(db,'post-views:'+user.id,40);
+    const input=await body(req);return json(res,200,await db.tx(tx=>recordPostViews(tx,user,input)));
    }
    await limit(db,'write:'+user.id,60);
    await limit(db,'ip:'+ipKey(req),180);

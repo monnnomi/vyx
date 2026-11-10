@@ -8,6 +8,8 @@ squeekchain-project: cd878942-a1fa-40cd-909a-ca45385a6f1d
 
 This repository contains the web client, server endpoints, database schema, migration scripts and isolated tests. VP are application points; they do not guarantee token eligibility, conversion or monetary value. Wallet binding, transferable NFT boosts and token distribution remain planned features. The proposed Squeekchain integration is not implemented in this beta.
 
+**Coding-agent handoff:** read [AGENTS.md](AGENTS.md) and [docs/AI-HANDOFF.md](docs/AI-HANDOFF.md) for the existing owner's-Mac setup, project connections, isolated QA and deployment workflow.
+
 ## Repository map
 
 | Path | Contents |
@@ -34,7 +36,9 @@ A conversation-first responsive client: compact navigation, a two-pane room mess
 - Direct messages between mutual followers, stored on the server; 15-second polling.
 - Discoverable rooms: X accounts create groups, join/leave and share a persistent group chat. History and member lists require current membership; 10-second polling, older-message pagination, room links and search. Owners can remove messages or close their rooms; members can remove their own messages. Creation and message retries are idempotent. Limits: 5 new rooms/day, 50 memberships/account, 500 members/room, 20 room messages/minute.
 - Room messenger: member-only last-message previews and timestamps, per-account unread counts, explicit monotone read acknowledgements, reply quotes, member @mention suggestions and inbox events, and one owner-managed pinned message per room. Removing a message hides its quote text and clears its pin. In-page drafts keep their reply target when switching rooms. Visible directory previews refresh every 15 seconds; room messages refresh every 10 seconds.
-- Chest inventory, cryptographic random rewards for previously earned chests and an immutable point ledger. The current quest list has been removed; Quests shows Coming soon and all retired quest claims are rejected by the server.
+- Chest inventory, cryptographic random rewards for previously earned chests and an immutable point ledger. Five current X quests award 8,500 VP in total after official API verification; the default task-verification read allowance is $1/day. Retired legacy quest claims remain rejected. See docs/x-quests.md.
+- Registered referrals, private NFT eligibility progress and an automatic public whitelist for free/50%-off qualification. See docs/nft-whitelist.md.
+- Twenty-four emoji choices for message reactions; each account has one replaceable/removable reaction per message. Rooms, DMs and public post cards show aggregate unique view counts, excluding the author. See docs/message-engagement.md.
 - A free Halloween collectible mint, once per immutable X account ID, before 2026-11-01 00:00 UTC. The database clock enforces the cutoff. This collectible never awards points. Earlier Halloween claims are migrated to mint records; their point awards are voided with the audit trail retained.
 - A private /admin dashboard, restricted by the VYX_ADMIN_X_IDS server-side allowlist, showing connected X accounts, mint receipts, connection times and online activity.
 - Visible pages send presence updates every 30 seconds. Online means activity within 90 seconds; signed-in users are deduplicated by account and guests by browser.
@@ -94,10 +98,10 @@ Run `npm run db:migrate`, then `npm start` for local development. Development OA
 
 ## Current limits
 
-This is an early beta. Real X credentials are configured in the live Vercel project. The administrator allowlist must be explicitly configured for the intended owner X identity; an empty list denies all accounts. X API access is subject to the owner's X account limits and pricing. Leaderboards show up to 200 members; feed pages contain 30 stories; conversations show the latest 100 messages. Messages are not end-to-end encrypted. Self-service account deletion, global moderation tools, referrals and token distribution are not implemented. VP do not guarantee token eligibility, conversion or monetary value.
+This is an early beta. Real X credentials are configured in the live Vercel project. The administrator allowlist must be explicitly configured for the intended owner X identity; an empty list denies all accounts. X API access is subject to the owner's X account limits and pricing. Leaderboards show up to 200 members; feed pages contain 30 stories; conversations show the latest 100 messages. Messages are not end-to-end encrypted. Account deletion requests are available but do not erase data automatically. Wallet/contract verification, NFT trading, token distribution and a dedicated short-video feed are not implemented. VP do not guarantee token eligibility, conversion or monetary value.
 
 
-The admin interface is read-only. No user receives admin privileges automatically. Administrative access uses the existing X session; no shared admin password is embedded in the site. The /api/admin endpoint independently enforces the allowlist and sends no-store responses.
+The admin interface exposes monitoring, private NFT selection and guarded moderation actions. No user receives admin privileges automatically. Administrative access uses the existing X session; no shared admin password is embedded in the site. The /api/admin endpoint independently enforces the allowlist and sends no-store responses.
 
 ## Production domain
 

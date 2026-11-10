@@ -34,6 +34,17 @@ test('loaded profiles and room threads do not flash false empty states while pen
  vm.runInContext('roomLoading=true',c);assert.match(c.roomBubbles(),/Loading the conversation/);assert.doesNotMatch(c.roomBubbles(),/Be the first/);
  vm.runInContext("roomLoading=false;roomLoadError='Offline'",c);assert.match(c.roomBubbles(),/Try again/);
 });
+test('recognition appears only in owner/public profiles with separate people and season-independent explanation',()=>{
+ const c=setup();vm.runInContext('data.user.reputation={recognized:12,people:3}',c);
+ const own=c.socialProfile();assert.match(own,/Recognized/);assert.match(own,/by 3 people/);assert.match(own,/Separate from VP; it does not reset with seasons/);assert.match(own,/account-reputation-count/);
+ const other=c.memberProfileHTML({person:{id:'bob',name:'Bob',handle:'bob',bio:'',followers:0,following_count:2,post_count:1,reputation:{recognized:4,people:1}},posts:[],rooms:[],controls:{}});assert.match(other,/by 1 person/);assert.match(other,/Recognized/);assert.match(other,/Following<\/dt><dd>2/);assert.doesNotMatch(other,/Your NFT eligibility/);
+ assert.doesNotMatch(c.socialFeed(),/Recognized|by 3 people/);assert.doesNotMatch(c.socialLeaderboard(),/Recognized|by 3 people/);
+ assert.match(c.reputationStatHTML({recognized:0,people:0}),/by 0 people/);assert.match(c.reputationStatHTML(null),/Loading recognition/);
+});
+test('opening the owner profile refreshes server recognition without overwriting another account',async()=>{
+ const c=setup();c.api=async()=>({person:{post_count:2,following_count:4,followers:3,reputation:{recognized:5,people:2}},posts:[]});await c.loadOwnProfile();assert.match(c.socialProfile(),/by 2 people/);assert.equal(vm.runInContext('data.user.reputation.recognized',c),5);
+ let finish;c.api=()=>new Promise(resolve=>finish=resolve);const pending=c.loadOwnProfile();vm.runInContext("data.user={id:'bob',reputation:{recognized:1,people:1}}",c);finish({person:{reputation:{recognized:99,people:99}},posts:[]});await pending;assert.equal(vm.runInContext('data.user.reputation.recognized',c),1);
+});
 test('text decoding preserves apostrophes and escapes entity-encoded markup',()=>{
  const c=setup();assert.equal(vm.runInContext("escapeHTML('It&#39;s a good day')",c),'It&#39;s a good day');
  const x=vm.runInContext("escapeHTML('&lt;script&gt;alert(1)&lt;/script&gt;')",c);assert.equal(x,'&lt;script&gt;alert(1)&lt;/script&gt;');assert.doesNotMatch(x,/<script>/);

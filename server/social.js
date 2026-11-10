@@ -1,3 +1,4 @@
+import {memberReputation} from './reputation.js';
 import {fail,text,uuid} from './http.js';
 import {publicUser,calendar} from './config.js';
 import {feed} from './service.js';
@@ -28,17 +29,19 @@ export async function memberProfile(db,user,id){
  EXISTS(SELECT 1 FROM follows WHERE follower_id=$1 AND following_id=u.id) AS following,
  EXISTS(SELECT 1 FROM follows WHERE following_id=$1 AND follower_id=u.id) AS follows_you,
  (SELECT count(*)::int FROM follows WHERE following_id=u.id) AS followers,
+ (SELECT count(*)::int FROM follows WHERE follower_id=u.id) AS following_count,
  (SELECT count(*)::int FROM posts WHERE user_id=u.id) AS post_count,
  COALESCE((SELECT sum(amount)::bigint FROM reward_ledger WHERE user_id=u.id AND season=$3),0) AS points
  FROM users u WHERE u.id=$2`,[user?.id||null,id,calendar().season]);
  if(!u)fail(404,'This member could not be found.');
+ const reputation=await memberReputation(db,id);
  const controls=user?(await db.q('SELECT blocked,muted FROM member_controls WHERE user_id=$1 AND target_id=$2',[user.id,id]))[0]||{}:{};
  const [hidden]=await db.q(`SELECT ${hiddenBy('$1','$2::uuid')} AS hidden`,[user?.id||null,id]);
  const rooms=hidden.hidden?[]:await db.q(`SELECT r.id,r.name,r.description,r.language,r.topic,r.owner_id,u.name AS owner_name,
  (SELECT count(*)::int FROM room_members WHERE room_id=r.id) AS member_count,
  EXISTS(SELECT 1 FROM room_members WHERE room_id=r.id AND user_id=$1) AS joined
  FROM rooms r JOIN users u ON u.id=r.owner_id WHERE r.archived_at IS NULL AND r.owner_id=$2 ORDER BY r.created_at DESC LIMIT 12`,[user?.id||null,id]);
- return {person:{...publicUser(u),following:u.following,follows_you:u.follows_you,followers:u.followers,post_count:u.post_count,points:Number(u.points)},controls,posts:hidden.hidden?[]:await feed(db,user,{author:id}),rooms,hidden:hidden.hidden};
+ return {person:{...publicUser(u),following:u.following,follows_you:u.follows_you,followers:u.followers,following_count:u.following_count,post_count:u.post_count,points:Number(u.points),reputation},controls,posts:hidden.hidden?[]:await feed(db,user,{author:id}),rooms,hidden:hidden.hidden};
 }
 export async function postDetail(db,user,id){
  uuid(id);const posts=await feed(db,user,{postId:id});if(!posts.length)fail(404,'This post is unavailable.');return {post:posts[0]};
@@ -127,7 +130,16 @@ export async function moderate(db,user,input){
   if(!['resolved','dismissed'].includes(input.status))fail(400,'Choose a review outcome.');
   const resolution=text(input.resolution,3,500);
   if(input.remove===true){
-   if(r.kind==='post')await tx.q('DELETE FROM posts WHERE id=$1',[r.target_id]);
+   if(r.kind==='post'){
+    // Delete the approved post atomically with its dependent records. Media become
+    // unreadable immediately; the existing cleanup job removes their stored bytes.
+    await tx.q('SELECT id FROM posts WHERE id=$1 FOR UPDATE',[r.target_id]);
+    await tx.q("UPDATE media_assets SET status='deleting',post_id=NULL,comment_id=NULL,expires_at=clock_timestamp() WHERE post_id=$1 OR comment_id IN (SELECT id FROM comments WHERE post_id=$1)",[r.target_id]);
+    await tx.q('DELETE FROM comments WHERE post_id=$1',[r.target_id]);
+    await tx.q('DELETE FROM reactions WHERE post_id=$1',[r.target_id]);
+    await tx.q('DELETE FROM saved_posts WHERE post_id=$1',[r.target_id]);
+    await tx.q('DELETE FROM posts WHERE id=$1',[r.target_id]);
+   }
    else if(r.kind==='comment')await tx.q('DELETE FROM comments WHERE id=$1',[r.target_id]);
    else if(r.kind==='room-message'){await tx.q('UPDATE room_messages SET deleted_at=now() WHERE id=$1',[r.target_id]);await voidContribution(tx,r.target_id);}
    else if(r.kind==='room')await tx.q('UPDATE rooms SET archived_at=now() WHERE id=$1',[r.target_id]);

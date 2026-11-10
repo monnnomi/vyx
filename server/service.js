@@ -1,3 +1,4 @@
+import {memberReputation} from './reputation.js';
 import {postViewProjection} from './post-views.js';
 import {reactionProjection,reactToMessage} from './message-reactions.js';
 import {messageViewProjection} from './message-views.js';
@@ -44,13 +45,14 @@ export async function state(db,user,now=null) {
  const c=calendar(now),[people,posts,tasks,event]=await Promise.all([members(db,user,c.season),feed(db,user),questState(db,user,now),halloweenState(db,user)]);
  let account=null;
  if(user){
-  const [balance,inventory,history,counts]=await Promise.all([
+  const [balance,inventory,history,counts,reputation]=await Promise.all([
    db.q('SELECT COALESCE(sum(amount) FILTER(WHERE season=$2),0)::int AS points,COALESCE(sum(amount),0)::int AS all_points FROM reward_ledger WHERE user_id=$1',[user.id,c.season]),
    db.q('SELECT tier,count(*)::int AS n FROM chests WHERE user_id=$1 AND opened_at IS NULL AND campaign_id IS NULL GROUP BY tier',[user.id]),
    db.q('SELECT l.amount,l.season,l.created_at,c.tier,c.campaign_id,l.source,r.name AS room_name FROM reward_ledger l LEFT JOIN chests c ON c.id=l.chest_id LEFT JOIN rooms r ON r.id=l.room_id WHERE l.user_id=$1 ORDER BY l.created_at DESC LIMIT 30',[user.id]),
-   db.q('SELECT (SELECT count(*)::int FROM posts WHERE user_id=$1) AS posts,(SELECT count(*)::int FROM follows WHERE follower_id=$1) AS following,(SELECT count(*)::int FROM follows WHERE following_id=$1) AS followers',[user.id])
+   db.q('SELECT (SELECT count(*)::int FROM posts WHERE user_id=$1) AS posts,(SELECT count(*)::int FROM follows WHERE follower_id=$1) AS following,(SELECT count(*)::int FROM follows WHERE following_id=$1) AS followers',[user.id]),
+   memberReputation(db,user.id)
   ]);
-  account={...publicUser(user),is_admin:isAdmin(user),...balance[0],inventory:[0,1,2,3].map(t=>inventory.find(i=>i.tier===t)?.n||0),history,...counts[0]};
+  account={...publicUser(user),is_admin:isAdmin(user),...balance[0],inventory:[0,1,2,3].map(t=>inventory.find(i=>i.tier===t)?.n||0),history,...counts[0],reputation};
  }
  return {calendar:c,mediaReady:mediaAvailable(),mediaLimits,user:account,members:people,posts,quests:tasks,event,farming:await farmingOverview(db,user),authReady:Boolean(process.env.X_CLIENT_ID&&process.env.X_CLIENT_SECRET&&process.env.VYX_APP_SECRET)};
 }

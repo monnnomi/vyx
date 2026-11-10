@@ -25,7 +25,7 @@ function signin(){if(!loaded){signInQueued=true;toast('Connecting to your circle
 function requireUser(){if(!data.user){signin();return false;}return true;}
 async function refresh(){
  const [stateResult,roomsResult]=await Promise.all([api('state'),api('rooms').catch(()=>({rooms:[]}))]);if(data.user?.id!==stateResult.user?.id){memberPreferences=null;preferencesError='';exploreState=null;exploreStatus='idle';exploreEpoch++;socialModalEpoch++;profileCache.clear();}data=stateResult;if(typeof syncMediaOwner==='function')syncMediaOwner(data.user?.id||null);if(dropOwner!==data.user?.id){dropData=null;inboxData=null;dropOwner=null;resetRoomWonder();}homeRooms=roomsResult.rooms;syncHalloweenClock(data.event);syncFarmClock(data.farming);loaded=true;feedStatus='ready';feedPosts=feedTab==='all'?data.posts:(await api('feed',undefined,{filter:feedTab})).posts;
- if(page==='profile'&&data.user){profileStatus='loading';try{profilePosts=(await api('feed',undefined,{author:data.user.id})).posts;profileStatus='ready';}catch(err){profileStatus='error';throw err;}}
+ if(page==='profile'&&data.user)await loadOwnProfile();
  render();loadProduct();if(signInQueued)signin();
 }
 async function write(action,body){
@@ -70,10 +70,20 @@ function render(){
  renderProductBadge();if(draft&&$('#post-input'))$('#post-input').value=draft;if(searchDraft!==undefined&&$('#room-search')){$('#room-search').value=searchDraft;if(searchFocused)$('#room-search').focus();}renderRail();if(typeof restoreMediaComposers==='function')restoreMediaComposers();
  const box=$('.chat-bubbles');if(box)box.scrollTop=box.scrollHeight;
 }
+let ownProfileEpoch=0;
+async function loadOwnProfile(){
+ const owner=data.user?.id,epoch=++ownProfileEpoch;if(!owner)return;profileStatus='loading';
+ try{
+  const result=await api('member-profile',undefined,{id:owner});
+  if(epoch!==ownProfileEpoch||owner!==data.user?.id)return;
+  profilePosts=result.posts;data.user.reputation=result.person.reputation;
+  data.user.posts=result.person.post_count;data.user.following=result.person.following_count;data.user.followers=result.person.followers;profileStatus='ready';
+ }catch(err){if(epoch===ownProfileEpoch&&owner===data.user?.id)profileStatus='error';throw err;}
+}
 async function loadPage(){
  try{
   if(['drops','notifications'].includes(page))await loadProduct();
-  if(page==='profile'&&data.user){profileStatus='loading';try{profilePosts=(await api('feed',undefined,{author:data.user.id})).posts;profileStatus='ready';}catch(err){profileStatus='error';throw err;}}
+  if(page==='profile'&&data.user)await loadOwnProfile();
   if(page==='messages'&&data.user){chats=(await api('conversations')).conversations;if(!activeChat&&chats.length)activeChat=chats[0].id;if(activeChat)chatMessages=(await api('messages',undefined,{id:activeChat})).messages;}
   if(['profile','leaderboard'].includes(page))await loadReferrals();
   if(page==='profile'&&data.user)await loadNftSelection();

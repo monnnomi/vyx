@@ -447,3 +447,7 @@ CREATE TABLE IF NOT EXISTS post_views (
  PRIMARY KEY(user_id,post_id)
 );
 CREATE INDEX IF NOT EXISTS post_views_post_idx ON post_views(post_id);
+
+-- Recognition reads existing reactions; no reputation ledger or score table.
+-- Read-time reputation: index existing likes without storing or backfilling a score.
+CREATE INDEX IF NOT EXISTS reactions_post_reputation_idx ON reactions(post_id,user_id);

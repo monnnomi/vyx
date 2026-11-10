@@ -450,3 +450,13 @@ html body[data-interface=social] .vyx-room-progress p{color:var(--sp-on-sun)}
 html body[data-interface=social] .vyx-guide-tabs button[aria-pressed=true],
 html body[data-interface=social] .vyx-interest-options button[aria-pressed=true]{background:var(--sp-ink);color:var(--sp-on-ink);border-color:transparent}
 html body[data-interface=social] .vyx-interest-options button{border-radius:999px;min-height:40px;padding:0 16px;font-size:13px;font-weight:600}
+
+/* Profile recognition: a permanent social status, separate from VP. */
+html body[data-interface=social] .account-social-counts{flex-wrap:wrap;align-items:flex-start;gap:18px 28px}
+html body[data-interface=social] .account-social-counts .account-reputation-count{align-items:baseline}
+html body[data-interface=social] .account-reputation-count dd{color:var(--accent)}
+html body[data-interface=social] .reputation-people{display:block;margin-top:3px;color:var(--muted);font-size:12px;font-weight:400;line-height:1.5}
+html body[data-interface=social] .reputation-explanation{max-width:560px;margin:-8px 0 23px;color:var(--muted);font-size:13px;line-height:1.65}
+html body[data-interface=social] .public-social-counts{gap:16px 24px;margin:20px 0}
+html body[data-interface=social] .public-profile .reputation-explanation{font-size:13px;line-height:1.65}
+@media(max-width:480px){html body[data-interface=social] .account-social-counts{gap:16px 22px}html body[data-interface=social] .account-social-counts>div{min-width:calc(50% - 22px);justify-content:flex-end}html body[data-interface=social] .reputation-explanation{font-size:12px;line-height:1.65}}

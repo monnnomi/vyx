@@ -41,20 +41,97 @@
     requestAnimationFrame(step);
   }
 
-  function shapes(){
-    const hero=document.querySelector('.conversation-stage .vyx-welcome');
-    if(!hero||hero.querySelector('.sp-shape'))return;
-    for(const s of ['s1','s2','s3']){
+  const SVG={
+    star:'<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 3l6.5 12.2 13.3-4-4 13.3L60 31l-12.2 6.5 4 13.3-13.3-4L32 59l-6.5-12.2-13.3 4 4-13.3L4 31l12.2-6.5-4-13.3 13.3 4z" fill="var(--sp-mint)" stroke="var(--sp-edge)" stroke-width="2.5" stroke-linejoin="round"/></svg>',
+    bubble:'<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M8 10h48a4 4 0 014 4v28a4 4 0 01-4 4H28L14 58V46H8a4 4 0 01-4-4V14a4 4 0 014-4z" fill="var(--sp-sky)" stroke="var(--sp-edge)" stroke-width="2.5" stroke-linejoin="round"/><path d="M17 23h30M17 32h19" stroke="var(--sp-edge)" stroke-width="2.5" stroke-linecap="round"/></svg>',
+    coin:'<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="28" fill="var(--sp-sun)" stroke="var(--sp-edge)" stroke-width="2.5"/><circle cx="32" cy="32" r="21" fill="none" stroke="var(--sp-edge)" stroke-width="1.5" stroke-dasharray="3 4"/><text x="32" y="39" text-anchor="middle" font-family="DM Sans,sans-serif" font-weight="800" font-size="19" fill="#15172b">VP</text></svg>',
+    block:'<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="5" y="5" width="54" height="54" rx="16" fill="var(--sp-coral)" stroke="var(--sp-edge)" stroke-width="2.5"/></svg>',
+    ring:'<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="22" fill="none" stroke="var(--sp-violet)" stroke-width="12"/><circle cx="32" cy="32" r="28" fill="none" stroke="var(--sp-edge)" stroke-width="2.5"/><circle cx="32" cy="32" r="16" fill="none" stroke="var(--sp-edge)" stroke-width="2.5"/></svg>'
+  };
+  const SHAPES=[['s1','block',26],['s2','coin',40],['s3','star',18],['s4','bubble',32],['s5','ring',14]];
+
+  function shapes(hero){
+    if(hero.querySelector('.sp-shape'))return;
+    for(const [cls,kind,depth] of SHAPES){
       const i=document.createElement('i');
-      i.className='sp-shape '+s;i.setAttribute('aria-hidden','true');
+      i.className='sp-shape '+cls;i.setAttribute('aria-hidden','true');i.style.setProperty('--d',depth);
+      i.innerHTML='<b>'+SVG[kind]+'</b>';
       hero.appendChild(i);
     }
+  }
+
+  // "Line one<br>Line two<br><span>Line three</span>" -> masked lines that slide up one after another.
+  function splitHeadline(hero){
+    const h=hero.querySelector('h1');
+    if(!h||h.dataset.spSplit)return;
+    h.dataset.spSplit='1';
+    const lines=[[]];
+    [...h.childNodes].forEach(n=>{if(n.nodeName==='BR')lines.push([]);else lines[lines.length-1].push(n)});
+    h.textContent='';
+    lines.filter(l=>l.length).forEach((nodes,i)=>{
+      const line=document.createElement('span');line.className='sp-line';
+      const inner=document.createElement('span');inner.className='sp-line-in';inner.style.animationDelay=(0.08+i*0.12)+'s';
+      nodes.forEach(n=>inner.appendChild(n));line.appendChild(inner);h.appendChild(line);
+    });
+  }
+
+  // Two rows of the real, currently listed rooms. Clicking a pill opens that room through the
+  // existing list button, so there is no second code path for joining.
+  function marquee(hero){
+    const rows=[...document.querySelectorAll('.chat-room-list .room-row[data-room-open]')];
+    const sig=rows.map(r=>r.dataset.roomOpen).join('|');
+    let band=hero.querySelector('.sp-marquee');
+    if(!rows.length){if(band)band.remove();return}
+    if(band&&band.dataset.sig===sig)return;
+    if(!band){
+      band=document.createElement('div');band.className='sp-marquee';band.setAttribute('aria-hidden','true');
+      const before=hero.querySelector('.vyx-quick-start');
+      hero.insertBefore(band,before);
+      band.addEventListener('click',e=>{
+        const pill=e.target.closest('[data-sp-room]');if(!pill)return;
+        const btn=[...document.querySelectorAll('.chat-room-list .room-row[data-room-open]')].find(r=>r.dataset.roomOpen===pill.dataset.spRoom);
+        if(btn)btn.click();
+      });
+    }
+    band.dataset.sig=sig;band.textContent='';
+    const items=rows.map(r=>({id:r.dataset.roomOpen,name:(r.querySelector('.room-row-name')||r).textContent.trim()})).filter(x=>x.name);
+    if(!items.length){band.remove();return}
+    for(let t=0;t<2;t++){
+      const track=document.createElement('div');track.className='sp-track'+(t?' rev':'');
+      let list=t?[...items].reverse():[...items];
+      while(list.length<8)list=list.concat(list);
+      for(let half=0;half<2;half++)list.forEach((it,i)=>{
+        const b=document.createElement('button');b.type='button';b.tabIndex=-1;b.className='sp-pill c'+((i+t*2)%5);
+        b.dataset.spRoom=it.id;b.textContent=it.name;track.appendChild(b);
+      });
+      track.style.animationDuration=Math.max(28,list.length*5)+'s';
+      band.appendChild(track);
+    }
+  }
+
+  let pointerBound=new WeakSet();
+  function pointer(hero){
+    if(pointerBound.has(hero))return;pointerBound.add(hero);
+    let raf=0,mx=0,my=0;
+    hero.addEventListener('pointermove',e=>{
+      if(reduced()||e.pointerType==='touch')return;
+      const r=hero.getBoundingClientRect();
+      mx=((e.clientX-r.left)/r.width-.5)*2;my=((e.clientY-r.top)/r.height-.5)*2;
+      if(!raf)raf=requestAnimationFrame(()=>{raf=0;hero.style.setProperty('--mx',mx.toFixed(3));hero.style.setProperty('--my',my.toFixed(3))});
+    });
+    hero.addEventListener('pointerleave',()=>{hero.style.setProperty('--mx',0);hero.style.setProperty('--my',0)});
+  }
+
+  function hero(){
+    const el=document.querySelector('.conversation-stage .vyx-welcome');
+    if(!el)return;
+    splitHeadline(el);shapes(el);marquee(el);pointer(el);
   }
 
   const KEYS=['.chat-directory-footer b','.x-task-summary>strong','.vyx-reward-summary strong','.ranking-podium-score','.drop-metrics strong'];
   const lastShown=new Map();
   function enhance(){
-    roundProgress();shapes();
+    roundProgress();hero();
     KEYS.forEach(sel=>document.querySelectorAll(sel).forEach((el,i)=>{
       if(seen.has(el))return;
       seen.add(el);

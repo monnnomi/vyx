@@ -317,6 +317,10 @@ html body[data-interface=social] .room-message.mine .room-message-content{border
 html body[data-interface=social] .vyx-room-progress{border:2px solid var(--sp-edge);background:var(--sp-sun);color:var(--sp-on-sun)}
 html body[data-interface=social] .vyx-room-progress *{color:var(--sp-on-sun)}
 html body[data-interface=social] .vyx-room-progress .text-link{text-decoration:underline}
+html body[data-interface=social] .vyx-room-progress.is-collapsed{background:transparent;border:0;padding:0;min-height:44px;margin-bottom:0}
+html body[data-interface=social] .vyx-room-progress.is-collapsed .vyx-room-progress-toggle,
+html body[data-interface=social] .vyx-room-progress.is-collapsed .vyx-room-progress-toggle *{color:var(--muted)}
+html body[data-interface=social] .vyx-room-progress.is-collapsed .vyx-room-progress-toggle:hover{background:var(--blue-soft);color:var(--accent)}
 html body[data-interface=social] .vyx-live-dot,html body[data-interface=social] .vyx-beta-label::before{animation:sp-pulse 1.8s infinite}
 html body[data-interface=social] .reaction-add{transition:transform .15s cubic-bezier(.3,1.6,.5,1)}
 html body[data-interface=social] .reaction-add:hover{transform:scale(1.12) rotate(-4deg)}

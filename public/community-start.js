@@ -7,6 +7,19 @@ const vyxJourneyMemory=new Set();
 function vyxOwner(){return data.user?.id||'guest';}
 function vyxStored(key){try{return JSON.parse(localStorage.getItem(key)||'null');}catch{return null;}}
 function vyxStore(key,value){try{localStorage.setItem(key,JSON.stringify(value));}catch{}}
+const vyxRoomProgressKey='vyx-room-progress-collapsed-v1';
+let vyxRoomProgressCollapsed=vyxStored(vyxRoomProgressKey)===true;
+function vyxSetRoomProgressCollapsed(collapsed){
+ vyxRoomProgressCollapsed=collapsed;
+ vyxStore(vyxRoomProgressKey,collapsed);
+ const panel=$('#vyx-room-progress'),content=$('#vyx-room-progress-content'),button=$('[data-vyx-progress-toggle]'),label=$('[data-vyx-progress-label]');
+ const log=$('.room-chat-log'),atBottom=log&&log.scrollHeight-log.scrollTop-log.clientHeight<80;
+ panel?.classList.toggle('is-collapsed',collapsed);
+ if(content)content.hidden=collapsed;
+ if(button){button.setAttribute('aria-expanded',String(!collapsed));button.setAttribute('aria-label',collapsed?'Show VP panel':'Hide VP panel');}
+ if(label)label.textContent=collapsed?'Show VP panel':'Hide';
+ if(atBottom)log.scrollTop=log.scrollHeight;
+}
 function vyxMeasured(){try{return window.VYX_ANALYTICS?.enabled&&localStorage.getItem('vyx-analytics-consent-v1')==='granted';}catch{return false;}}
 function vyxJourneyOnce(event,owner=vyxOwner(),session=false){
  if(!vyxMeasured())return;
@@ -54,7 +67,7 @@ function vyxRoomProgressHTML(id){
  const f=farmRooms.get(id),feedback=vyxSendFeedback.get(id),validFeedback=feedback?.owner===data.user?.id?feedback:null,info=f||data.farming;
  if(!data.user||!roomInfo?.joined)return '';
  const last=f?.room?.drops?.find(d=>Number(d.own)>0),count=f?.room?.activity?.own;
- return `<section id="vyx-room-progress" class="vyx-room-progress" aria-label="Your room contribution"><div class="vyx-room-progress-line"><span class="vyx-live-dot"></span>${info?.status==='active'&&info.current?`<span>Round closes in <b data-farm-end="${e(info.current.endsAt)}">${farmCountdown(info.current.endsAt)}</b></span>`:'<span>Room rewards</span>'}<span>${count==null?'Loading your contribution…':`${fmt(count)} eligible ${count===1?'message':'messages'} this round`}</span><button class="text-link" data-room-action="details">Details</button></div>${validFeedback?`<p class="vyx-send-feedback ${validFeedback.counted?'is-counted':''}" role="status"><strong>${validFeedback.counted?'✓ Message counted for VP.':'Message delivered; no VP contribution.'}</strong> ${e(validFeedback.reason||'')} <button class="text-link" data-vyx-guide="rewards">Why?</button></p>`:`<p class="vyx-send-feedback">${count>0?'Your contribution is recorded for this round. Keep the conversation going.':'Share an original idea or reply. Your next eligible message starts your contribution.'}</p>`}${last?`<small>Last confirmed room drop: +${fmt(last.own)} VP · ${utcTime(last.ends_at)}</small>`:'<small>No confirmed reward in the recent room drops. Receipts appear after processing.</small>'}</section>`;
+ return `<section id="vyx-room-progress" class="vyx-room-progress${vyxRoomProgressCollapsed?' is-collapsed':''}" aria-label="Your room contribution"><button class="vyx-room-progress-toggle" data-vyx-progress-toggle aria-expanded="${!vyxRoomProgressCollapsed}" aria-controls="vyx-room-progress-content" aria-label="${vyxRoomProgressCollapsed?'Show VP panel':'Hide VP panel'}"><span data-vyx-progress-label>${vyxRoomProgressCollapsed?'Show VP panel':'Hide'}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><div id="vyx-room-progress-content"${vyxRoomProgressCollapsed?' hidden':''}><div class="vyx-room-progress-line"><span class="vyx-live-dot"></span>${info?.status==='active'&&info.current?`<span>Round closes in <b data-farm-end="${e(info.current.endsAt)}">${farmCountdown(info.current.endsAt)}</b></span>`:'<span>Room rewards</span>'}<span>${count==null?'Loading your contribution…':`${fmt(count)} eligible ${count===1?'message':'messages'} this round`}</span><button class="text-link" data-room-action="details">Details</button></div>${validFeedback?`<p class="vyx-send-feedback ${validFeedback.counted?'is-counted':''}" role="status"><strong>${validFeedback.counted?'✓ Message counted for VP.':'Message delivered; no VP contribution.'}</strong> ${e(validFeedback.reason||'')} <button class="text-link" data-vyx-guide="rewards">Why?</button></p>`:`<p class="vyx-send-feedback">${count>0?'Your contribution is recorded for this round. Keep the conversation going.':'Share an original idea or reply. Your next eligible message starts your contribution.'}</p>`}${last?`<small>Last confirmed room drop: +${fmt(last.own)} VP · ${utcTime(last.ends_at)}</small>`:'<small>No confirmed reward in the recent room drops. Receipts appear after processing.</small>'}</div></section>`;
 }
 function vyxUpdateRoomProgress(){const node=$('#vyx-room-progress');if(node&&activeRoom)node.outerHTML=vyxRoomProgressHTML(activeRoom);}
 
@@ -91,6 +104,7 @@ window.addEventListener('vyx-auth-changed',()=>{vyxSendFeedback.clear();});
 window.addEventListener('vyx-analytics-choice',()=>vyxMeasureVisit());
 document.addEventListener('click',async ev=>{
  const b=ev.target.closest('button');if(!b)return;
+ if(b.hasAttribute('data-vyx-progress-toggle'))vyxSetRoomProgressCollapsed(!vyxRoomProgressCollapsed);
  if(b.hasAttribute('data-vyx-start')){trackProduct('getting_started');vyxStartModal();}
  if(b.dataset.vyxInterest){vyxInterest=vyxInterests.includes(b.dataset.vyxInterest)?b.dataset.vyxInterest:vyxInterests[0];vyxStartModal();}
  if(b.dataset.vyxGuide)vyxGuideModal(b.dataset.vyxGuide);

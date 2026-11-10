@@ -34,3 +34,16 @@ body[data-interface=social] .primary.vyx-primary:hover{background:#ff6584;color:
 .vyx-starter-rooms{grid-template-columns:minmax(0,1fr)}
 .vyx-starter-room{min-width:0;max-width:100%}
 .vyx-starter-room strong{overflow-wrap:anywhere}
+
+/* Keep the chat and its draft intact when hiding the reward summary. */
+.vyx-room-progress{position:relative}
+.vyx-room-progress-line{padding-right:74px;min-height:30px}
+.vyx-room-progress-toggle{position:absolute;top:4px;right:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 10px;border:0;border-radius:12px;background:transparent;color:inherit;font:inherit;font-weight:650;cursor:pointer}
+.vyx-room-progress-toggle svg{transform:rotate(180deg)}
+.vyx-room-progress-toggle:hover{background:#15172b12}
+.vyx-room-progress-toggle:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+#vyx-room-progress-content[hidden]{display:none}
+#vyx-room-progress-content>small{display:block;font-size:inherit;line-height:1.6}
+.vyx-room-progress.is-collapsed{display:flex;justify-content:flex-end;padding:0 12px;background:none;border:0;min-height:44px}
+.vyx-room-progress.is-collapsed .vyx-room-progress-toggle{position:static;color:var(--muted)}
+.vyx-room-progress.is-collapsed .vyx-room-progress-toggle svg{transform:none}

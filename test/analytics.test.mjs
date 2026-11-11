@@ -53,3 +53,7 @@ test('journey goals are queued until ready, use only approved fields and stop af
  assert.ok(!JSON.stringify(ga).includes('SECRET'));assert.ok(!JSON.stringify(ga).includes('private-room'));
  b.choose('denied');b.window.VYXAnalytics.track('first_vp_contribution');assert.ok(!b.window.dataLayer.some(a=>a[1]==='first_vp_contribution'));
 });
+test('news visits measure only the section, with no story or source-account identifiers',()=>{
+ const b=browser({saved:'granted'});b.ready();b.location.search='?story=PRIVATE-STORY';b.navigate('#news');
+ const hit=b.views().google.at(-1);assert.equal(hit[2].page_location,'https://new-vyx.example/#news');assert.ok(!JSON.stringify(b.views()).includes('PRIVATE-STORY'));
+});

@@ -80,6 +80,7 @@ npm test
 | --- | --- |
 | Общая разметка, загрузка модулей | `public/index.html`, `public/community.js`, `public/app.js` |
 | Оболочка, лента, профиль, навигация и темы | `public/social-shell.js/.css`, `public/social-quality.js/.css`, `public/brand-v1.css`, `public/community-start.js/.css` |
+| Новости и мониторинг X | `public/news.js/.css`, `public/admin-news.js`, `api/news.js`, `api/news-cron/`, `server/news*.js`, `docs/newsroom.md` |
 | Комнаты и сообщения | `public/rooms.js`, `public/room-messenger.js`, `server/rooms.js`, `server/room-activity.js` |
 | Общие операции, посты, личные сообщения | `api/vyx.js`, `server/service.js`, `server/social.js` |
 | Реакции и просмотры | `public/message-reactions.js`, `public/message-views.js`, `public/post-views.js`, соответствующие файлы в `server/` |

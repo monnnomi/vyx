@@ -86,3 +86,7 @@ test('news schedule is hourly UTC and separate from the six unchanged farm trigg
  const crons=v.crons.filter(c=>c.path.startsWith('/api/news-cron/'));
  assert.deepEqual(crons.map(c=>c.schedule),Array.from({length:24},(_,h)=>`25 ${h} * * *`));assert.equal(new Set(v.crons.map(c=>c.path)).size,30);
 });
+test('news readers remain present under the news section without receiving rewards',async()=>{
+ const {touchPresence}=await import('../api/presence.js');await touchPresence(db,member.user,token(),'news');
+ const [row]=await db.q('SELECT page FROM presence_sessions WHERE user_id=$1',[member.user.id]);assert.equal(row.page,'news');
+});

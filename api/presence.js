@@ -1,7 +1,7 @@
 import {withDB} from '../server/db.js';
 import {session,sameOrigin,body,fail,handleError,json,cookie,setCookie,token,hash,limit,ipKey} from '../server/http.js';
 export async function touchPresence(db,user,visitorToken,page){
- const allowed=['feed','tasks','rewards','leaderboard','messages','rooms','profile','whitelist','admin'];
+ const allowed=['news','feed','tasks','rewards','leaderboard','messages','rooms','profile','whitelist','admin'];
  const route=allowed.includes(page)?page:'feed';
  await db.q(`INSERT INTO presence_sessions(token_hash,user_id,page,last_seen_at) VALUES($1,$2,$3,clock_timestamp())
  ON CONFLICT(token_hash) DO UPDATE SET user_id=EXCLUDED.user_id,page=EXCLUDED.page,last_seen_at=EXCLUDED.last_seen_at`,[hash(visitorToken),user?.id||null,route]);

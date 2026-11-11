@@ -1,6 +1,7 @@
 import {createHash,randomUUID,timingSafeEqual} from 'node:crypto';
 import {fail} from './http.js';
-import {newsModel,newsCategories,reserveNewsCost} from './news.js';
+import {newsCategories,reserveNewsCost} from './news.js';
+import {newsAIConfig,newsAIStatus} from './news-ai.js';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 export function requireNewsCron(req){const secret=process.env.CRON_SECRET;if(!secret||!timingSafeEqual(Buffer.from(hash(String(req.headers.authorization||'')),'hex'),Buffer.from(hash('Bearer '+secret),'hex')))fail(401,'Unauthorized.');}
 async function fetchJSON(fetcher,url,options={}){
@@ -52,10 +53,11 @@ const schema=properties=>({type:'object',additionalProperties:false,properties,r
 const draftSchema=schema({newsworthy:bool,category:{type:'string',enum:newsCategories},risk:{type:'string',enum:['low','high']},title_en:str,title_ru:str,summary_en:str,summary_ru:str,body_en:{type:'array',items:str},body_ru:{type:'array',items:str},evidence:{type:'array',items:str},duplicate_of:{type:['string','null']}});
 const verifySchema=schema({supported:bool,translations_match:bool,newsworthy:bool,low_risk:bool,confidence:{type:'integer'},reason:str});
 async function ai(db,fetcher,name,format,payload,instructions){
+ const config=newsAIConfig();if(!config.key)throw Error('AI credential missing');
  const input=JSON.stringify(payload);if(Buffer.byteLength(input+instructions)>48000)throw Error('input-too-large');
- // Fixed model: $0.75/1M input, $4.50/1M output. 48k input bytes + 2400 output tokens < 6 cents.
+ // Conservative reservation for the two allowlisted models. Provider reference rates are documented.
  await reserveNewsCost(db,'ai',6);
- const r=await fetchJSON(fetcher,'https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+process.env.OPENAI_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({model:newsModel,store:false,instructions,input,max_output_tokens:2400,reasoning:{effort:'none'},text:{format:{type:'json_schema',name,strict:true,schema:format}}})});
+ const r=await fetchJSON(fetcher,config.endpoint,{method:'POST',headers:{Authorization:'Bearer '+config.key,'Content-Type':'application/json'},body:JSON.stringify({model:config.model,store:false,instructions,input,max_output_tokens:2400,reasoning:{effort:'none'},text:{format:{type:'json_schema',name,strict:true,schema:format}}})});
  if(r.status!=='completed')throw Error('incomplete-ai-output');
  const output=(r.output||[]).flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join('');
  return JSON.parse(output);
@@ -96,7 +98,7 @@ async function processItem(db,item,fetcher,lease){
 export async function runNewsPipeline(db,fetcher=fetch){
  const [settings]=await db.q('SELECT * FROM news_settings WHERE id=1');
  const [count]=await db.q('SELECT count(*)::int AS n FROM news_sources WHERE enabled AND NOT archived');
- const idle=!count.n?'waiting-for-sources':!settings.enabled?'paused':!process.env.X_NEWS_BEARER_TOKEN||!process.env.OPENAI_API_KEY?'waiting-for-credentials':null;
+ const idle=!count.n?'waiting-for-sources':!settings.enabled?'paused':!process.env.X_NEWS_BEARER_TOKEN||!newsAIStatus().ready?'waiting-for-credentials':null;
  if(idle){await db.q('UPDATE news_settings SET last_status=$1 WHERE id=1',[idle]);return {status:idle,collected:0,processed:0};}
  const started=Date.now(),lease=randomUUID();
  const [lock]=await db.q("UPDATE news_settings SET lease_token=$1,lease_until=clock_timestamp()+interval '3 minutes',last_started_at=clock_timestamp(),last_status='running' WHERE id=1 AND (lease_until IS NULL OR lease_until<clock_timestamp()) RETURNING id",[lease]);

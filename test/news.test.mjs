@@ -2,7 +2,7 @@ import {test,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import {randomUUID} from 'node:crypto';
+import {newsAIConfig,newsAIStatus} from '../server/news-ai.js';
 import {listNews,newsAdminState,newsAdminWrite,reserveNewsCost,newsHandle} from '../server/news.js';
 import {normalizeNewsPost,canAutoPublish,runNewsPipeline} from '../server/news-pipeline.js';
 import {createNewsHandler} from '../api/news.js';
@@ -17,17 +17,17 @@ after(()=>pg.close());
 const sourceText='The public test network now supports a faster block explorer. The updated interface includes clearer transaction details and a new search tool for developers.';
 const draft={newsworthy:true,category:'updates',risk:'low',title_en:'A clearer block explorer is now available',title_ru:'В тестовой сети обновили обозреватель блоков',summary_en:'The account announced an updated explorer with improved transaction details and search.',summary_ru:'Аккаунт сообщил об обновлении обозревателя: улучшены данные транзакций и поиск.',body_en:['According to the account, the public test network has updated its block explorer with clearer transaction details and a new search tool.'],body_ru:['По сообщению аккаунта, в публичной тестовой сети обновили обозреватель блоков, добавив более понятные данные транзакций и новый поиск.'],evidence:['clearer transaction details and a new search tool'],duplicate_of:null};
 const verdict={supported:true,translations_match:true,newsworthy:true,low_risk:true,confidence:97,reason:'Both versions stay within the source announcement.'};
-async function reset(){await db.q('DELETE FROM news_audit');await db.q('DELETE FROM news_items');await db.q('DELETE FROM news_sources');await db.q('DELETE FROM news_budget');await db.q("UPDATE news_settings SET enabled=false,auto_publish=true,daily_budget_cents=100,lease_token=NULL,lease_until=NULL,last_status='waiting-for-sources'");process.env.X_NEWS_BEARER_TOKEN='fixture-x';process.env.OPENAI_API_KEY='fixture-ai';}
+async function reset(){delete process.env.VYX_NEWS_AI_BASE_URL;delete process.env.VYX_NEWS_AI_MODEL;delete process.env.VYX_NEWS_AI_API_KEY;await db.q('DELETE FROM news_audit');await db.q('DELETE FROM news_items');await db.q('DELETE FROM news_sources');await db.q('DELETE FROM news_budget');await db.q("UPDATE news_settings SET enabled=false,auto_publish=true,daily_budget_cents=100,lease_token=NULL,lease_until=NULL,last_status='waiting-for-sources'");process.env.X_NEWS_BEARER_TOKEN='fixture-x';process.env.OPENAI_API_KEY='fixture-ai';}
 async function source(){await newsAdminWrite(db,owner.user,{action:'source-add',username:'@example'});return (await db.q('SELECT * FROM news_sources'))[0];}
 async function enable(){await newsAdminWrite(db,owner.user,{action:'settings',enabled:true,autoPublish:true,budgetCents:100});}
 const post=(id='10000')=>({id,author_id:'123',text:sourceText,created_at:new Date().toISOString()});
-function provider({d=draft,v=verdict,posts=[post()],next=null,onAI=async()=>{}}={}){
+function provider({d=draft,v=verdict,posts=[post()],next=null,onAI=async()=>{},endpoint='https://api.openai.com/v1/responses'}={}){
  const calls=[];let ai=0;
  const fetcher=async(url,options)=>{
   calls.push({url,options});assert.equal(options.redirect,'error');
   if(url.includes('/by/username/'))return new Response(JSON.stringify({data:{id:'123',username:'example'}}));
   if(url.includes('/tweets'))return new Response(JSON.stringify({data:posts,meta:next?{next_token:next}:{}}));
-  assert.equal(url,'https://api.openai.com/v1/responses');const payload=JSON.parse(options.body);assert.equal(payload.store,false);assert.equal(payload.text.format.strict,true);await onAI(++ai);
+  assert.equal(url,endpoint);const payload=JSON.parse(options.body);assert.equal(payload.store,false);assert.equal(payload.text.format.strict,true);await onAI(++ai);
   return new Response(JSON.stringify({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(ai%2?d:v)}]}]}));
  };return {calls,fetcher};
 }
@@ -49,7 +49,7 @@ test('only allowlisted admins can manage sources, drafts or automation; POST req
  assert.equal(newsHandle('https://x.com/Example'),'example');for(const s of ['https://evil.invalid/a','example?secret=1','a/b','x'.repeat(16)])assert.throws(()=>newsHandle(s));
 });
 test('cron requires its secret and missing credentials cannot enable collection',async()=>{
- await reset();await source();delete process.env.OPENAI_API_KEY;await assert.rejects(()=>enable(),/connect X and OpenAI/);
+ await reset();await source();delete process.env.OPENAI_API_KEY;await assert.rejects(()=>enable(),/connect X and the AI service/);
  const cron=createNewsCronHandler(fn=>fn(db),()=>{throw Error('must not call');});assert.equal((await call(cron,{url:'/api/news-cron'})).status,401);
 });
 test('collection validates author, time, references and full source text',()=>{
@@ -89,4 +89,22 @@ test('news schedule is hourly UTC and separate from the six unchanged farm trigg
 test('news readers remain present under the news section without receiving rewards',async()=>{
  const {touchPresence}=await import('../api/presence.js');await touchPresence(db,member.user,token(),'news');
  const [row]=await db.q('SELECT page FROM presence_sessions WHERE user_id=$1',[member.user.id]);assert.equal(row.page,'news');
+});
+test('ORBITA provider uses its own key, with both writing and verification sent only to its endpoint',async()=>{
+ await reset();process.env.VYX_NEWS_AI_BASE_URL='https://triklz27.ru/v1';process.env.VYX_NEWS_AI_MODEL='gpt-6-luna';process.env.VYX_NEWS_AI_API_KEY='fixture-orbita-ai';
+ await source();await enable();const p=provider({endpoint:'https://triklz27.ru/v1/responses'});await runNewsPipeline(db,p.fetcher);
+ const calls=p.calls.filter(c=>c.options.method==='POST');assert.equal(calls.length,2);
+ for(const c of calls){assert.equal(c.options.headers.Authorization,'Bearer fixture-orbita-ai');assert.equal(JSON.parse(c.options.body).model,'gpt-6-luna');}
+ const state=await newsAdminState(db,owner.user);assert.equal(state.readiness.ai,true);assert.equal(state.readiness.provider,'ORBITA AI service');assert.ok(!JSON.stringify(state).includes('fixture-orbita-ai'));
+ assert.equal((await listNews(db)).articles.length,1);
+});
+test('unapproved AI hosts, URL credentials, paths, ports and unpriced models fail closed without sending keys',async()=>{
+ await reset();
+ for(const base of ['http://triklz27.ru/v1','https://evil.invalid/v1','https://triklz27.ru.evil.invalid/v1','https://api.openai.com@evil.invalid/v1','https://secret@triklz27.ru/v1','https://triklz27.ru/v1?key=secret','https://triklz27.ru/v1#secret','https://triklz27.ru:444/v1','https://triklz27.ru/other']){
+  process.env.VYX_NEWS_AI_BASE_URL=base;assert.equal(newsAIStatus().ready,false);assert.throws(()=>newsAIConfig());
+ }
+ process.env.VYX_NEWS_AI_BASE_URL='https://triklz27.ru/v1';delete process.env.VYX_NEWS_AI_API_KEY;assert.equal(newsAIStatus().ready,false,'An official OpenAI fallback key is not sent to the proxy');
+ process.env.VYX_NEWS_AI_API_KEY='fixture-orbita-ai';process.env.VYX_NEWS_AI_MODEL='unpriced-model';assert.equal(newsAIStatus().ready,false);
+ delete process.env.VYX_NEWS_AI_MODEL;process.env.VYX_NEWS_AI_API_KEY='bad\nheader';assert.equal(newsAIStatus().ready,false);
+ await reset();
 });

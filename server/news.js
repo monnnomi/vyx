@@ -1,6 +1,6 @@
 import {fail,uuid} from './http.js';
 import {requireAdmin} from './admin.js';
-export const newsModel='gpt-5.4-mini-2026-03-17';
+import {newsAIStatus} from './news-ai.js';
 export const newsCategories=['updates','ecosystem','events','security'];
 export function newsHandle(value){
  const handle=String(value||'').trim().replace(/^https:\/\/(?:www\.)?(?:x\.com|twitter\.com)\//i,'').replace(/^@/,'').replace(/\/$/,'');
@@ -30,14 +30,15 @@ export async function newsAdminState(db,user){
  const [usage]=await db.q("SELECT * FROM news_budget WHERE day=(clock_timestamp() AT TIME ZONE 'UTC')::date");
  const counts=await db.q('SELECT status,count(*)::int AS total FROM news_items GROUP BY status');
  const {lease_token,lease_until,...safeSettings}=settings;
+ const ai=newsAIStatus();
  return {settings:safeSettings,sources,items,counts,usage:usage||{reserved_cents:0,x_cents:0,ai_cents:0},
- readiness:{x:Boolean(process.env.X_NEWS_BEARER_TOKEN),ai:Boolean(process.env.OPENAI_API_KEY),sources:sources.some(s=>s.enabled),model:newsModel},budgetNote:'Conservative request reservations in USD cents, not an invoice. Failed or uncertain requests keep their reservation. UTC daily reset.'};
+ readiness:{x:Boolean(process.env.X_NEWS_BEARER_TOKEN),ai:ai.ready,sources:sources.some(s=>s.enabled),model:ai.model,provider:ai.provider},budgetNote:'Conservative request reservations in USD cents, not an invoice. Failed or uncertain requests keep their reservation. UTC daily reset.'};
 }
 export async function newsAdminWrite(db,user,input){
  requireAdmin(user);
  if(input.action==='settings'){
   if(typeof input.enabled!=='boolean'||typeof input.autoPublish!=='boolean'||!Number.isInteger(input.budgetCents)||input.budgetCents<0||input.budgetCents>100)fail(400,'Choose a daily allowance from $0 to $1.');
-  if(input.enabled){const [n]=await db.q('SELECT count(*)::int AS n FROM news_sources WHERE enabled AND NOT archived');if(!n.n||!process.env.X_NEWS_BEARER_TOKEN||!process.env.OPENAI_API_KEY)fail(409,'Add sources and connect X and OpenAI before starting the newsroom.');}
+  if(input.enabled){const [n]=await db.q('SELECT count(*)::int AS n FROM news_sources WHERE enabled AND NOT archived');if(!n.n||!process.env.X_NEWS_BEARER_TOKEN||!newsAIStatus().ready)fail(409,'Add sources and connect X and the AI service before starting the newsroom.');}
   await db.q('UPDATE news_settings SET enabled=$1,auto_publish=$2,daily_budget_cents=$3,updated_at=clock_timestamp() WHERE id=1',[input.enabled,input.autoPublish,input.budgetCents]);
  }else if(input.action==='source-add'){
   const username=newsHandle(input.username);

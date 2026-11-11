@@ -3,7 +3,7 @@
 const dmDrafts=new Map();
 let socialPostDraft='';
 function socialNav(){
- const items=[['rooms','message','Chats'],['feed','home','Feed'],['tasks','tasks','Quests'],['notifications','bell','Activity'],['profile','user','You']];
+ const items=[['rooms','message','Chats'],['feed','home','Feed'],['news','news','News'],['tasks','tasks','Quests'],['notifications','bell','Activity'],['profile','user','You']];
  for(const target of ['#main-nav','#mobile-nav'])$(target).innerHTML=items.map(([id,glyph,label])=>`<a class="nav-link ${page===id||(id==='rooms'&&page==='messages')?'active':''}" href="#${id}" aria-label="${label}" ${page===id?'aria-current="page"':''}>${icon(glyph)}<span class="nav-text">${label}</span></a>`).join('');
  const account=$('#nav-account');if(account)account.innerHTML=`<button class="nav-account" data-action="${data.user?'profile':'signin'}" aria-label="${data.user?'Your account':'Connect with X'}">${data.user?avatar(data.user):icon('user')}</button>`;
 }

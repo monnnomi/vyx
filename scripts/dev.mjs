@@ -9,9 +9,11 @@ import presence from '../api/presence.js';
 import media from '../api/media.js';
 import farm from '../api/farm.js';
 import farmCron from '../api/farm-cron.js';
+import news from '../api/news.js';
+import newsCron from '../api/news-cron.js';
 const port=Number(process.env.PORT||4173),root=resolve('public');
 process.env.PUBLIC_APP_URL=`http://127.0.0.1:${port}`;
-const routes={'/api/vyx':handler,'/api/media':media,'/api/admin':admin,'/api/presence':presence,'/api/farm':farm,'/api/farm-cron':farmCron,'/api/auth/x':start,'/api/auth/callback/x':callback};
+const routes={'/api/news':news,'/api/news-cron':newsCron,'/api/vyx':handler,'/api/media':media,'/api/admin':admin,'/api/presence':presence,'/api/farm':farm,'/api/farm-cron':farmCron,'/api/auth/x':start,'/api/auth/callback/x':callback};
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.webp':'image/webp','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'};
 http.createServer(async(req,res)=>{
  const path=new URL(req.url,process.env.PUBLIC_APP_URL).pathname;

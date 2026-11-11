@@ -36,7 +36,7 @@
       ]
     },
     {
-      "source": "/(x-tasks.js|x-tasks.css|nft-selection.js|referrals.js|message-reactions.js|social-quality.js|social-quality.css|admin-community.js|media.js|media.css|media-upload-sdk.js|analytics-config.js|analytics.js|analytics.css|app.js|social-shell.js|social-shell.css|app.webmanifest|wonder.js|wonder.css|club.js|club.css|product.js|product.css|drop-scene.js|drop-scene.css|drop-lab.html|drop-lab.js|fonts.css|community.js|rooms.js|rooms.css|room-messenger.js|room-messenger.css|farming.js|farming.css|halloween.js|styles.css|halloween.css|presence.js|admin.js|admin.css|admin|admin.html|index.html)",
+      "source": "/(news.js|news.css|admin-news.js|x-tasks.css|nft-selection.js|referrals.js|message-reactions.js|social-quality.js|social-quality.css|admin-community.js|media.js|media.css|media-upload-sdk.js|analytics-config.js|analytics.js|analytics.css|app.js|social-shell.js|social-shell.css|app.webmanifest|wonder.js|wonder.css|club.js|club.css|product.js|product.css|drop-scene.js|drop-scene.css|drop-lab.html|drop-lab.js|fonts.css|community.js|rooms.js|rooms.css|room-messenger.js|room-messenger.css|farming.js|farming.css|halloween.js|styles.css|halloween.css|presence.js|admin.js|admin.css|admin|admin.html|index.html)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -87,6 +87,102 @@
     {
       "path": "/api/farm-cron/20",
       "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/news-cron/00",
+      "schedule": "25 0 * * *"
+    },
+    {
+      "path": "/api/news-cron/01",
+      "schedule": "25 1 * * *"
+    },
+    {
+      "path": "/api/news-cron/02",
+      "schedule": "25 2 * * *"
+    },
+    {
+      "path": "/api/news-cron/03",
+      "schedule": "25 3 * * *"
+    },
+    {
+      "path": "/api/news-cron/04",
+      "schedule": "25 4 * * *"
+    },
+    {
+      "path": "/api/news-cron/05",
+      "schedule": "25 5 * * *"
+    },
+    {
+      "path": "/api/news-cron/06",
+      "schedule": "25 6 * * *"
+    },
+    {
+      "path": "/api/news-cron/07",
+      "schedule": "25 7 * * *"
+    },
+    {
+      "path": "/api/news-cron/08",
+      "schedule": "25 8 * * *"
+    },
+    {
+      "path": "/api/news-cron/09",
+      "schedule": "25 9 * * *"
+    },
+    {
+      "path": "/api/news-cron/10",
+      "schedule": "25 10 * * *"
+    },
+    {
+      "path": "/api/news-cron/11",
+      "schedule": "25 11 * * *"
+    },
+    {
+      "path": "/api/news-cron/12",
+      "schedule": "25 12 * * *"
+    },
+    {
+      "path": "/api/news-cron/13",
+      "schedule": "25 13 * * *"
+    },
+    {
+      "path": "/api/news-cron/14",
+      "schedule": "25 14 * * *"
+    },
+    {
+      "path": "/api/news-cron/15",
+      "schedule": "25 15 * * *"
+    },
+    {
+      "path": "/api/news-cron/16",
+      "schedule": "25 16 * * *"
+    },
+    {
+      "path": "/api/news-cron/17",
+      "schedule": "25 17 * * *"
+    },
+    {
+      "path": "/api/news-cron/18",
+      "schedule": "25 18 * * *"
+    },
+    {
+      "path": "/api/news-cron/19",
+      "schedule": "25 19 * * *"
+    },
+    {
+      "path": "/api/news-cron/20",
+      "schedule": "25 20 * * *"
+    },
+    {
+      "path": "/api/news-cron/21",
+      "schedule": "25 21 * * *"
+    },
+    {
+      "path": "/api/news-cron/22",
+      "schedule": "25 22 * * *"
+    },
+    {
+      "path": "/api/news-cron/23",
+      "schedule": "25 23 * * *"
     }
   ],
   "buildCommand": "node scripts/build-analytics.mjs && node scripts/build-media.mjs && node scripts/build-drop-audio.mjs",

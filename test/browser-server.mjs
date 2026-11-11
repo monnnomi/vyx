@@ -1,5 +1,6 @@
 // Isolated UI fixtures, bound to loopback only. This file is excluded from deployment.
 import http from 'node:http';
+import {createNewsHandler} from '../api/news.js';
 import {readFile} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
 import {randomBytes,randomUUID} from 'node:crypto';
@@ -47,6 +48,11 @@ if(process.env.VYX_QA_PROFILE==='1'){
  await db.q("INSERT INTO event_mints(campaign_id,user_id,x_id,minted_at) VALUES('halloween-2026',$1,'1001','2026-10-31T12:00:00Z') ON CONFLICT DO NOTHING",[a.user.id]);
 }
 let nftQaMember=null;
+if(process.env.VYX_QA_NEWS==='1'){
+ const [source]=await db.q("INSERT INTO news_sources(username,x_user_id,enabled) VALUES('vyx_qa_news','99999',false) RETURNING id");
+ await db.q(`INSERT INTO news_items(source_id,x_post_id,source_url,source_text,source_published_at,content_hash,status,title_en,title_ru,summary_en,summary_ru,body_en,body_ru,published_at)
+ VALUES($1,'999999','https://x.com/vyx_qa_news/status/999999','Isolated fixture, not a real announcement.',now(),'qa-fixture','published','QA preview: a place for the next good story','QA: место для следующей хорошей новости','An isolated example for checking the newsroom layout, source links and article navigation. This is not a real news story.','Изолированный пример для проверки оформления, источников и переходов. Это не настоящая новость.',$2::jsonb,$3::jsonb,now())`,[source.id,JSON.stringify(['This fixture exists only in the local QA database. It helps check the article reading layout and never appears on the live website.']),JSON.stringify(['Пример существует только в локальной тестовой базе. Он нужен для проверки текста статьи и никогда не публикуется на основном сайте.'])]);
+}
 if(process.env.VYX_QA_ENGAGEMENT==='1'){
  const r=await mutate(db,a.user,'room-create',{name:'Community conversation',description:'Isolated message-view and reaction checks.',requestId:randomUUID()});
  await mutate(db,b.user,'room-join',{id:r.id});
@@ -105,6 +111,7 @@ http.createServer(async(req,res)=>{
   const parts=[];let size=0;for await(const part of req){size+=part.length;if(size>52428800){res.writeHead(413).end(JSON.stringify({error:'Too large'}));return;}parts.push(part);}
   qaMediaFiles.set(asset.pathname,{bytes:Buffer.concat(parts),type:req.headers['content-type']});res.setHeader('Content-Type','application/json');res.end(JSON.stringify({pathname:asset.pathname}));return;
  }
+ if(path==='/api/news')return createNewsHandler(fn=>fn(db))(req,res);
  if(path==='/api/vyx')return api(req,res);
  if(path==='/api/admin')return admin(req,res);
  if(path==='/api/presence')return presence(req,res);

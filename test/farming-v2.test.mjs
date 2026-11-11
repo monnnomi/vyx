@@ -129,8 +129,9 @@ test('base event retention restores each edition independently of additional per
 });
 test('six daily UTC cron triggers share the authenticated, idempotent settlement handler',async t=>{
  const f=await fixture(t),config=JSON.parse(await readFile(new URL('../vercel.json',import.meta.url),'utf8'));
- assert.deepEqual(config.crons.map(c=>c.schedule),[0,4,8,12,16,20].map(h=>`0 ${h} * * *`));
- assert.equal(new Set(config.crons.map(c=>c.path)).size,6);
+ const farmCrons=config.crons.filter(c=>c.path.startsWith('/api/farm-cron/'));
+ assert.deepEqual(farmCrons.map(c=>c.schedule),[0,4,8,12,16,20].map(h=>`0 ${h} * * *`));
+ assert.equal(new Set(farmCrons.map(c=>c.path)).size,6);
  const h=createFarmCronHandler(fn=>fn(f.db));process.env.CRON_SECRET='local-cron-fixture';
  const call=async authorization=>{const res={setHeader(){},end(s){this.body=JSON.parse(s);}};await h({method:'GET',url:'/api/farm-cron/04',headers:{authorization}},res);return res;};
  assert.equal((await call('Bearer wrong')).statusCode,401);

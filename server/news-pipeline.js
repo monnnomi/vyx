@@ -4,6 +4,7 @@ import {newsCategories,reserveNewsCost} from './news.js';
 import {newsAIConfig,newsAIStatus} from './news-ai.js';
 import {newsSourceContext,draftInstructions,verifyInstructions} from './news-policy.js';
 import {enqueueNewsPost} from './news-queue.js';
+import {newsMediaFields} from './news-media.js';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 export function requireNewsCron(req){const secret=process.env.CRON_SECRET;if(!secret||!timingSafeEqual(Buffer.from(hash(String(req.headers.authorization||'')),'hex'),Buffer.from(hash('Bearer '+secret),'hex')))fail(401,'Unauthorized.');}
 async function fetchJSON(fetcher,url,options={},timeoutMs=14000){
@@ -25,6 +26,7 @@ async function collect(db,source,fetcher){
   }
   const url=new URL(`https://api.x.com/2/users/${source.x_user_id}/tweets`);
   url.searchParams.set('max_results','5');url.searchParams.set('exclude','retweets,replies');url.searchParams.set('tweet.fields','created_at,author_id,referenced_tweets,note_tweet');
+  newsMediaFields(url);
   if(source.since_id)url.searchParams.set('since_id',source.since_id);else url.searchParams.set('start_time',new Date(source.initial_start_at).toISOString());
   if(source.pagination_token)url.searchParams.set('pagination_token',source.pagination_token);
   // Five returned posts at $0.005 each, rounded up. No assumption of provider deduplication.
@@ -34,7 +36,7 @@ async function collect(db,source,fetcher){
   let latest=source.pending_since_id||source.since_id||'0';
   for(const post of result.data||[]){
    if(/^[0-9]{1,20}$/.test(String(post.id))&&BigInt(post.id)>BigInt(latest))latest=String(post.id);
-   await enqueueNewsPost(db,post,source);
+   await enqueueNewsPost(db,post,source,new Date(),result.includes);
   }
   const next=result.meta?.next_token||null;
   if(next&&(typeof next!=='string'||next.length>2000))throw Error('invalid-cursor');

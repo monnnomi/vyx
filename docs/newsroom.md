@@ -1,5 +1,15 @@
 # VYX Newsroom
 
+## Original post images
+
+The collector requests `attachments.media_keys` with media URL, type, dimensions and alt text in the existing post read. Only `photo` attachments explicitly belonging to that exact post are stored, in attachment order (up to four). Quoted-post images, avatars, video previews, unrelated included media and foreign hosts are excluded. Photo URLs must be HTTPS `pbs.twimg.com/media/` paths. The public API sanitizes them again. No Grok/vision service, image generation, Blob upload or separate media metadata write is used.
+
+Cards show the first image and a photo count. Articles show every image, with links to originals and source attribution; portrait and landscape images keep their proportions. Missing images hide their frame without hiding the article or comments.
+
+Existing published articles without a completed media check are enriched in groups of up to ten during news jobs. Each lookup reserves its maximum post-read cost before contacting X, within the existing $1/day news allowance and writer reserve. Returned posts must match both the original post ID and known author ID. Missing/deleted posts back off for a day; partial or uncertain requests keep their reservation. Text, publication status, comments and VP are not rewritten. If today's remaining collection allowance is insufficient, enrichment waits for a later day.
+
+Apply `db/news-media.sql` before deployment (`node --env-file=.env.local scripts/rollout-news-media.mjs --apply`). The additive migration preserves existing content and adds an empty media array plus sync timestamps. `VYX_QA_NEWS=1 VYX_QA_NEWS_MEDIA=1` uses isolated landscape/portrait illustrations and a test-only response mapping to local files; these routes and fixtures are excluded from deployment.
+
 The existing VYX app has `/#news`, English-only briefs and direct article links `/?story=<uuid>#news`. It is independent of social posts, referrals, reactions, VP and NFT eligibility. No test sources or stories are seeded into production. All generated articles, headings and highlights are English only. There is no language switch; legacy language query parameters/preferences cannot select Russian. Legacy translation columns remain unused for compatibility, without a destructive schema migration.
 
 ## Operation

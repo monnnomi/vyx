@@ -52,6 +52,7 @@ if(process.env.VYX_QA_NEWS==='1'){
  const [source]=await db.q("INSERT INTO news_sources(username,x_user_id,enabled) VALUES('vyx_qa_news','99999',false) RETURNING id");
  await db.q(`INSERT INTO news_items(source_id,x_post_id,source_url,source_text,source_published_at,content_hash,status,title_en,summary_en,body_en,presentation,published_at)
  VALUES($1,'999999','https://x.com/vyx_qa_news/status/999999','Isolated fixture, not a real announcement.',now(),'qa-fixture','published','QA preview: a place for the next good story','An isolated example for checking the newsroom layout, source links and article navigation. This is not a real news story.',$2::jsonb,$3::jsonb,now())`,[source.id,JSON.stringify(['This fixture exists only in the local QA database. It helps check the article reading layout and never appears on the live website.']),JSON.stringify({kind:'news',highlights_en:['Local preview only: no real announcement or live publication.','Checks headings, source attribution and the VYX byline.'],headings_en:['A story for layout checks']})]);
+ if(process.env.VYX_QA_NEWS_MEDIA==='1')await db.q("UPDATE news_items SET source_media=$1::text::jsonb,media_checked_at=now() WHERE x_post_id='999999'",[JSON.stringify([{url:'https://pbs.twimg.com/media/vyx_qa_wide.png',alt:'Local landscape photo fixture',width:1200,height:720},{url:'https://pbs.twimg.com/media/vyx_qa_tall.png',alt:'Local portrait photo fixture',width:800,height:1100}])]);
 }
 if(process.env.VYX_QA_ENGAGEMENT==='1'){
  const r=await mutate(db,a.user,'room-create',{name:'Community conversation',description:'Isolated message-view and reaction checks.',requestId:randomUUID()});
@@ -111,7 +112,16 @@ http.createServer(async(req,res)=>{
   const parts=[];let size=0;for await(const part of req){size+=part.length;if(size>52428800){res.writeHead(413).end(JSON.stringify({error:'Too large'}));return;}parts.push(part);}
   qaMediaFiles.set(asset.pathname,{bytes:Buffer.concat(parts),type:req.headers['content-type']});res.setHeader('Content-Type','application/json');res.end(JSON.stringify({pathname:asset.pathname}));return;
  }
- if(path==='/api/news')return createNewsHandler(fn=>fn(db))(req,res);
+ if(process.env.VYX_QA_NEWS_MEDIA==='1'&&path==='/test-news-image.svg'){
+  const tall=new URL(req.url,process.env.PUBLIC_APP_URL).searchParams.get('shape')==='tall',w=tall?800:1200,h=tall?1100:720;
+  res.setHeader('Content-Type','image/svg+xml');res.end(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="${tall?'#bcb4ec':'#c2e4d6'}"/><circle cx="${w*.76}" cy="${h*.3}" r="${w*.2}" fill="#ffdc59"/><path d="M0 ${h*.8} Q${w*.45} ${h*.25} ${w} ${h*.7} V${h} H0" fill="#25273e"/><text x="55" y="95" font-family="sans-serif" font-size="38" font-weight="bold" fill="#25273e">VYX / NEWS IMAGE</text><text x="55" y="150" font-family="sans-serif" font-size="22" fill="#25273e">Local layout fixture</text></svg>`);return;
+ }
+ if(path==='/api/news'){
+  if(process.env.VYX_QA_NEWS_MEDIA==='1'){
+   const end=res.end.bind(res);res.end=raw=>{const result=JSON.parse(raw);for(const article of result.articles||[result.article]){if(article?.source?.username==='vyx_qa_news')for(const image of article.media||[])image.url='/test-news-image.svg?shape='+ (image.url.includes('_tall')?'tall':'wide');}return end(JSON.stringify(result));};
+  }
+  return createNewsHandler(fn=>fn(db))(req,res);
+ }
  if(path==='/api/vyx')return api(req,res);
  if(path==='/api/admin')return admin(req,res);
  if(path==='/api/presence')return presence(req,res);

@@ -2,6 +2,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {reserveNewsCost} from './news.js';
 import {enqueueNewsPost} from './news-queue.js';
 import {newsAIConfig} from './news-ai.js';
+import {newsMediaFields} from './news-media.js';
 export function buildNewsBatches(sources){
  const active=sources.filter(s=>s.enabled&&!s.archived).sort((a,b)=>a.username.localeCompare(b.username));
  const batches=[];
@@ -76,6 +77,7 @@ export async function collectNewsBatches(db,fetcher=fetch,startedAt=Date.now()){
    try{
     reservation=await reserveBatchRead(db,5,writerReserve);
     const url=new URL('https://api.x.com/2/tweets/search/recent');url.searchParams.set('query',row.query);url.searchParams.set('max_results','10');url.searchParams.set('sort_order','recency');url.searchParams.set('tweet.fields','created_at,author_id,referenced_tweets,note_tweet');
+    newsMediaFields(url);
     if(row.since_id)url.searchParams.set('since_id',row.since_id);else url.searchParams.set('start_time',new Date(row.initial_start_at).toISOString());
     if(row.pagination_token)url.searchParams.set('next_token',row.pagination_token);
     const result=await xJSON(fetcher,url.href),posts=result.data||[];
@@ -85,7 +87,7 @@ export async function collectNewsBatches(db,fetcher=fetch,startedAt=Date.now()){
     for(const post of posts){
      if(!/^[0-9]{1,20}$/.test(String(post.id)))throw Error('invalid-post-id');
      if(BigInt(post.id)>BigInt(latest))latest=String(post.id);
-     await enqueueNewsPost(db,post,b.members.find(s=>s.x_user_id===post.author_id));
+     await enqueueNewsPost(db,post,b.members.find(s=>s.x_user_id===post.author_id),new Date(),result.includes);
     }
     await settleBatchRead(db,reservation,posts.length);
     await db.q("UPDATE news_scan_batches SET since_id=CASE WHEN $3::text IS NULL THEN COALESCE($2,since_id) ELSE since_id END,pending_since_id=CASE WHEN $3::text IS NULL THEN NULL ELSE $2 END,pagination_token=$3,last_fetched_at=clock_timestamp(),next_fetch_at=CASE WHEN $3::text IS NULL THEN date_trunc('hour',clock_timestamp())+(floor(extract(minute from clock_timestamp())/15)+1)*interval '15 minutes' ELSE clock_timestamp() END,last_status='ok' WHERE id=$1",[row.id,latest==='0'?null:latest,next]);

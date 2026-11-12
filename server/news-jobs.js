@@ -2,11 +2,13 @@ import {appURL} from './http.js';
 import {newsAIStatus,newsAIConfig} from './news-ai.js';
 import {runNewsPipeline} from './news-pipeline.js';
 import {collectNewsBatches,newsWriterReserve} from './news-batch.js';
+import {syncNewsPhotos} from './news-media-sync.js';
 export async function runNewsJobs(db,fetcher=fetch){
  const startedAt=Date.now(),[settings]=await db.q('SELECT collection_mode FROM news_settings WHERE id=1');
  const scan=settings.collection_mode==='batch'?await collectNewsBatches(db,fetcher,startedAt):null;
+ const media=settings.collection_mode==='batch'?await syncNewsPhotos(db,fetcher,startedAt):null;
  const result=await runNewsPipeline(db,fetcher,{startedAt,collectPosts:settings.collection_mode!=='batch'});
- return {...result,...(scan?{scan}: {})};
+ return {...result,...(scan?{scan,media}: {})};
 }
 export async function newsQueueHasWork(db){
  if(!newsAIStatus().ready||!process.env.CRON_SECRET)return false;

@@ -3,6 +3,7 @@ import {requireAdmin} from './admin.js';
 import {newsAIStatus} from './news-ai.js';
 import {newsPublisher} from './news-policy.js';
 import {newsCommentCount} from './news-comments.js';
+import {cleanNewsPhotos} from './news-media.js';
 export const newsCategories=['updates','ecosystem','events','security','markets'];
 export function newsHandle(value){
  const handle=String(value||'').trim().replace(/^https:\/\/(?:www\.)?(?:x\.com|twitter\.com)\//i,'').replace(/^@/,'').replace(/\/$/,'');
@@ -11,7 +12,7 @@ export function newsHandle(value){
 }
 export function publicNewsItem(row,full=false){
  const list=value=>Array.isArray(value)?value:[];
- return {id:row.id,comments:Number(row.comment_count||0),language:'en',publisher:newsPublisher,kind:row.presentation?.kind||'news',highlights:list(row.presentation?.highlights_en),headings:list(row.presentation?.headings_en),title:row.title_en,summary:row.summary_en,
+ return {id:row.id,comments:Number(row.comment_count||0),media:cleanNewsPhotos(row.source_media),language:'en',publisher:newsPublisher,kind:row.presentation?.kind||'news',highlights:list(row.presentation?.highlights_en),headings:list(row.presentation?.headings_en),title:row.title_en,summary:row.summary_en,
  ...(full?{paragraphs:list(row.body_en)}:{}),category:row.category,source:{username:row.username,url:row.source_url,publishedAt:row.source_published_at},publishedAt:row.published_at};
 }
 export async function listNews(db,{category='all',before=null,id=null,viewer=null}={}){

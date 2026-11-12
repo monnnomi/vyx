@@ -49,3 +49,11 @@ The owner selected a strict $1/day app allowance and batched polling, rather tha
 Apply `db/news-batch.sql` before deployment via `node --env-file=.env.local scripts/rollout-news-batch.mjs --apply`; migrations preserve users, community content, VP and existing news. Browser QA uses the isolated fixture server only. Source identities and news in production must be real.
 
 References: [X Recent Search](https://docs.x.com/x-api/posts/search-recent-posts), [X read pricing](https://docs.x.com/x-api/getting-started/pricing), [Vercel static Schedules](https://vercel.com/docs/schedules/configuration), [scheduled path authentication](https://vercel.com/docs/schedules/handle-runs), [background promises](https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package#waituntil).
+
+## News discussions
+
+Published articles have public, paginated comment threads and viewer-aware comment counts. Signing in with X is required to write. Members can edit and delete their own comments; allowlisted administrators can delete comments but cannot edit someone else's words. Existing block/mute controls hide matching authors and their contributions from the viewer's counters. Withdrawn or unpublished articles cannot be discussed through the API.
+
+Comment writes use `/api/news`, same-origin checks, session authorization, account/IP rate limits and a 30-new-comments/hour account limit. A stable request ID prevents duplicate submissions; deletion retains an internal tombstone so a retry cannot restore the comment. Comments do not call X/AI, use the news allowance, create community posts or award VP.
+
+Add `db/news-comments.sql` before deploying the new reader. `node --env-file=.env.local scripts/rollout-news-comments.mjs --apply` applies the additive migration and checks that existing users, posts, messages, articles and VP totals are preserved. The complete fresh schema also includes the new table. Browser QA must use the isolated `VYX_QA_NEWS=1` fixture, never fabricated comments on production articles.

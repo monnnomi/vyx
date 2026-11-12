@@ -2,6 +2,7 @@ import {fail,uuid} from './http.js';
 import {requireAdmin} from './admin.js';
 import {newsAIStatus} from './news-ai.js';
 import {newsPublisher} from './news-policy.js';
+import {newsCommentCount} from './news-comments.js';
 export const newsCategories=['updates','ecosystem','events','security','markets'];
 export function newsHandle(value){
  const handle=String(value||'').trim().replace(/^https:\/\/(?:www\.)?(?:x\.com|twitter\.com)\//i,'').replace(/^@/,'').replace(/\/$/,'');
@@ -10,17 +11,17 @@ export function newsHandle(value){
 }
 export function publicNewsItem(row,full=false){
  const list=value=>Array.isArray(value)?value:[];
- return {id:row.id,language:'en',publisher:newsPublisher,kind:row.presentation?.kind||'news',highlights:list(row.presentation?.highlights_en),headings:list(row.presentation?.headings_en),title:row.title_en,summary:row.summary_en,
+ return {id:row.id,comments:Number(row.comment_count||0),language:'en',publisher:newsPublisher,kind:row.presentation?.kind||'news',highlights:list(row.presentation?.highlights_en),headings:list(row.presentation?.headings_en),title:row.title_en,summary:row.summary_en,
  ...(full?{paragraphs:list(row.body_en)}:{}),category:row.category,source:{username:row.username,url:row.source_url,publishedAt:row.source_published_at},publishedAt:row.published_at};
 }
-export async function listNews(db,{category='all',before=null,id=null}={}){
+export async function listNews(db,{category='all',before=null,id=null,viewer=null}={}){
  if(!['all',...newsCategories].includes(category))fail(400,'Invalid news filter.');
- if(id){const [row]=await db.q("SELECT n.*,s.username FROM news_items n JOIN news_sources s ON s.id=n.source_id WHERE n.id=$1 AND n.status='published'",[uuid(id)]);if(!row)fail(404,'This story is not available.');return {article:publicNewsItem(row,true)};}
+ if(id){const [row]=await db.q(`SELECT n.*,s.username,${newsCommentCount('$2')} FROM news_items n JOIN news_sources s ON s.id=n.source_id WHERE n.id=$1 AND n.status='published'`,[uuid(id),viewer?.id||null]);if(!row)fail(404,'This story is not available.');return {article:publicNewsItem(row,true)};}
  const cursor=before?uuid(before):null;
- const rows=await db.q(`SELECT n.*,s.username FROM news_items n JOIN news_sources s ON s.id=n.source_id
+ const rows=await db.q(`SELECT n.*,s.username,${newsCommentCount('$3')} FROM news_items n JOIN news_sources s ON s.id=n.source_id
  WHERE n.status='published' AND ($1='all' OR n.category=$1)
  AND ($2::uuid IS NULL OR (n.published_at,n.id)<(SELECT published_at,id FROM news_items WHERE id=$2 AND status='published'))
- ORDER BY n.published_at DESC,n.id DESC LIMIT 13`,[category,cursor]);
+ ORDER BY n.published_at DESC,n.id DESC LIMIT 13`,[category,cursor,viewer?.id||null]);
  return {articles:rows.slice(0,12).map(r=>publicNewsItem(r)),next:rows.length>12?rows[11].id:null};
 }
 export async function newsAdminState(db,user){

@@ -5,8 +5,8 @@ import {newsAIConfig,newsAIStatus} from './news-ai.js';
 import {obviousNewsNoise,newsSourceContext,draftInstructions,verifyInstructions} from './news-policy.js';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 export function requireNewsCron(req){const secret=process.env.CRON_SECRET;if(!secret||!timingSafeEqual(Buffer.from(hash(String(req.headers.authorization||'')),'hex'),Buffer.from(hash('Bearer '+secret),'hex')))fail(401,'Unauthorized.');}
-async function fetchJSON(fetcher,url,options={}){
- const r=await fetcher(url,{...options,redirect:'error',signal:AbortSignal.timeout(14000)});
+async function fetchJSON(fetcher,url,options={},timeoutMs=14000){
+ const r=await fetcher(url,{...options,redirect:'error',signal:AbortSignal.timeout(timeoutMs)});
  if(!r.ok)throw Error('upstream-'+r.status);
  const raw=await r.text();if(Buffer.byteLength(raw)>250000)throw Error('oversized-response');
  return JSON.parse(raw);
@@ -58,12 +58,18 @@ const str={type:'string'},bool={type:'boolean'};
 const schema=properties=>({type:'object',additionalProperties:false,properties,required:Object.keys(properties)});
 const draftSchema=schema({newsworthy:bool,selection_reason:str,kind:{type:'string',enum:['news','market-view']},highlights_en:{type:'array',items:str},headings_en:{type:'array',items:str},category:{type:'string',enum:newsCategories},risk:{type:'string',enum:['low','high']},title_en:str,summary_en:str,body_en:{type:'array',items:str},evidence:{type:'array',items:str},duplicate_of:{type:['string','null']}});
 const verifySchema=schema({supported:bool,english:bool,newsworthy:bool,low_risk:bool,confidence:{type:'integer'},reason:str});
-async function ai(db,fetcher,name,format,payload,instructions){
+export function newsAITimeout(deadline,now=Date.now()){
+ const remaining=Math.floor(Math.min(30000,deadline-now));
+ if(!Number.isFinite(remaining)||remaining<4000)throw Error('news-run-deadline');
+ return remaining;
+}
+async function ai(db,fetcher,name,format,payload,instructions,deadline){
  const config=newsAIConfig();if(!config.key)throw Error('AI credential missing');
  const input=JSON.stringify(payload);if(Buffer.byteLength(input+instructions)>48000)throw Error('input-too-large');
+ const timeoutMs=newsAITimeout(deadline);
  // Conservative reservation for the two allowlisted models. Provider reference rates are documented.
  await reserveNewsCost(db,'ai',config.reservationCents);
- const r=await fetchJSON(fetcher,config.endpoint,{method:'POST',headers:{Authorization:'Bearer '+config.key,'Content-Type':'application/json'},body:JSON.stringify({model:config.model,store:false,instructions,input,max_output_tokens:3200,reasoning:{effort:'none'},text:{format:{type:'json_schema',name,strict:true,schema:format}}})});
+ const r=await fetchJSON(fetcher,config.endpoint,{method:'POST',headers:{Authorization:'Bearer '+config.key,'Content-Type':'application/json'},body:JSON.stringify({model:config.model,store:false,instructions,input,max_output_tokens:3200,reasoning:{effort:'none'},text:{format:{type:'json_schema',name,strict:true,schema:format}}})},timeoutMs);
  if(r.status!=='completed')throw Error('incomplete-ai-output');
  const output=(r.output||[]).flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join('');
  return JSON.parse(output);
@@ -81,16 +87,16 @@ export function canAutoPublish(d,v,sourceText){
  const risky=/\b(hack|exploit|breach|stolen|airdrop|claim|giveaway|guaranteed)\b|ignore.{0,30}instructions|system prompt|seed phrase|private key/i.test(sourceText);
  return !risky&&d.risk==='low'&&d.category!=='security'&&d.duplicate_of===null&&v.supported===true&&v.english===true&&v.newsworthy===true&&v.low_risk===true&&Number.isInteger(v.confidence)&&v.confidence>=90&&v.confidence<=100;
 }
-async function processItem(db,item,fetcher,lease){
+async function processItem(db,item,fetcher,lease,deadline){
  const recent=await db.q("SELECT id,title_en FROM news_items WHERE status IN ('published','review') AND created_at>clock_timestamp()-interval '7 days' AND id<>$1 ORDER BY created_at DESC LIMIT 12",[item.id]);
  try{
   const d=await ai(db,fetcher,'vyx_news_draft',draftSchema,{source:{...newsSourceContext(item.username),published_at:item.source_published_at,text:item.source_text},recent_stories:recent},
-   draftInstructions);
+   draftInstructions,deadline);
   if(d.newsworthy===false){await db.q("UPDATE news_items SET status='rejected',reason=$2,processing_until=NULL,updated_at=clock_timestamp() WHERE id=$1 AND status='pending' AND processing_token=$3",[item.id,String(d.selection_reason||'Not a substantive news update').slice(0,400),lease]);return 'rejected';}
   if(!validNewsDraft(d,item.source_text))throw Error('invalid-draft');
   if(!d.newsworthy||d.duplicate_of){if(d.duplicate_of&&!recent.some(r=>r.id===d.duplicate_of))throw Error('invalid-duplicate');await db.q("UPDATE news_items SET status='rejected',reason=$2,processing_until=NULL,updated_at=clock_timestamp() WHERE id=$1 AND processing_token=$3",[item.id,d.duplicate_of?'Duplicate event':'Not a substantive news update',lease]);return 'rejected';}
   const v=await ai(db,fetcher,'vyx_news_verification',verifySchema,{source:item.source_text,draft:d},
-   verifyInstructions);
+   verifyInstructions,deadline);
   if(typeof v.supported!=='boolean'||typeof v.english!=='boolean'||typeof v.reason!=='string'||v.reason.length>1000)throw Error('invalid-verification');
   return await db.tx(async tx=>{
    const [settings]=await tx.q('SELECT * FROM news_settings WHERE id=1 FOR UPDATE');
@@ -102,7 +108,9 @@ async function processItem(db,item,fetcher,lease){
    return publish?'published':'review';
   });
  }catch(error){
-  await db.q(`UPDATE news_items SET status=CASE WHEN attempts>=3 THEN 'review' ELSE 'pending' END,reason=$2,next_attempt_at=clock_timestamp()+interval '1 hour',processing_until=NULL,updated_at=clock_timestamp() WHERE id=$1 AND status='pending' AND processing_token=$3`,[item.id,error.status===503?'Daily allowance reached or paused; retry later.':'Draft processing failed; retry scheduled.',lease]);
+  const upstream=/^upstream-(\d{3})$/.exec(error.message||'')?.[1];
+  const reason=error.status===503?'Daily allowance reached or paused; retry later.':['TimeoutError','AbortError'].includes(error.name)?'AI request timed out; retry scheduled.':error.message==='news-run-deadline'?'Run time limit reached; retry scheduled.':upstream?'AI service returned HTTP '+upstream+'; retry scheduled.':['invalid-draft','incomplete-ai-output','invalid-verification'].includes(error.message)?'AI returned an incomplete article or source check; retry scheduled.':'Draft processing failed; retry scheduled.';
+  await db.q(`UPDATE news_items SET status=CASE WHEN attempts>=3 THEN 'review' ELSE 'pending' END,reason=$2,next_attempt_at=clock_timestamp()+interval '1 hour',processing_until=NULL,updated_at=clock_timestamp() WHERE id=$1 AND status='pending' AND processing_token=$3`,[item.id,reason,lease]);
   return 'retry';
  }
 }
@@ -124,7 +132,7 @@ export async function runNewsPipeline(db,fetcher=fetch){
    SELECT n.id FROM news_items n JOIN news_sources s ON s.id=n.source_id WHERE n.status='pending' AND s.enabled AND NOT s.archived
    AND n.source_published_at>clock_timestamp()-interval '48 hours' AND n.next_attempt_at<=clock_timestamp() AND (n.processing_until IS NULL OR n.processing_until<clock_timestamp()) ORDER BY n.created_at LIMIT 1)
    RETURNING *`,[lease]);
-  if(!item)break;const [s]=await db.q('SELECT username FROM news_sources WHERE id=$1',[item.source_id]);processed++;const outcome=await processItem(db,{...item,username:s.username},fetcher,lease);if(outcome!=='rejected')break;
+  if(!item)break;const [s]=await db.q('SELECT username FROM news_sources WHERE id=$1',[item.source_id]);processed++;const outcome=await processItem(db,{...item,username:s.username},fetcher,lease,started+52000);if(outcome!=='rejected')break;
   }
   await db.q("UPDATE news_items SET status='rejected',reason='Source update is older than 48 hours.' WHERE status='pending' AND source_published_at<=clock_timestamp()-interval '48 hours'");
   await db.q("UPDATE news_settings SET last_completed_at=clock_timestamp(),last_status='completed' WHERE id=1 AND lease_token=$1",[lease]);

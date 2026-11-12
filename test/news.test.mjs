@@ -5,7 +5,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {newsAIConfig,newsAIStatus} from '../server/news-ai.js';
 import {listNews,newsAdminState,newsAdminWrite,reserveNewsCost,newsHandle} from '../server/news.js';
 import {initialNewsSources,newsSourceContext} from '../server/news-policy.js';
-import {normalizeNewsPost,validNewsDraft,canAutoPublish,runNewsPipeline} from '../server/news-pipeline.js';
+import {normalizeNewsPost,validNewsDraft,canAutoPublish,runNewsPipeline,newsAITimeout} from '../server/news-pipeline.js';
 import {createNewsHandler} from '../api/news.js';
 import {createNewsCronHandler} from '../api/news-cron.js';
 import {login} from '../server/oauth.js';
@@ -170,4 +170,12 @@ test('legacy Russian query parameters cannot expose translated articles or prese
   const article=result.data.article||result.data.articles[0];assert.equal(article.language,'en');assert.equal(article.title,draft.title_en);assert.deepEqual(article.highlights,draft.highlights_en);
   assert.ok(!/[А-Яа-яЁё]/.test(JSON.stringify(result.data)));
  }
+});
+
+test('AI calls allow long articles but stay within the shared run deadline; timeout details stay private',async()=>{
+ assert.equal(newsAITimeout(60000,1000),30000);assert.equal(newsAITimeout(60000,50000),10000);assert.throws(()=>newsAITimeout(60000,57000),/news-run-deadline/);
+ await reset();await source();await enable();const p=provider();
+ await runNewsPipeline(db,async(url,options)=>{if(options.method==='POST')throw Object.assign(Error('private provider detail'),{name:'TimeoutError'});return p.fetcher(url,options);});
+ const [item]=await db.q('SELECT status,reason,attempts FROM news_items');assert.equal(item.status,'pending');assert.equal(item.attempts,1);assert.equal(item.reason,'AI request timed out; retry scheduled.');
+ assert.equal((await listNews(db)).articles.length,0);assert.equal((await db.q('SELECT lease_until FROM news_settings'))[0].lease_until,null);
 });

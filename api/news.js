@@ -17,7 +17,7 @@ export function createNewsHandler(useDB=withDB,fetcher=fetch){return async(req,r
     return json(res,200,await newsAdminWrite(db,user,input));
    }
    if(admin)return json(res,200,await newsAdminState(db,await session(db,req)));
-   return json(res,200,await listNews(db,{language:u.searchParams.get('language')||'en',category:u.searchParams.get('category')||'all',before:u.searchParams.get('before'),id:u.searchParams.get('id')}));
+   return json(res,200,await listNews(db,{category:u.searchParams.get('category')||'all',before:u.searchParams.get('before'),id:u.searchParams.get('id')}));
   });
  }catch(error){handleError(res,error);}
 };}

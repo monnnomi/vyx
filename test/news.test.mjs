@@ -16,8 +16,8 @@ process.env.VYX_APP_SECRET=token();process.env.VYX_ADMIN_X_IDS='1001';process.en
 const owner=await db.tx(tx=>login(tx,{id:'1001',username:'owner',name:'Owner',avatar:''})),member=await db.tx(tx=>login(tx,{id:'1002',username:'member',name:'Member',avatar:''}));
 after(()=>pg.close());
 const sourceText='The public test network now supports a faster block explorer. The updated interface includes clearer transaction details and a new search tool for developers.';
-const draft={newsworthy:true,selection_reason:'Concrete product update.',kind:'news',highlights_en:['An updated block explorer with clearer transaction details.'],highlights_ru:['Обновлённый обозреватель с понятными данными транзакций.'],headings_en:['What changed'],headings_ru:['Что изменилось'],category:'updates',risk:'low',title_en:'A clearer block explorer is now available',title_ru:'В тестовой сети обновили обозреватель блоков',summary_en:'The account announced an updated explorer with improved transaction details and search.',summary_ru:'Аккаунт сообщил об обновлении обозревателя: улучшены данные транзакций и поиск.',body_en:['According to the account, the public test network has updated its block explorer with clearer transaction details and a new search tool.'],body_ru:['По сообщению аккаунта, в публичной тестовой сети обновили обозреватель блоков, добавив более понятные данные транзакций и новый поиск.'],evidence:['clearer transaction details and a new search tool'],duplicate_of:null};
-const verdict={supported:true,translations_match:true,newsworthy:true,low_risk:true,confidence:97,reason:'Both versions stay within the source announcement.'};
+const draft={newsworthy:true,selection_reason:'Concrete product update.',kind:'news',highlights_en:['An updated block explorer with clearer transaction details.'],headings_en:['What changed'],category:'updates',risk:'low',title_en:'A clearer block explorer is now available',summary_en:'The account announced an updated explorer with improved transaction details and search.',body_en:['According to the account, the public test network has updated its block explorer with clearer transaction details and a new search tool.'],evidence:['clearer transaction details and a new search tool'],duplicate_of:null};
+const verdict={supported:true,english:true,newsworthy:true,low_risk:true,confidence:97,reason:'The English story stays within the source announcement.'};
 async function reset(){delete process.env.VYX_NEWS_AI_BASE_URL;delete process.env.VYX_NEWS_AI_MODEL;delete process.env.VYX_NEWS_AI_API_KEY;await db.q('DELETE FROM news_audit');await db.q('DELETE FROM news_items');await db.q('DELETE FROM news_sources');await db.q('DELETE FROM news_budget');await db.q("UPDATE news_settings SET enabled=false,auto_publish=true,daily_budget_cents=100,lease_token=NULL,lease_until=NULL,last_status='waiting-for-sources'");process.env.X_NEWS_BEARER_TOKEN='fixture-x';process.env.OPENAI_API_KEY='fixture-ai';}
 async function source(){await newsAdminWrite(db,owner.user,{action:'source-add',username:'@example'});return (await db.q('SELECT * FROM news_sources'))[0];}
 async function enable(){await newsAdminWrite(db,owner.user,{action:'settings',enabled:true,autoPublish:true,budgetCents:100});}
@@ -28,7 +28,7 @@ function provider({d=draft,v=verdict,posts=[post()],next=null,onAI=async()=>{},e
   calls.push({url,options});assert.equal(options.redirect,'error');
   if(url.includes('/by/username/'))return new Response(JSON.stringify({data:{id:'123',username:'example'}}));
   if(url.includes('/tweets'))return new Response(JSON.stringify({data:posts,meta:next?{next_token:next}:{}}));
-  assert.equal(url,endpoint);const payload=JSON.parse(options.body);assert.equal(payload.store,false);assert.equal(payload.text.format.strict,true);await onAI(++ai);
+  assert.equal(url,endpoint);const payload=JSON.parse(options.body);assert.equal(payload.store,false);assert.equal(payload.text.format.strict,true);assert.ok(!Object.keys(payload.text.format.schema.properties).some(k=>k.endsWith('_ru')||k==='translations_match'));await onAI(++ai);
   return new Response(JSON.stringify({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(ai%2?d:v)}]}]}));
  };return {calls,fetcher};
 }
@@ -56,17 +56,17 @@ test('cron requires its secret and missing credentials cannot enable collection'
 test('collection validates author, time, references and full source text',()=>{
  const s={x_user_id:'123',username:'example'};assert.ok(normalizeNewsPost(post(),s));assert.equal(normalizeNewsPost({...post(),author_id:'456'},s),null);assert.equal(normalizeNewsPost({...post(),created_at:'bad'},s),null);assert.equal(normalizeNewsPost({...post(),referenced_tweets:[{type:'retweeted'}]},s),null);assert.equal(normalizeNewsPost({...post(),text:sourceText+'…'},s),null);assert.equal(normalizeNewsPost({...post(),created_at:'2020-01-01'},s),null);
 });
-test('real-shaped pipeline publishes verified bilingual news once, with a public source and no private data',async()=>{
+test('real-shaped pipeline publishes verified English news once, with a public source and no private data',async()=>{
  await reset();await source();await enable();const p=provider();assert.equal((await runNewsPipeline(db,p.fetcher)).processed,1);assert.equal(p.calls.length,4);
  const feed=await listNews(db);assert.equal(feed.articles.length,1);assert.equal(feed.articles[0].source.username,'example');assert.equal(feed.articles[0].title,draft.title_en);assert.ok(!JSON.stringify(feed).includes('source_text'));assert.ok(!JSON.stringify(feed).includes('fixture-'));
- const story=await listNews(db,{language:'ru',id:feed.articles[0].id});assert.equal(story.article.title,draft.title_ru);assert.deepEqual(story.article.paragraphs,draft.body_ru);assert.equal(story.article.publisher.name,'VYX');assert.equal(story.article.publisher.avatar,'/assets/vyx-mark-v1.png');assert.deepEqual(story.article.highlights,draft.highlights_ru);assert.deepEqual(story.article.headings,draft.headings_ru);
+ const story=await listNews(db,{language:'ru',id:feed.articles[0].id});assert.equal(story.article.title,draft.title_en);assert.deepEqual(story.article.paragraphs,draft.body_en);assert.equal(story.article.publisher.name,'VYX');assert.equal(story.article.publisher.avatar,'/assets/vyx-mark-v1.png');assert.deepEqual(story.article.highlights,draft.highlights_en);assert.deepEqual(story.article.headings,draft.headings_en);
  await db.q('UPDATE news_sources SET next_fetch_at=clock_timestamp()');await runNewsPipeline(db,p.fetcher);assert.equal((await db.q('SELECT count(*)::int AS n FROM news_items'))[0].n,1);
  const budget=(await db.q('SELECT * FROM news_budget'))[0];assert.equal(budget.ai_cents,12);assert.equal(budget.x_cents,7);
  const admin=await newsAdminState(db,owner.user);assert.ok(!('lease_token' in admin.settings));assert.equal((await db.q('SELECT count(*)::int AS n FROM reward_ledger'))[0].n,0);
 });
-test('risky content, unverifiable evidence and translation mismatches are never auto-published',async()=>{
- assert.equal(canAutoPublish(draft,verdict,'Claim your free token airdrop now'),false);assert.equal(canAutoPublish(draft,{...verdict,translations_match:false},sourceText),false);
- await reset();await source();await enable();await runNewsPipeline(db,provider({v:{...verdict,translations_match:false,reason:'Different numbers in translation.'}}).fetcher);
+test('risky content, unverifiable evidence and non-English drafts are never auto-published',async()=>{
+ assert.equal(canAutoPublish(draft,verdict,'Claim your free token airdrop now'),false);assert.equal(canAutoPublish(draft,{...verdict,english:false},sourceText),false);
+ await reset();await source();await enable();await runNewsPipeline(db,provider({v:{...verdict,english:false,reason:'The draft is not in English.'}}).fetcher);
  const [i]=await db.q('SELECT * FROM news_items');assert.equal(i.status,'review');assert.equal((await listNews(db)).articles.length,0);await assert.rejects(()=>newsAdminWrite(db,owner.user,{action:'publish',id:i.id}),/complete, source-checked/);
  await reset();await source();await enable();await runNewsPipeline(db,provider({d:{...draft,evidence:['This is not in the source post.']}}).fetcher);assert.equal((await listNews(db)).articles.length,0);
 });
@@ -127,7 +127,7 @@ test('owner-selected sources are idempotent and do not restart monitoring',async
 test('reasoned market views retain attribution, while guarantees and malformed presentation cannot publish',async()=>{
  await reset();await source();await enable();
  const text='My view: Bitcoin could see stronger demand if the announced institutional flows continue. The thesis depends on those flows holding; a reversal would undermine it.';
- const d={...draft,category:'markets',kind:'market-view',evidence:['The thesis depends on those flows holding'],title_en:'An account outlines a conditional Bitcoin demand thesis',title_ru:'Автор описал условный сценарий спроса на биткоин',summary_en:'The author links a possible rise in demand to continued institutional flows, while noting reversal risk.',summary_ru:'Автор связывает возможный рост спроса с продолжением институциональных потоков и отмечает риск разворота.',body_en:['The author suggests Bitcoin demand could strengthen if institutional flows continue, and says a reversal would undermine the thesis.'],body_ru:['Автор считает, что спрос на биткоин может вырасти при продолжении институциональных потоков, а их разворот подорвёт этот сценарий.'],highlights_en:['A conditional market thesis, attributed to the source author.'],highlights_ru:['Условный рыночный сценарий, изложенный автором поста.']};
+ const d={...draft,category:'markets',kind:'market-view',evidence:['The thesis depends on those flows holding'],title_en:'An account outlines a conditional Bitcoin demand thesis',summary_en:'The author links a possible rise in demand to continued institutional flows, while noting reversal risk.',body_en:['The author suggests Bitcoin demand could strengthen if institutional flows continue, and says a reversal would undermine the thesis.'],highlights_en:['A conditional market thesis, attributed to the source author.'],};
  assert.equal(validNewsDraft(d,text),true);assert.equal(validNewsDraft({...d,kind:'news'},text),false);assert.equal(validNewsDraft({...d,headings_en:[]},text),false);
  assert.equal(canAutoPublish(d,verdict,text),true);assert.equal(canAutoPublish(d,verdict,text+' Guaranteed returns.'),false);
  await runNewsPipeline(db,provider({d,posts:[{...post(),text}]}).fetcher);
@@ -158,4 +158,16 @@ test('manual cycle is admin-only, respects pause, and uses the same spending and
 test('source errors expose actionable status without leaking credentials or upstream content',async()=>{
  await reset();await source();await enable();await runNewsPipeline(db,async()=>new Response('private upstream content',{status:401}));
  const state=await newsAdminState(db,owner.user);assert.equal(state.sources[0].last_status,'x-authentication-required');assert.ok(!JSON.stringify(state).includes('private upstream content'));
+});
+
+test('legacy Russian query parameters cannot expose translated articles or presentation',async()=>{
+ await reset();await source();await enable();await runNewsPipeline(db,provider().fetcher);
+ const [{id}]=await db.q('SELECT id FROM news_items');
+ await db.q("UPDATE news_items SET title_ru='Старый перевод',summary_ru='Русский текст',body_ru='[\"Русский абзац\"]'::jsonb,presentation=presentation||'{\"highlights_ru\":[\"Перевод\"],\"headings_ru\":[\"Заголовок\"]}'::jsonb");
+ const api=createNewsHandler(fn=>fn(db));
+ for(const suffix of ['', '&id='+id]){
+  const result=await call(api,{url:'/api/news?language=ru'+suffix});assert.equal(result.status,200);
+  const article=result.data.article||result.data.articles[0];assert.equal(article.language,'en');assert.equal(article.title,draft.title_en);assert.deepEqual(article.highlights,draft.highlights_en);
+  assert.ok(!/[А-Яа-яЁё]/.test(JSON.stringify(result.data)));
+ }
 });

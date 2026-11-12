@@ -8,20 +8,19 @@ export function newsHandle(value){
  if(!/^[A-Za-z0-9_]{1,15}$/.test(handle))fail(400,'Enter an X username or a profile link.');
  return handle.toLowerCase();
 }
-export function publicNewsItem(row,language='en',full=false){
- const ru=language==='ru';
- return {id:row.id,publisher:newsPublisher,kind:row.presentation?.kind||'news',highlights:row.presentation?.[ru?'highlights_ru':'highlights_en']||[],headings:row.presentation?.[ru?'headings_ru':'headings_en']||[],title:ru?row.title_ru:row.title_en,summary:ru?row.summary_ru:row.summary_en,
- ...(full?{paragraphs:ru?row.body_ru:row.body_en}:{}),category:row.category,source:{username:row.username,url:row.source_url,publishedAt:row.source_published_at},publishedAt:row.published_at};
+export function publicNewsItem(row,full=false){
+ return {id:row.id,language:'en',publisher:newsPublisher,kind:row.presentation?.kind||'news',highlights:row.presentation?.highlights_en||[],headings:row.presentation?.headings_en||[],title:row.title_en,summary:row.summary_en,
+ ...(full?{paragraphs:row.body_en}:{}),category:row.category,source:{username:row.username,url:row.source_url,publishedAt:row.source_published_at},publishedAt:row.published_at};
 }
-export async function listNews(db,{language='en',category='all',before=null,id=null}={}){
- if(!['en','ru'].includes(language)||!['all',...newsCategories].includes(category))fail(400,'Invalid news filter.');
- if(id){const [row]=await db.q("SELECT n.*,s.username FROM news_items n JOIN news_sources s ON s.id=n.source_id WHERE n.id=$1 AND n.status='published'",[uuid(id)]);if(!row)fail(404,'This story is not available.');return {article:publicNewsItem(row,language,true)};}
+export async function listNews(db,{category='all',before=null,id=null}={}){
+ if(!['all',...newsCategories].includes(category))fail(400,'Invalid news filter.');
+ if(id){const [row]=await db.q("SELECT n.*,s.username FROM news_items n JOIN news_sources s ON s.id=n.source_id WHERE n.id=$1 AND n.status='published'",[uuid(id)]);if(!row)fail(404,'This story is not available.');return {article:publicNewsItem(row,true)};}
  const cursor=before?uuid(before):null;
  const rows=await db.q(`SELECT n.*,s.username FROM news_items n JOIN news_sources s ON s.id=n.source_id
  WHERE n.status='published' AND ($1='all' OR n.category=$1)
  AND ($2::uuid IS NULL OR (n.published_at,n.id)<(SELECT published_at,id FROM news_items WHERE id=$2 AND status='published'))
  ORDER BY n.published_at DESC,n.id DESC LIMIT 13`,[category,cursor]);
- return {articles:rows.slice(0,12).map(r=>publicNewsItem(r,language)),next:rows.length>12?rows[11].id:null};
+ return {articles:rows.slice(0,12).map(r=>publicNewsItem(r)),next:rows.length>12?rows[11].id:null};
 }
 export async function newsAdminState(db,user){
  requireAdmin(user);
@@ -52,7 +51,7 @@ export async function newsAdminWrite(db,user,input){
    const [item]=await tx.q('SELECT * FROM news_items WHERE id=$1 FOR UPDATE',[uuid(input.id)]);if(!item)fail(404,'Story not found.');
    let status;
    if(input.action==='publish'){
-    if(item.status!=='review'||!item.title_en||!item.title_ru||!item.body_en?.length||!item.body_ru?.length||(!item.verification?.supported||!item.verification?.translations_match))fail(409,'Only a complete, source-checked draft can be published.');
+    if(item.status!=='review'||!item.title_en||!item.body_en?.length||item.verification?.supported!==true||item.verification?.english!==true)fail(409,'Only a complete, source-checked English draft can be published.');
     status='published';
    }else if(input.action==='withdraw'){if(item.status!=='published')fail(409,'This story is not published.');status='withdrawn';}
    else if(input.action==='retry'){if(!['review','rejected'].includes(item.status))fail(409,'This story cannot be retried.');status='pending';}

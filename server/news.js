@@ -1,7 +1,8 @@
 import {fail,uuid} from './http.js';
 import {requireAdmin} from './admin.js';
 import {newsAIStatus} from './news-ai.js';
-export const newsCategories=['updates','ecosystem','events','security'];
+import {newsPublisher} from './news-policy.js';
+export const newsCategories=['updates','ecosystem','events','security','markets'];
 export function newsHandle(value){
  const handle=String(value||'').trim().replace(/^https:\/\/(?:www\.)?(?:x\.com|twitter\.com)\//i,'').replace(/^@/,'').replace(/\/$/,'');
  if(!/^[A-Za-z0-9_]{1,15}$/.test(handle))fail(400,'Enter an X username or a profile link.');
@@ -9,7 +10,7 @@ export function newsHandle(value){
 }
 export function publicNewsItem(row,language='en',full=false){
  const ru=language==='ru';
- return {id:row.id,title:ru?row.title_ru:row.title_en,summary:ru?row.summary_ru:row.summary_en,
+ return {id:row.id,publisher:newsPublisher,kind:row.presentation?.kind||'news',highlights:row.presentation?.[ru?'highlights_ru':'highlights_en']||[],headings:row.presentation?.[ru?'headings_ru':'headings_en']||[],title:ru?row.title_ru:row.title_en,summary:ru?row.summary_ru:row.summary_en,
  ...(full?{paragraphs:ru?row.body_ru:row.body_en}:{}),category:row.category,source:{username:row.username,url:row.source_url,publishedAt:row.source_published_at},publishedAt:row.published_at};
 }
 export async function listNews(db,{language='en',category='all',before=null,id=null}={}){

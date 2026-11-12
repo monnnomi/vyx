@@ -9,7 +9,7 @@ export function newsAIConfig(){
  if(!models.has(model)||(base.hostname==='api.openai.com'&&model!==newsModel))throw Error('Unpriced newsroom AI model');
  const key=process.env.VYX_NEWS_AI_API_KEY||(base.hostname==='api.openai.com'?process.env.OPENAI_API_KEY:'')||'';
  if(/[\r\n]/.test(key))throw Error('Invalid newsroom AI credential');
- return {endpoint:base.origin+'/v1/responses',model,key,provider:base.hostname==='triklz27.ru'?'ORBITA AI service':'OpenAI'};
+ return {endpoint:base.origin+'/v1/responses',model,key,provider:base.hostname==='triklz27.ru'?'ORBITA AI service':'OpenAI',reservationCents:model==='gpt-6-luna'?1:6};
 }
 export function newsAIStatus(){
  try{const {key,provider,model}=newsAIConfig();return {ready:Boolean(key),provider,model};}

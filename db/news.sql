@@ -18,10 +18,10 @@ CREATE TABLE IF NOT EXISTS news_items (
  x_post_id text NOT NULL UNIQUE CHECK(x_post_id ~ '^[0-9]{1,20}$'), source_url text NOT NULL,
  source_text text NOT NULL CHECK(length(source_text)<=8000), source_published_at timestamptz NOT NULL,
  content_hash text NOT NULL UNIQUE, status text NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','review','rejected','published','withdrawn')),
- category text NOT NULL DEFAULT 'updates' CHECK(category IN ('updates','ecosystem','events','security')),
+ category text NOT NULL DEFAULT 'updates' CHECK(category IN ('updates','ecosystem','events','security','markets')),
  title_en text NOT NULL DEFAULT '', title_ru text NOT NULL DEFAULT '', summary_en text NOT NULL DEFAULT '', summary_ru text NOT NULL DEFAULT '',
  body_en jsonb NOT NULL DEFAULT '[]', body_ru jsonb NOT NULL DEFAULT '[]',
- verification jsonb NOT NULL DEFAULT '{}', reason text NOT NULL DEFAULT '', attempts integer NOT NULL DEFAULT 0,
+ presentation jsonb NOT NULL DEFAULT '{}', verification jsonb NOT NULL DEFAULT '{}', reason text NOT NULL DEFAULT '', attempts integer NOT NULL DEFAULT 0,
  next_attempt_at timestamptz NOT NULL DEFAULT now(), processing_token uuid, processing_until timestamptz,
  published_at timestamptz, reviewed_by uuid REFERENCES users(id), reviewed_at timestamptz,
  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()

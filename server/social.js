@@ -68,7 +68,25 @@ async function reportTarget(db,user,kind,id){
  const rows=await db.q(queries[kind],['room-message','message'].includes(kind)?[id,user.id]:[id]);
  if(!rows.length)fail(404,'This item is unavailable.');
 }
+async function removePost(tx,id){
+    await tx.q("UPDATE media_assets SET status='deleting',post_id=NULL,comment_id=NULL,expires_at=clock_timestamp() WHERE post_id=$1 OR comment_id IN (SELECT id FROM comments WHERE post_id=$1)",[id]);
+    await tx.q('DELETE FROM comments WHERE post_id=$1',[id]);
+    await tx.q('DELETE FROM reactions WHERE post_id=$1',[id]);
+    await tx.q('DELETE FROM saved_posts WHERE post_id=$1',[id]);
+    await tx.q('DELETE FROM posts WHERE id=$1',[id]);
+}
 export async function mutateSocial(tx,user,action,input){
+ if(action==='post-edit'||action==='post-delete'){
+  const id=uuid(input.id);
+  const [post]=await tx.q('SELECT id FROM posts WHERE id=$1 AND user_id=$2 FOR UPDATE',[id,user.id]);
+  if(!post)fail(404,'Post not found.');
+  if(action==='post-delete')await removePost(tx,id);
+  else{
+   const media=await tx.q('SELECT 1 FROM media_assets WHERE post_id=$1 LIMIT 1',[id]);
+   await tx.q('UPDATE posts SET body=$2 WHERE id=$1',[id,text(input.body,media.length?0:20,1500)]);
+  }
+  return {ok:true};
+ }
  if(action==='member-control'){
   const id=uuid(input.id);if(id===user.id)fail(400,'Choose another member.');
   const field=input.control;if(!['blocked','muted'].includes(field)||typeof input.enabled!=='boolean')fail(400,'Choose a control.');
@@ -134,11 +152,7 @@ export async function moderate(db,user,input){
     // Delete the approved post atomically with its dependent records. Media become
     // unreadable immediately; the existing cleanup job removes their stored bytes.
     await tx.q('SELECT id FROM posts WHERE id=$1 FOR UPDATE',[r.target_id]);
-    await tx.q("UPDATE media_assets SET status='deleting',post_id=NULL,comment_id=NULL,expires_at=clock_timestamp() WHERE post_id=$1 OR comment_id IN (SELECT id FROM comments WHERE post_id=$1)",[r.target_id]);
-    await tx.q('DELETE FROM comments WHERE post_id=$1',[r.target_id]);
-    await tx.q('DELETE FROM reactions WHERE post_id=$1',[r.target_id]);
-    await tx.q('DELETE FROM saved_posts WHERE post_id=$1',[r.target_id]);
-    await tx.q('DELETE FROM posts WHERE id=$1',[r.target_id]);
+    await removePost(tx,r.target_id);
    }
    else if(r.kind==='comment')await tx.q('DELETE FROM comments WHERE id=$1',[r.target_id]);
    else if(r.kind==='room-message'){await tx.q('UPDATE room_messages SET deleted_at=now() WHERE id=$1',[r.target_id]);await voidContribution(tx,r.target_id);}

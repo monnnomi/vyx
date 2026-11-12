@@ -15,6 +15,18 @@ const make=async(id,name)=> (await db.q('INSERT INTO users(x_id,x_username,handl
 const alice=await make('101','Alice'),bob=await make('102','Bob'),carol=await make('103','Carol');
 after(()=>pg.close());
 const rejects=(p,status)=>assert.rejects(p,e=>e.status===status);
+test('only the author can edit or delete published posts',async()=>{
+ const {id}=await mutate(db,alice,'post',{body:'Original test post for the community.'});
+ await mutate(db,bob,'comment',{id,body:'Reply'});
+ await mutate(db,bob,'react',{id});
+ await rejects(mutate(db,bob,'post-edit',{id,body:'Unauthorized replacement text.'}),404);
+ await rejects(mutate(db,bob,'post-delete',{id}),404);
+ await mutate(db,alice,'post-edit',{id,body:'Updated test post for the community.'});
+ assert.equal((await db.q('SELECT body FROM posts WHERE id=$1',[id]))[0].body,'Updated test post for the community.');
+ assert.equal((await db.q('SELECT id FROM comments WHERE post_id=$1',[id])).length,1);
+ await mutate(db,alice,'post-delete',{id});
+ assert.equal((await db.q('SELECT id FROM posts WHERE id=$1',[id])).length,0);
+});
 
 test('new account starts at zero; public state excludes private message data',async()=>{
  const s=await state(db,alice,now);assert.equal(s.user.points,0);assert.deepEqual(s.user.inventory,[0,0,0,0]);assert.ok(!('x_id' in s.user));assert.ok(!('messages' in s));

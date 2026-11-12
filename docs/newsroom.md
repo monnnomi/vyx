@@ -20,7 +20,7 @@ Stories display the VYX Newsroom byline, the original X source, publication date
 
 ## Setup and validation
 
-For a first newsroom installation, apply `db/news.sql` before deploying the routes: `node --env-file=.env.local scripts/rollout-news.mjs --apply`. The migration is additive/idempotent; the script checks that existing community and VP totals do not change. For an existing newsroom apply `node --env-file=.env.local scripts/rollout-news-editorial.mjs --apply` before deploying the editorial update; it adds the presentation JSON column and `markets` category while preserving existing stories. Test migrations in PGlite first.
+For a first newsroom installation, apply `db/news.sql` before deploying the routes: `node --env-file=.env.local scripts/rollout-news.mjs --apply`. The migration is additive/idempotent; the script checks that existing community and VP totals do not change. For an existing newsroom apply `node --env-file=.env.local scripts/rollout-news-editorial.mjs --apply` before deploying the editorial update; it adds the presentation JSON column and `markets` category while preserving existing stories. Test migrations in PGlite first. JSON write parameters bind as text before the jsonb cast so postgres.js does not encode them twice. `db/news-json.sql` repairs existing encoded JSON strings without changing article content, status or publication history; its repeatability and the real driver serializer are covered by tests.
 
 `npm test` runs isolated PGlite cases. `VYX_QA_PORT=4174 VYX_QA_NEWS=1 node test/browser-server.mjs` adds one explicitly labeled local-only article with headings, highlights and English presentation for browser checks, with no external API calls. Never put these fixtures in production.
 

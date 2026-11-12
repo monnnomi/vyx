@@ -9,8 +9,9 @@ export function newsHandle(value){
  return handle.toLowerCase();
 }
 export function publicNewsItem(row,full=false){
- return {id:row.id,language:'en',publisher:newsPublisher,kind:row.presentation?.kind||'news',highlights:row.presentation?.highlights_en||[],headings:row.presentation?.headings_en||[],title:row.title_en,summary:row.summary_en,
- ...(full?{paragraphs:row.body_en}:{}),category:row.category,source:{username:row.username,url:row.source_url,publishedAt:row.source_published_at},publishedAt:row.published_at};
+ const list=value=>Array.isArray(value)?value:[];
+ return {id:row.id,language:'en',publisher:newsPublisher,kind:row.presentation?.kind||'news',highlights:list(row.presentation?.highlights_en),headings:list(row.presentation?.headings_en),title:row.title_en,summary:row.summary_en,
+ ...(full?{paragraphs:list(row.body_en)}:{}),category:row.category,source:{username:row.username,url:row.source_url,publishedAt:row.source_published_at},publishedAt:row.published_at};
 }
 export async function listNews(db,{category='all',before=null,id=null}={}){
  if(!['all',...newsCategories].includes(category))fail(400,'Invalid news filter.');
@@ -51,7 +52,7 @@ export async function newsAdminWrite(db,user,input){
    const [item]=await tx.q('SELECT * FROM news_items WHERE id=$1 FOR UPDATE',[uuid(input.id)]);if(!item)fail(404,'Story not found.');
    let status;
    if(input.action==='publish'){
-    if(item.status!=='review'||!item.title_en||!item.body_en?.length||item.verification?.supported!==true||item.verification?.english!==true)fail(409,'Only a complete, source-checked English draft can be published.');
+    if(item.status!=='review'||!item.title_en||(!Array.isArray(item.body_en)||!item.body_en.length)||item.verification?.supported!==true||item.verification?.english!==true)fail(409,'Only a complete, source-checked English draft can be published.');
     status='published';
    }else if(input.action==='withdraw'){if(item.status!=='published')fail(409,'This story is not published.');status='withdrawn';}
    else if(input.action==='retry'){if(!['review','rejected'].includes(item.status))fail(409,'This story cannot be retried.');status='pending';}

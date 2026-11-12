@@ -103,7 +103,8 @@ async function processItem(db,item,fetcher,lease,deadline){
    const [source]=await tx.q('SELECT enabled,archived FROM news_sources WHERE id=$1',[item.source_id]);
    const [today]=await tx.q("SELECT count(*)::int AS n FROM news_items WHERE published_at>=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'");
    const publish=settings.enabled&&settings.lease_token===lease&&source.enabled&&!source.archived&&settings.auto_publish&&today.n<6&&canAutoPublish(d,v,item.source_text);
-   await tx.q(`UPDATE news_items SET title_en=$2,summary_en=$3,body_en=$4::jsonb,presentation=$5::jsonb,category=$6,verification=$7::jsonb,reason=$8,status=$9,published_at=CASE WHEN $9='published' THEN clock_timestamp() ELSE NULL END,processing_until=NULL,updated_at=clock_timestamp()
+   // Bind encoded JSON as text: postgres.js otherwise encodes the string a second time for jsonb parameters.
+   await tx.q(`UPDATE news_items SET title_en=$2,summary_en=$3,body_en=$4::text::jsonb,presentation=$5::text::jsonb,category=$6,verification=$7::text::jsonb,reason=$8,status=$9,published_at=CASE WHEN $9='published' THEN clock_timestamp() ELSE NULL END,processing_until=NULL,updated_at=clock_timestamp()
     WHERE id=$1 AND status='pending' AND processing_token=$10`,[item.id,d.title_en,d.summary_en,JSON.stringify(d.body_en),JSON.stringify({kind:d.kind,headings_en:d.headings_en,highlights_en:d.highlights_en}),d.category,JSON.stringify(v),v.reason,publish?'published':'review',lease]);
    return publish?'published':'review';
   });

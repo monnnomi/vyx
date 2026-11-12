@@ -179,3 +179,34 @@ test('AI calls allow long articles but stay within the shared run deadline; time
  const [item]=await db.q('SELECT status,reason,attempts FROM news_items');assert.equal(item.status,'pending');assert.equal(item.attempts,1);assert.equal(item.reason,'AI request timed out; retry scheduled.');
  assert.equal((await listNews(db)).articles.length,0);assert.equal((await db.q('SELECT lease_until FROM news_settings'))[0].lease_until,null);
 });
+
+test('the production postgres serializer saves arrays and objects rather than encoded JSON strings',async()=>{
+ const {Types}=await import('../node_modules/postgres/src/types.js');const types=Types();
+ const productionLike=underlying=>({
+  q:async(sql,args=[])=>{
+   if(sql.startsWith('UPDATE news_items SET title_en=')){
+    await underlying.q('PREPARE news_driver_write AS '+sql);
+    const [{param_types}]=await underlying.q("SELECT parameter_types::text[] AS param_types FROM pg_prepared_statements WHERE name='news_driver_write'");
+    await underlying.q('DEALLOCATE news_driver_write');
+    args=args.map((v,i)=>param_types[i]==='jsonb'?types.serializer(3802)(v):param_types[i]==='text'?types.serializer(25)(v):v);
+   }
+   return underlying.q(sql,args);
+  },tx:fn=>underlying.tx(tx=>fn(productionLike(tx)))
+ });
+ await reset();await source();await enable();await runNewsPipeline(productionLike(db),provider().fetcher);
+ const [row]=await db.q('SELECT body_en,presentation,verification FROM news_items');assert.deepEqual(row.body_en,draft.body_en);assert.deepEqual(row.presentation.highlights_en,draft.highlights_en);assert.equal(row.verification.english,true);
+});
+test('JSON repair restores existing content and review evidence without changing status, history or VP',async()=>{
+ await reset();await source();await enable();await runNewsPipeline(db,provider().fetcher);
+ const before=await db.q('SELECT * FROM news_items');const awards=await db.q('SELECT count(*)::int AS n FROM reward_ledger');
+ await db.q('UPDATE news_items SET body_en=$1::jsonb,presentation=$2::jsonb,verification=$3::jsonb',[JSON.stringify(JSON.stringify(before[0].body_en)),JSON.stringify(JSON.stringify(before[0].presentation)),JSON.stringify(JSON.stringify(before[0].verification))]);
+ const sql=await readFile(new URL('../db/news-json.sql',import.meta.url),'utf8');await pg.exec(sql);await pg.exec(sql);
+ assert.deepEqual(await db.q('SELECT * FROM news_items'),before);assert.deepEqual(await db.q('SELECT count(*)::int AS n FROM reward_ledger'),awards);
+});
+
+test('attributed options-feature reporting can publish when its facts and English pass the editorial check',async()=>{
+ await reset();await source();await enable();
+ const text='The brokerage announced an agent that identifies positions where early options exercise may make economic sense. It can also exercise those positions for users, and the feature is available now.';
+ const d={...draft,title_en:'Brokerage announces an options exercise agent',summary_en:'The brokerage says its new agent can identify potential early-exercise positions and exercise them for users.',body_en:['The brokerage says its agent can identify options positions where early exercise may make economic sense. It says the feature is available now.'],evidence:['the feature is available now']};
+ await runNewsPipeline(db,provider({d,posts:[{...post(),text}]}).fetcher);assert.equal((await listNews(db)).articles.length,1);
+});

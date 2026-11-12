@@ -2,7 +2,8 @@ import {createHash,randomUUID,timingSafeEqual} from 'node:crypto';
 import {fail} from './http.js';
 import {newsCategories,reserveNewsCost} from './news.js';
 import {newsAIConfig,newsAIStatus} from './news-ai.js';
-import {obviousNewsNoise,newsSourceContext,draftInstructions,verifyInstructions} from './news-policy.js';
+import {newsSourceContext,draftInstructions,verifyInstructions} from './news-policy.js';
+import {enqueueNewsPost} from './news-queue.js';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 export function requireNewsCron(req){const secret=process.env.CRON_SECRET;if(!secret||!timingSafeEqual(Buffer.from(hash(String(req.headers.authorization||'')),'hex'),Buffer.from(hash('Bearer '+secret),'hex')))fail(401,'Unauthorized.');}
 async function fetchJSON(fetcher,url,options={},timeoutMs=14000){
@@ -11,16 +12,8 @@ async function fetchJSON(fetcher,url,options={},timeoutMs=14000){
  const raw=await r.text();if(Buffer.byteLength(raw)>250000)throw Error('oversized-response');
  return JSON.parse(raw);
 }
-export function normalizeNewsPost(post,source,now=new Date()){
- if(!/^[0-9]{1,20}$/.test(String(post.id))||String(post.author_id)!==source.x_user_id)return null;
- if(post.referenced_tweets?.some(r=>['retweeted','replied_to'].includes(r.type)))return null;
- const date=Date.parse(post.created_at),age=now.getTime()-date;
- if(!Number.isFinite(date)||age< -600000||age>172800000)return null;
- const text=post.note_tweet?.text||post.text;
- if(typeof text!=='string'||text.trim().length<60||text.length>8000||/[\u0000-\u0008]/.test(text)||/(?:…|\.\.\.)$/.test(text.trim()))return null;
- if(obviousNewsNoise(text))return null;
- return {id:String(post.id),body:text.trim(),publishedAt:new Date(date).toISOString(),url:`https://x.com/${source.username}/status/${post.id}`,hash:hash(text.toLowerCase().replace(/https?:\/\/\S+/g,'').replace(/\s+/g,' ').trim())};
-}
+export {normalizeNewsPost} from './news-queue.js';
+
 async function collect(db,source,fetcher){
  const headers={Authorization:'Bearer '+process.env.X_NEWS_BEARER_TOKEN,Accept:'application/json'};
  try{
@@ -41,9 +34,7 @@ async function collect(db,source,fetcher){
   let latest=source.pending_since_id||source.since_id||'0';
   for(const post of result.data||[]){
    if(/^[0-9]{1,20}$/.test(String(post.id))&&BigInt(post.id)>BigInt(latest))latest=String(post.id);
-   const p=normalizeNewsPost(post,source);if(!p)continue;
-   await db.q(`INSERT INTO news_items(source_id,x_post_id,source_url,source_text,source_published_at,content_hash)
-    SELECT $1,$2,$3,$4,$5,$6 FROM news_sources WHERE id=$1 AND enabled AND NOT archived ON CONFLICT DO NOTHING`,[source.id,p.id,p.url,p.body,p.publishedAt,p.hash]);
+   await enqueueNewsPost(db,post,source);
   }
   const next=result.meta?.next_token||null;
   if(next&&(typeof next!=='string'||next.length>2000))throw Error('invalid-cursor');
@@ -115,18 +106,20 @@ async function processItem(db,item,fetcher,lease,deadline){
   return 'retry';
  }
 }
-export async function runNewsPipeline(db,fetcher=fetch){
+export async function runNewsPipeline(db,fetcher=fetch,{collectPosts=true,startedAt=Date.now()}={}){
  const [settings]=await db.q('SELECT * FROM news_settings WHERE id=1');
  const [count]=await db.q('SELECT count(*)::int AS n FROM news_sources WHERE enabled AND NOT archived');
  const idle=!count.n?'waiting-for-sources':!settings.enabled?'paused':!process.env.X_NEWS_BEARER_TOKEN||!newsAIStatus().ready?'waiting-for-credentials':null;
  if(idle){await db.q('UPDATE news_settings SET last_status=$1 WHERE id=1',[idle]);return {status:idle,collected:0,processed:0};}
- const started=Date.now(),lease=randomUUID();
+ const started=startedAt,lease=randomUUID();
  const [lock]=await db.q("UPDATE news_settings SET lease_token=$1,lease_until=clock_timestamp()+interval '3 minutes',last_started_at=clock_timestamp(),last_status='running' WHERE id=1 AND (lease_until IS NULL OR lease_until<clock_timestamp()) RETURNING id",[lease]);
  if(!lock)return {status:'already-running'};
  try{
   // One source and one story per run keep execution inside the serverless time limit.
-  const [source]=await db.q('SELECT * FROM news_sources WHERE enabled AND NOT archived AND next_fetch_at<=clock_timestamp() ORDER BY next_fetch_at,id LIMIT 1');
+  const [source]=collectPosts&&settings.collection_mode!=='batch'?await db.q('SELECT * FROM news_sources WHERE enabled AND NOT archived AND next_fetch_at<=clock_timestamp() ORDER BY next_fetch_at,id LIMIT 1'):[];
   if(source)await collect(db,source,fetcher);
+  const [{published}]=await db.q("SELECT count(*)::int AS published FROM news_items WHERE published_at>=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'");
+  if(published>=6){await db.q("UPDATE news_settings SET last_status='daily-publication-limit',last_completed_at=clock_timestamp() WHERE id=1 AND lease_token=$1",[lease]);return {status:'daily-publication-limit',collected:source?1:0,processed:0};}
   let processed=0;
   for(let candidate=0;candidate<2&&Date.now()-started<25000;candidate++){
   const [item]=await db.q(`UPDATE news_items SET processing_token=$1,processing_until=clock_timestamp()+interval '3 minutes',attempts=attempts+1 WHERE id=(

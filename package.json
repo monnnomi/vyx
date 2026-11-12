@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@vercel/blob": "^2.8.2",
+    "@vercel/functions": "^3.11.1",
     "postgres": "4.0.0"
   },
   "devDependencies": {

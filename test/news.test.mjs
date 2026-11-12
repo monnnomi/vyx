@@ -18,7 +18,7 @@ after(()=>pg.close());
 const sourceText='The public test network now supports a faster block explorer. The updated interface includes clearer transaction details and a new search tool for developers.';
 const draft={newsworthy:true,selection_reason:'Concrete product update.',kind:'news',highlights_en:['An updated block explorer with clearer transaction details.'],headings_en:['What changed'],category:'updates',risk:'low',title_en:'A clearer block explorer is now available',summary_en:'The account announced an updated explorer with improved transaction details and search.',body_en:['According to the account, the public test network has updated its block explorer with clearer transaction details and a new search tool.'],evidence:['clearer transaction details and a new search tool'],duplicate_of:null};
 const verdict={supported:true,english:true,newsworthy:true,low_risk:true,confidence:97,reason:'The English story stays within the source announcement.'};
-async function reset(){delete process.env.VYX_NEWS_AI_BASE_URL;delete process.env.VYX_NEWS_AI_MODEL;delete process.env.VYX_NEWS_AI_API_KEY;await db.q('DELETE FROM news_audit');await db.q('DELETE FROM news_items');await db.q('DELETE FROM news_sources');await db.q('DELETE FROM news_budget');await db.q("UPDATE news_settings SET enabled=false,auto_publish=true,daily_budget_cents=100,lease_token=NULL,lease_until=NULL,last_status='waiting-for-sources'");process.env.X_NEWS_BEARER_TOKEN='fixture-x';process.env.OPENAI_API_KEY='fixture-ai';}
+async function reset(){delete process.env.VYX_NEWS_AI_BASE_URL;delete process.env.VYX_NEWS_AI_MODEL;delete process.env.VYX_NEWS_AI_API_KEY;await db.q('DELETE FROM news_audit');await db.q('DELETE FROM news_items');await db.q('DELETE FROM news_sources');await db.q('DELETE FROM news_budget');await db.q("UPDATE news_settings SET collection_mode='timeline',enabled=false,auto_publish=true,daily_budget_cents=100,lease_token=NULL,lease_until=NULL,last_status='waiting-for-sources'");process.env.X_NEWS_BEARER_TOKEN='fixture-x';process.env.OPENAI_API_KEY='fixture-ai';}
 async function source(){await newsAdminWrite(db,owner.user,{action:'source-add',username:'@example'});return (await db.q('SELECT * FROM news_sources'))[0];}
 async function enable(){await newsAdminWrite(db,owner.user,{action:'settings',enabled:true,autoPublish:true,budgetCents:100});}
 const post=(id='10000')=>({id,author_id:'123',text:sourceText,created_at:new Date().toISOString()});
@@ -82,10 +82,9 @@ test('manual review publishes supported drafts and withdrawal hides them without
  await reset();await source();await enable();await db.q('UPDATE news_settings SET auto_publish=false');await runNewsPipeline(db,provider().fetcher);const [i]=await db.q('SELECT * FROM news_items');assert.equal(i.status,'review');
  await newsAdminWrite(db,owner.user,{action:'publish',id:i.id});assert.equal((await listNews(db)).articles.length,1);await newsAdminWrite(db,owner.user,{action:'withdraw',id:i.id});assert.equal((await listNews(db)).articles.length,0);await assert.rejects(()=>listNews(db,{id:i.id}),/not available/);assert.equal((await db.q('SELECT count(*)::int AS n FROM news_audit WHERE item_id=$1',[i.id]))[0].n,2);
 });
-test('news schedule is hourly UTC and separate from the six unchanged farm triggers',async()=>{
+test('news schedule scans every fifteen minutes and preserves the six farm triggers',async()=>{
  const v=JSON.parse(await readFile(new URL('../vercel.json',import.meta.url),'utf8'));
- const crons=v.crons.filter(c=>c.path.startsWith('/api/news-cron/'));
- assert.deepEqual(crons.map(c=>c.schedule),Array.from({length:24},(_,h)=>`25 ${h} * * *`));assert.equal(new Set(v.crons.map(c=>c.path)).size,30);
+ assert.deepEqual(v.schedules['vyx-news-scan'],{schedule:'*/15 * * * *',timezone:'UTC',path:'/api/news-cron',requestMethod:'GET'});assert.equal(v.crons.length,6);assert.ok(v.crons.every(c=>c.path.startsWith('/api/farm-cron/')));
 });
 test('news readers remain present under the news section without receiving rewards',async()=>{
  const {touchPresence}=await import('../api/presence.js');await touchPresence(db,member.user,token(),'news');

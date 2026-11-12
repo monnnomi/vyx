@@ -5,7 +5,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {buildNewsBatches,collectNewsBatches,reserveBatchRead,settleBatchRead} from '../server/news-batch.js';
 import {newsAdminWrite,newsAdminState,reserveNewsCost} from '../server/news.js';
 import {runNewsJobs,newsQueueHasWork,dispatchNewsQueue} from '../server/news-jobs.js';
-import {createNewsWorkerHandler} from '../api/news-worker.js';
+import {createNewsCronHandler} from '../api/news-cron.js';
 import {login} from '../server/oauth.js';
 const pg=new PGlite();await pg.exec(await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'));
 const wrap=p=>({q:async(s,a=[])=>(await p.query(s,a)).rows,tx:fn=>p.transaction(t=>fn(wrap(t)))}),db=wrap(pg);
@@ -68,7 +68,7 @@ test('bulk source updates are atomic, deduplicate names, and enforce 100 active 
  const state=await newsAdminState(db,owner.user);assert.ok(!('scan_lease_token' in state.settings));
 });
 test('worker endpoint rejects outsiders and acknowledges authorized work before the background completes',async()=>{
- const tasks=[],api=createNewsWorkerHandler(fn=>fn(db),async()=>{throw Error('unexpected network')},p=>tasks.push(p));
+ const tasks=[],api=createNewsCronHandler(fn=>fn(db),async()=>{throw Error('unexpected network')},p=>tasks.push(p));
  const call=async headers=>{const res={setHeader(){},end(s){this.body=JSON.parse(s);}};await api({method:'POST',headers},res);return res;};
  assert.equal((await call({})).statusCode,401);assert.equal(tasks.length,0);await reset();await db.q('UPDATE news_settings SET enabled=false');assert.equal((await call({authorization:'Bearer fixture-cron'})).statusCode,202);await Promise.all(tasks);
 });
@@ -81,7 +81,7 @@ test('batch collection feeds the writer immediately and dispatches remaining wor
  const draft={newsworthy:true,selection_reason:'Product release.',kind:'news',highlights_en:['A clearer transaction search interface is available.'],headings_en:['What changed'],category:'updates',risk:'low',title_en:'A clearer transaction search interface is available',summary_en:'The account announced a developer release with clearer transaction details and improved search.',body_en:['The account announced a new developer release with clearer transaction details and an improved search interface.'],evidence:['clearer transaction details'],duplicate_of:null};
  const verdict={supported:true,english:true,newsworthy:true,low_risk:true,confidence:98,reason:'The source supports the article.'};
  const fetcher=async(raw,options)=>{
-  if(raw==='https://joinvyx.com/api/news-worker'){dispatches.push(options);return new Response('{}',{status:202});}
+  if(raw==='https://joinvyx.com/api/news-cron'){dispatches.push(options);assert.equal(options.method,'POST');return new Response('{}',{status:202});}
   if(raw.startsWith('https://api.x.com/'))return p.fetcher(raw,options);
   const request=JSON.parse(options.body),result=request.text.format.name==='vyx_news_draft'?draft:verdict;
   return new Response(JSON.stringify({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(result)}]}]}));

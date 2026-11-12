@@ -1,8 +1,8 @@
 import {waitUntil} from '@vercel/functions';
-import {withDB} from '../server/db.js';
-import {fail,handleError,json} from '../server/http.js';
-import {requireNewsCron} from '../server/news-pipeline.js';
-import {runNewsJobs,dispatchNewsQueue} from '../server/news-jobs.js';
+import {withDB} from './db.js';
+import {fail,handleError,json} from './http.js';
+import {requireNewsCron} from './news-pipeline.js';
+import {runNewsJobs,dispatchNewsQueue} from './news-jobs.js';
 export function createNewsWorkerHandler(useDB=withDB,fetcher=fetch,background=waitUntil){return async(req,res)=>{
  try{
   if(req.method!=='POST')fail(405,'Method not allowed.');requireNewsCron(req);

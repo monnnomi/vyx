@@ -22,6 +22,6 @@ export async function newsQueueHasWork(db){
 }
 export async function dispatchNewsQueue(db,fetcher=fetch){
  if(!await newsQueueHasWork(db))return;
- const r=await fetcher(new URL('/api/news-worker',appURL()).href,{method:'POST',redirect:'error',signal:AbortSignal.timeout(5000),headers:{Authorization:'Bearer '+process.env.CRON_SECRET}});
+ const r=await fetcher(new URL('/api/news-cron',appURL()).href,{method:'POST',redirect:'error',signal:AbortSignal.timeout(5000),headers:{Authorization:'Bearer '+process.env.CRON_SECRET}});
  if(!r.ok)throw Error('News worker dispatch failed');
 }

@@ -536,3 +536,222 @@ html body[data-interface=social] .vyx-welcome h1>.sp-line::after{display:none}
 html body[data-interface=social] .vyx-welcome .sp-shape.s4{left:calc(55% - 36px);top:96px;z-index:2}
 html body[data-interface=social] .vyx-welcome .sp-shape.s3{left:auto;right:22px;top:372px}
 html body[data-interface=social] .vyx-welcome .sp-shape.s2{left:48.5%;top:348px}
+
+/* =====================================================================
+   Phone home: the round island, a quieter pitch, a floating tab bar.
+   One bold object per screen; everything else steps back.
+   ===================================================================== */
+html body[data-interface=social]{--sp-bar:#15172b}
+html body[data-interface=social][data-appearance=dark]{--sp-bar:#262a52}
+html body[data-interface=social] .sp-island{display:none}
+@media(max-width:720px){
+ /* island */
+ html body[data-interface=social] .sp-island{display:flex;align-items:center;gap:12px;width:calc(100% - 24px);margin:2px 12px 14px;padding:10px 10px 10px 12px;min-height:64px;border:0;border-radius:24px;background:var(--sp-bar);color:#fff;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .15s ease}
+ html body[data-interface=social] .sp-island[hidden]{display:none}
+ html body[data-interface=social] .sp-island:active{transform:scale(.98)}
+ html body[data-interface=social] .sp-island-ring{flex:0 0 40px;height:40px;border-radius:50%;background:conic-gradient(#ffd84d calc(var(--sp-round,0)*1turn),#ffffff2e 0);-webkit-mask:radial-gradient(circle,transparent 12px,#000 13px);mask:radial-gradient(circle,transparent 12px,#000 13px)}
+ html body[data-interface=social] .sp-island-copy{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.15}
+ html body[data-interface=social] .sp-island-label{font-size:12px;font-weight:500;color:#c5c8e0}
+ html body[data-interface=social] .sp-island-time{font-size:22px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:#fff}
+ html body[data-interface=social] .sp-island-chip{flex:none;display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:16px;background:#ffd84d;color:#15172b;font-size:15px;font-weight:800;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+ html body[data-interface=social] .chat-directory-footer{display:none}
+
+ /* pitch: type on the page, no card; members skip it */
+ html body[data-interface=social] .vyx-mobile-start{background:none;border:0;box-shadow:none;border-radius:0;margin:0 0 6px;padding:6px 16px 14px;color:var(--text)}
+ html body[data-interface=social] .vyx-mobile-start *{color:inherit}
+ html body[data-interface=social] .vyx-mobile-start .vyx-section-label,
+ html body[data-interface=social] .vyx-mobile-start .vyx-round-teaser{display:none}
+ html body[data-interface=social] .vyx-mobile-start h2{font-size:clamp(34px,10.5vw,44px);line-height:.98;letter-spacing:-.05em;font-weight:800;margin:0 0 10px;max-width:9em}
+ html body[data-interface=social] .vyx-mobile-start p{font-size:16px;line-height:1.45;color:var(--muted);margin:0 0 16px;max-width:30em}
+ html body[data-interface=social] .vyx-mobile-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+ html body[data-interface=social] .vyx-mobile-start .primary.vyx-primary{background:var(--accent);color:#fff;min-height:52px;padding-inline:26px;font-size:16px;border:0;box-shadow:none}
+ html body[data-interface=social][data-appearance=dark] .vyx-mobile-start .primary.vyx-primary{background:#6a4ff7}
+ html body[data-interface=social] .vyx-mobile-start .primary.vyx-primary *{color:#fff}
+ html body[data-interface=social] .vyx-mobile-start .text-link{color:var(--text);font-size:15px;font-weight:600;text-decoration:underline;text-underline-offset:4px;min-height:44px}
+ html body.sp-member[data-interface=social] .vyx-mobile-start{display:none}
+
+ /* list chrome */
+ html body[data-interface=social] .chat-directory-heading h1{font-size:28px}
+ html body[data-interface=social] .chat-room-list .room-row,
+ html body[data-interface=social] .chat-room-list .room-row:hover{box-shadow:none;transform:none;border-color:transparent}
+ html body[data-interface=social] .chat-room-list .room-list-item{animation:none}
+ html body[data-interface=social] .chat-directory-scroll{padding-bottom:16px}
+
+ /* floating tab bar */
+ html body[data-interface=social] .mobile-nav{left:10px;right:10px;bottom:calc(8px + env(safe-area-inset-bottom));width:auto;height:60px;padding:6px;gap:2px;border:0;border-radius:30px;background:var(--sp-bar);box-shadow:0 10px 30px #15172b33;align-items:center}
+ html body[data-interface=social] .mobile-nav .nav-link{flex:1 1 0;height:48px;min-height:48px;flex-direction:row;gap:7px;border-radius:24px;color:#b9bdd8;background:none;box-shadow:none;border:0;font-size:13px;font-weight:700;padding:0;transition:flex-grow .25s cubic-bezier(.2,.8,.2,1),background .2s,color .2s}
+ html body[data-interface=social] .mobile-nav .nav-link .nav-text{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ html body[data-interface=social] .mobile-nav .nav-link.active{flex:2.2 1 0;background:#ffd84d;color:#15172b;box-shadow:none;border:0}
+ html body[data-interface=social] .mobile-nav .nav-link.active .nav-text{position:static;width:auto;height:auto;overflow:visible;clip-path:none}
+ html body[data-interface=social] .mobile-nav .nav-link .icon,html body[data-interface=social] .mobile-nav .nav-link svg{width:22px;height:22px}
+
+ /* room header */
+ html body[data-interface=social] .room-thread-header{align-items:center;gap:10px}
+ html body[data-interface=social] .room-thread-header>div:not(.conversation-header-actions){flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+ html body[data-interface=social] .room-thread-header h1{margin:0;line-height:1.2}
+ html body[data-interface=social] .room-member-count{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;text-align:left;font-size:12px;min-height:0;padding:0}
+ html body[data-interface=social] .room-thread-header .chat-room-avatar{width:40px;height:40px;flex-basis:40px;font-size:16px}
+ html body[data-interface=social] .room-thread-header .icon-button{width:40px;height:40px}
+}
+@media(max-width:720px) and (prefers-reduced-motion:reduce){html body[data-interface=social] .mobile-nav .nav-link{transition:none}}
+@media(max-width:720px){
+ html body[data-interface=social] .vyx-mobile-start h2{font-size:clamp(32px,9.6vw,40px);max-width:7em}
+}
+
+/* =====================================================================
+   v3 — restraint. One bold object per screen; cards go flat; motion only
+   where it answers an action or on the home sequence.
+   ===================================================================== */
+/* flat cards */
+html body[data-interface=social] .x-task-card,html body[data-interface=social] .nft-selection,
+html body[data-interface=social] .referral-invite,html body[data-interface=social] .drop-metrics,
+html body[data-interface=social] .current-round,html body[data-interface=social] .ranking-podium-card,
+html body[data-interface=social] .composer,html body[data-interface=social] .social-feed>.vyx-official,
+html body[data-interface=social] .whitelist-edition,html body[data-interface=social] .news-intro{border:0;box-shadow:none}
+html body[data-interface=social] .x-task-card,html body[data-interface=social] .x-task-card:hover,
+html body[data-interface=social] .post,html body[data-interface=social] .post:hover,
+html body[data-interface=social] .product-heading,html body[data-interface=social] .room-message{animation:none;transform:none}
+html body[data-interface=social] .x-task-card:hover{box-shadow:none}
+html body[data-interface=social] .chat-room-list .room-list-item{animation:none}
+/* page-title labels say nothing the title does not */
+html body[data-interface=social] .product-heading .eyebrow,
+html body[data-interface=social] .news-heading .eyebrow{display:none}
+html body[data-interface=social] .eyebrow,html body[data-interface=social] .vyx-section-label{letter-spacing:.04em}
+
+/* ---------- Room ---------- */
+html body[data-interface=social] .vyx-room-progress{display:flex;align-items:center;gap:8px;margin:0 20px 8px;padding:6px 8px 6px 14px;min-height:52px;border:0;border-radius:26px;background:var(--bg);color:var(--text);font-size:13px}
+html body[data-interface=social] .vyx-room-progress *{color:inherit}
+html body[data-interface=social] #vyx-room-progress-content{flex:1;min-width:0;display:flex;align-items:center;gap:14px}
+html body[data-interface=social] #vyx-room-progress-content[hidden]{display:none}
+html body[data-interface=social] .vyx-room-progress-line{flex:none;display:flex;align-items:center;gap:12px;flex-wrap:nowrap;padding:0;min-height:0;font-size:13px}
+html body[data-interface=social] .vyx-room-progress-line b{font-size:16px;font-weight:800;letter-spacing:-.02em}
+html body[data-interface=social] .vyx-room-progress-line>span:nth-of-type(3){flex:none;color:var(--muted)}
+html body[data-interface=social] .vyx-room-progress .vyx-live-dot{flex:0 0 22px;width:22px;height:22px;border-radius:50%;animation:none;background:conic-gradient(var(--accent) calc(var(--sp-round,0)*1turn),var(--line) 0);-webkit-mask:radial-gradient(circle,transparent 6px,#000 7px);mask:radial-gradient(circle,transparent 6px,#000 7px)}
+html body[data-interface=social] .vyx-room-progress .vyx-send-feedback{flex:1;min-width:0;margin:0;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body[data-interface=social] #vyx-room-progress-content>small{display:none}
+html body[data-interface=social] .vyx-room-progress-line>.text-link{margin:0;font-size:13px;color:var(--accent);text-decoration:none;order:9}
+html body[data-interface=social] .vyx-room-progress-toggle{position:static;flex:none;min-height:40px;border-radius:20px;font-size:13px;color:var(--muted)}
+html body[data-interface=social] .vyx-room-progress.is-collapsed{background:none;min-height:40px;margin-bottom:0;justify-content:flex-end}
+
+html body[data-interface=social] .room-message-content{padding:10px 14px 8px;border-radius:6px 20px 20px 20px}
+html body[data-interface=social] .room-message.mine .room-message-content{border:0;box-shadow:none;border-radius:20px 20px 6px 20px}
+html body[data-interface=social] .room-message-content>p{font-size:15px;line-height:1.45;margin:2px 0 4px}
+html body[data-interface=social] .room-message-by strong{font-size:13px;font-weight:700}
+html body[data-interface=social] .room-message.mine .room-message-by strong{display:none}
+html body[data-interface=social] .room-message-by time{opacity:.75}
+html body[data-interface=social] .message-reactions{gap:8px;align-items:center}
+html body[data-interface=social] .reaction-add{background:none;min-height:28px;padding:0 6px;opacity:.55;font-size:13px}
+html body[data-interface=social] .room-message.mine .reaction-add{background:none}
+html body[data-interface=social] .room-message:hover .reaction-add,html body[data-interface=social] .reaction-add:focus-visible{opacity:1}
+html body[data-interface=social] .message-view-count{opacity:.65;font-size:12px}
+html body[data-interface=social] .room-message>.avatar{width:36px;height:36px;flex:0 0 36px;font-size:14px;font-weight:800;border-radius:50%}
+html body[data-interface=social] .room-wonder-art{border-radius:12px}
+html body[data-interface=social] .room-chat-form{border:2px solid transparent;transition:border-color .15s}
+html body[data-interface=social] .room-chat-form:focus-within{border-color:var(--accent)}
+html body[data-interface=social] .room-chat-form .primary{border:0;box-shadow:none}
+
+/* ---------- Feed ---------- */
+html body[data-interface=social] .social-feed>.vyx-official{border-radius:24px;padding:18px 20px}
+html body[data-interface=social] .social-feed>.vyx-official h2{font-size:19px;line-height:1.2;margin:10px 0 6px}
+html body[data-interface=social] .social-feed>.vyx-official p{font-size:13px;line-height:1.5;margin:0 0 12px}
+html body[data-interface=social] .composer{border-radius:24px;padding:16px 18px}
+html body[data-interface=social] .composer textarea{font-size:16px}
+html body[data-interface=social] .composer:focus-within{outline:2px solid var(--accent);outline-offset:-2px}
+html body[data-interface=social] .post{border-radius:24px;padding:20px 22px 12px}
+html body[data-interface=social] .post-top .icon-button{background:none;width:44px;height:44px}
+html body[data-interface=social] .post-top .avatar{width:44px;height:44px;font-weight:800}
+html body[data-interface=social] .post-handle{font-size:13px;color:var(--muted)}
+html body[data-interface=social] .post-text{margin:10px 0 8px}
+html body[data-interface=social] .post-actions{gap:4px;margin-left:-10px;align-items:center}
+html body[data-interface=social] .post-actions button,html body[data-interface=social] .post-actions .post-view-count{min-width:44px;min-height:40px;padding:0 10px;border-radius:20px;display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);background:none;border:0}
+html body[data-interface=social] .post-actions button:hover{background:var(--bg);color:var(--text)}
+html body[data-interface=social] .post-actions button[aria-pressed=true]{color:var(--vyx-coral)}
+html body[data-interface=social] .quiet-intro h2,html body[data-interface=social] .quiet-intro h3{font-size:22px;letter-spacing:-.03em}
+
+/* ---------- News ---------- */
+html body[data-interface=social] .news-intro{border-radius:24px}
+html body[data-interface=social] .news-filters button{border:0;box-shadow:none}
+
+/* ---------- Quests ---------- */
+html body[data-interface=social] .x-task-summary{position:relative;padding-bottom:40px;box-shadow:none;border:0}
+html body[data-interface=social] .x-task-summary::before,html body[data-interface=social] .x-task-summary::after{content:"";position:absolute;left:26px;right:26px;bottom:20px;height:8px;border-radius:4px;background:#ffffff26}
+html body[data-interface=social] .x-task-summary::after{right:auto;width:calc((100% - 52px)*var(--sp-p,0));min-width:8px;background:#ffd84d;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+html body[data-interface=social] .x-task-card{border-radius:24px;padding:22px}
+html body[data-interface=social] .x-task-connect{border-radius:24px}
+
+/* ---------- Profile ---------- */
+html body[data-interface=social] .account-social-counts{gap:10px}
+html body[data-interface=social] .account-social-counts>div{flex-direction:column-reverse;align-items:flex-start;gap:2px;background:var(--bg);border-radius:18px;padding:12px 16px;min-width:104px}
+html body[data-interface=social] .account-social-counts dd{font-size:22px;font-weight:800;letter-spacing:-.03em;margin:0;line-height:1.1}
+html body[data-interface=social] .account-social-counts dt{font-size:12px;color:var(--muted);font-weight:500}
+html body[data-interface=social] .nft-selection,html body[data-interface=social] .referral-invite{border-radius:24px}
+
+/* ---------- Drops ---------- */
+html body[data-interface=social] .drop-metrics,html body[data-interface=social] .current-round{border-radius:24px}
+html body[data-interface=social] .drop-metrics small,html body[data-interface=social] .drop-metrics span{font-size:12px}
+
+/* ---------- Rankings ---------- */
+html body[data-interface=social] .ranking-podium-card{border-radius:24px}
+html body[data-interface=social] .ranking-podium-card:first-child{background:var(--sp-sun);color:var(--sp-on-sun)}
+html body[data-interface=social] .ranking-podium-card:first-child *{color:var(--sp-on-sun)}
+html body[data-interface=social] .ranking-row.is-you{background:var(--blue-soft);color:var(--text);border-block:0}
+html body[data-interface=social] .ranking-row.is-you *{color:var(--text)}
+
+@media(max-width:720px){
+ html body[data-interface=social] .vyx-room-progress{margin:0 10px 6px;border-radius:22px;align-items:flex-start;padding:8px 6px 8px 12px}
+ html body[data-interface=social] #vyx-room-progress-content{flex-wrap:wrap;gap:2px 12px;padding-top:4px}
+ html body[data-interface=social] .vyx-room-progress-line{flex:1 1 100%;flex-wrap:wrap;gap:4px 10px}
+ html body[data-interface=social] .vyx-room-progress .vyx-send-feedback{flex:1 1 100%;white-space:normal;font-size:12px}
+ html body[data-interface=social] .account-social-counts>div{min-width:calc(50% - 5px);flex:1}
+ html body[data-interface=social] .post{padding:16px 16px 8px}
+}
+
+/* v3 fixes */
+html body[data-interface=social] .drop-metrics strong{font-size:30px}
+html body[data-interface=social] .drop-metrics strong .sp-count{font-size:inherit}
+html body[data-interface=social] .vyx-room-progress-toggle{order:2}
+html body[data-interface=social] #vyx-room-progress-content{order:1}
+html body[data-interface=social] .ranking-podium-card:first-child .ranking-you{background:#15172b;color:#fff}
+html body[data-interface=social] .ranking-row.is-you{border-left:0;box-shadow:none}
+@media(max-width:720px){
+ html body[data-interface=social] .vyx-room-progress .vyx-send-feedback{display:none}
+ html body[data-interface=social] .vyx-room-progress{align-items:center}
+ html body[data-interface=social] #vyx-room-progress-content{padding-top:0}
+ html body[data-interface=social] .social-feed>.vyx-official{margin:4px 10px 10px;padding:14px 16px}
+ html body[data-interface=social] .social-feed>.vyx-official p{display:none}
+ html body[data-interface=social] .social-feed>.vyx-official h2{font-size:17px;margin:8px 0 10px}
+ html body[data-interface=social] .social-feed>.vyx-official .vyx-guide-links{flex-wrap:nowrap;overflow-x:auto;margin-inline:-16px;padding-inline:16px;scrollbar-width:none}
+ html body[data-interface=social] .social-feed>.vyx-official .vyx-guide-links::-webkit-scrollbar{display:none}
+ html body[data-interface=social] .social-feed>.vyx-official .vyx-guide-links button{flex:none}
+ html body[data-interface=social] .direct-thread .chat-bubbles{max-height:none;flex:1 1 0}
+ html body[data-interface=social] .settings-panel .setting-item{gap:12px}
+ html body[data-interface=social] .settings-panel .setting-item>div{min-width:0;flex:1}
+ html body[data-interface=social] .settings-panel .secondary{flex:none;padding-inline:14px;font-size:13px;max-width:46%;white-space:normal}
+ html body[data-interface=social] #main-content{overflow-x:clip}
+}
+
+/* ---------- Dialog forms, picker, public profile, room details ---------- */
+html body[data-interface=social] .modal:not(.is-wonder) label{font-size:13px;font-weight:600;color:var(--text)}
+html body[data-interface=social] .modal:not(.is-wonder) input:not([type=checkbox]):not([type=radio]):not([type=file]),
+html body[data-interface=social] .modal:not(.is-wonder) textarea,
+html body[data-interface=social] .modal:not(.is-wonder) select{background:var(--bg);border:2px solid transparent;border-radius:16px;min-height:48px;padding:12px 16px;font-size:15px;color:var(--text);box-shadow:none;transition:border-color .15s}
+html body[data-interface=social] .modal:not(.is-wonder) input:focus,
+html body[data-interface=social] .modal:not(.is-wonder) textarea:focus{border-color:var(--accent);outline:0}
+html body[data-interface=social] .modal:not(.is-wonder) .primary{min-height:52px;font-size:15px}
+html body[data-interface=social] [data-reaction],html body[data-interface=social] .reaction-option{border-radius:14px;transition:transform .12s cubic-bezier(.3,1.6,.5,1)}
+html body[data-interface=social] [data-reaction]:hover,html body[data-interface=social] .reaction-option:hover{transform:scale(1.18)}
+html body[data-interface=social] .public-social-counts,html body[data-interface=social] .public-profile .account-social-counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+html body[data-interface=social] .public-social-counts>div,html body[data-interface=social] .public-profile .account-social-counts>div{min-width:0;padding:12px}
+html body[data-interface=social] .public-profile .primary,html body[data-interface=social] .public-profile .secondary{vertical-align:middle}
+html body[data-interface=social] .room-context{padding:22px;font-size:13px;line-height:1.5}
+html body[data-interface=social] .room-context .room-description{font-size:14px;color:var(--text)}
+html body[data-interface=social] .room-farming{padding:18px;border-radius:22px}
+html body[data-interface=social] .room-farming h2,html body[data-interface=social] .room-farming h3{font-size:17px;letter-spacing:-.02em;line-height:1.2}
+html body[data-interface=social] .farm-countdown strong,html body[data-interface=social] .farm-countdown b,
+html body[data-interface=social] .farm-speed strong,html body[data-interface=social] .farm-speed b{font-size:24px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+html body[data-interface=social] .contribution-status{border-radius:14px;background:var(--blue-soft);border:0;padding:10px 12px}
+html body[data-interface=social] .context-members{border-radius:16px;background:var(--panel);min-height:48px;padding-inline:14px}
+@media(max-width:720px){
+ html body[data-interface=social] .public-social-counts,html body[data-interface=social] .public-profile .account-social-counts{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+html body[data-interface=social] .room-context{width:min(360px,100%)}

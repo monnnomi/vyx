@@ -6,7 +6,7 @@
   const seen=new WeakSet();
 
   function roundProgress(){
-    document.querySelectorAll('.vyx-round-teaser').forEach(box=>{
+    document.querySelectorAll('.vyx-round-teaser,.vyx-room-progress').forEach(box=>{
       const end=box.querySelector('[data-farm-end]');
       if(!end)return;
       const left=new Date(end.dataset.farmEnd).getTime()-Date.now();
@@ -122,6 +122,68 @@
     hero.addEventListener('pointerleave',()=>{hero.style.setProperty('--mx',0);hero.style.setProperty('--my',0)});
   }
 
+  // Phone: one "round island" replaces the pitch card's timer line and the floating rewards bar.
+  // It mirrors values the app already renders and forwards taps to the app's own button.
+  const phone=matchMedia('(max-width:720px)');
+  function island(){
+    const dir=document.querySelector('.chat-directory');
+    const head=dir&&dir.querySelector('.chat-directory-heading');
+    let el=dir&&dir.querySelector('.sp-island');
+    if(!head||!phone.matches){if(el)el.remove();return}
+    const foot=dir.querySelector('.chat-directory-footer button');
+    const vp=dir.querySelector('.chat-directory-footer b');
+    const src=dir.querySelector('.vyx-mobile-start [data-farm-end]')||document.querySelector('[data-farm-end]');
+    document.body.classList.toggle('sp-member',!!vp);
+    if(!el){
+      el=document.createElement('button');el.type='button';el.className='sp-island';
+      el.innerHTML='<span class="sp-island-ring" aria-hidden="true"></span><span class="sp-island-copy"><span class="sp-island-label">Round closes in</span><span class="sp-island-time"></span></span><span class="sp-island-chip"></span>';
+      el.addEventListener('click',()=>{const b=document.querySelector('.chat-directory-footer button');if(b)b.click()});
+      head.after(el);
+    }
+    const time=src?src.textContent.trim():'';
+    const chip=vp?vp.textContent.trim():'Join';
+    const t=el.querySelector('.sp-island-time'),c=el.querySelector('.sp-island-chip');
+    if(t.textContent!==time)t.textContent=time;
+    if(c.textContent!==chip)c.textContent=chip;
+    el.hidden=!time||!foot;
+    el.setAttribute('aria-label',(time?'Round closes in '+time+'. ':'')+(vp?'Your rewards: '+chip:'Connect to join the conversation'));
+    const m=/^(\d+):(\d+):(\d+)$/.exec(time);
+    if(m)el.style.setProperty('--sp-round',Math.min(1,Math.max(0,1-((+m[1]*3600+ +m[2]*60+ +m[3])*1000)/ROUND_MS)).toFixed(4));
+  }
+
+  // Quests: turn "N / 8,500 VP earned" into a progress value for the summary bar.
+  function questProgress(){
+    const box=document.querySelector('.x-task-summary');if(!box)return;
+    const strong=box.querySelector('strong');if(!strong)return;
+    const final=strong.querySelector('.sp-count');
+    const text=(final&&final.dataset.spFinal)||strong.textContent;
+    const nums=(text+' '+strong.textContent).replace(/,/g,'').match(/\d+/g)||[];
+    const total=8500,earned=Math.min(total,+(nums[0]||0));
+    box.style.setProperty('--sp-p',(earned/total).toFixed(4));
+  }
+
+  // Legibility floor: older stylesheets set many labels at 6-10px. Lift any text below 12px,
+  // once per element, leaving the illustrated drop scene alone.
+  const sized=new WeakSet();
+  function legible(){
+    const walk=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+    let n;const todo=[];
+    while((n=walk.nextNode())){
+      const el=n.parentElement;
+      if(!el||sized.has(el)||!n.textContent.trim())continue;
+      sized.add(el);
+      if(el.closest('svg,.wonder-scene,.sky-scene,script,style'))continue;
+      todo.push(el);
+    }
+    const small=todo.filter(el=>parseFloat(getComputedStyle(el).fontSize)<12);
+    small.forEach(el=>{el.style.fontSize='12px'});
+  }
+  let legibleQueued=false;
+  function queueLegible(){
+    if(legibleQueued)return;legibleQueued=true;
+    (window.requestIdleCallback||(f=>setTimeout(f,120)))(()=>{legibleQueued=false;legible()});
+  }
+
   function hero(){
     const el=document.querySelector('.conversation-stage .vyx-welcome');
     if(!el)return;
@@ -131,7 +193,7 @@
   const KEYS=['.chat-directory-footer b','.x-task-summary>strong','.vyx-reward-summary strong','.ranking-podium-score','.drop-metrics strong'];
   const lastShown=new Map();
   function enhance(){
-    roundProgress();hero();
+    roundProgress();hero();island();questProgress();queueLegible();
     KEYS.forEach(sel=>document.querySelectorAll(sel).forEach((el,i)=>{
       if(seen.has(el))return;
       seen.add(el);
@@ -154,6 +216,6 @@
 
   let queued=false;
   const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;enhance()})};
-  const boot=()=>{enhance();new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});setInterval(roundProgress,15000)};
+  const boot=()=>{enhance();new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});setInterval(roundProgress,15000);setInterval(island,1000);phone.addEventListener('change',island)};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();

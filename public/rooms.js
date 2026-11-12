@@ -77,6 +77,16 @@ document.addEventListener('click',async ev=>{
   if(d.roomOpen){await openRoom(d.roomOpen);return;}
   if(d.roomFilter){rememberRoomSignIn();if(d.roomFilter==='mine'&&!requireUser())return;roomFilter=d.roomFilter;await reloadRoomDirectory();}
   if(d.roomMemberPage)await showRoomMembers(Number(d.roomMemberPage));
+  if(d.roomEditMessage){
+   const message=roomMessages.find(m=>m.id===d.roomEditMessage&&m.sender_id===data.user?.id);
+   if(!message)return;
+   showModal(`<h2 id="modal-title">Edit message</h2><label class="modal-field">Message<textarea id="room-edit-body" maxlength="2000" rows="5">${e(message.body)}</textarea></label><button class="primary" data-room-save-message="${e(message.id)}">Save changes</button>`);
+   $('#room-edit-body').focus();
+  }
+  if(d.roomSaveMessage){
+   const body=$('#room-edit-body').value;
+   if(await roomWrite('room-edit-message',{id:activeRoom,messageId:d.roomSaveMessage,body})){closeModal();await loadRooms();}
+  }
   if(d.roomRemove){showModal(`<h2 id="modal-title">Remove this message?</h2><p class="modal-subtitle">It will disappear from this room for everyone.</p><button class="primary" data-room-delete="${e(d.roomRemove)}">Remove message</button>`);}
   if(d.roomDelete){if(await roomWrite('room-delete-message',{id:activeRoom,messageId:d.roomDelete})){roomMessages=roomMessages.filter(m=>m.id!==d.roomDelete);closeModal();await loadRooms();}}
   if(!d.roomAction)return;const a=d.roomAction;

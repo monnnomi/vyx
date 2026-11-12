@@ -78,7 +78,7 @@ export async function mutate(db,user,action,input,now=new Date()) {
  return db.tx(async tx=>{
   const [fresh]=await tx.q('SELECT * FROM users WHERE id=$1 AND NOT is_system FOR UPDATE',[user.id]);
   if(!fresh)fail(401,'Please sign in again.');user=fresh;
-  if(['room-create','room-join','room-leave','room-close','room-send','room-delete-message','room-read','room-pin','room-edit'].includes(action))return mutateRoom(tx,user,action,input);
+  if(['room-create','room-join','room-leave','room-close','room-send','room-edit-message','room-delete-message','room-read','room-pin','room-edit'].includes(action))return mutateRoom(tx,user,action,input);
   if(action==='message-react')return reactToMessage(tx,user,input);
   const social=await mutateSocial(tx,user,action,input);if(social!==undefined)return social;
   const c=calendar(now);

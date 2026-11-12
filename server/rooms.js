@@ -163,10 +163,16 @@ export async function mutateRoom(tx,user,action,input){
   if(recent.n>=20)fail(429,'You can send up to 20 room messages per minute.');
   const [message]=await tx.q('INSERT INTO room_messages(room_id,sender_id,body,request_id,reply_to) VALUES($1,$2,$3,$4,$5) RETURNING id',[id,user.id,content,requestId,replyTo]);
   await attachMedia(tx,user,'room',id,message.id,ids);
-  const handles=handlesIn(content);
-  if(handles.length)await tx.q(`INSERT INTO room_mentions(message_id,user_id) SELECT $1,u.id FROM users u JOIN room_members rm ON rm.user_id=u.id
-   WHERE rm.room_id=$2 AND u.id<>$3 AND lower(u.handle)=ANY($4::text[]) ON CONFLICT DO NOTHING`,[message.id,id,user.id,handles]);
+  await addMentions(tx,message.id,id,user,content);
   const farming=await recordContribution(tx,user,id,message.id,content);return {...message,farming};
+ }
+ if(action==='room-edit-message'){
+  const messageId=uuid(input.messageId),content=text(input.body??'',1,2000);
+  const [updated]=await tx.q('UPDATE room_messages SET body=$4 WHERE id=$1 AND room_id=$2 AND sender_id=$3 AND deleted_at IS NULL RETURNING id',[messageId,id,user.id,content]);
+  if(!updated)fail(404,'Your message was not found in this room.');
+  await tx.q('DELETE FROM room_mentions WHERE message_id=$1',[messageId]);
+  await addMentions(tx,messageId,id,user,content);
+  return {ok:true};
  }
  if(action==='room-delete-message'){
   const messageId=uuid(input.messageId);
@@ -186,4 +192,10 @@ async function membershipLimit(tx,user){
 async function maskQuotes(db,user,rows){
  const controls=await db.q('SELECT target_id AS id FROM member_controls WHERE user_id=$1 AND (blocked OR muted) UNION SELECT user_id AS id FROM member_controls WHERE target_id=$1 AND blocked',[user.id]);
  const hidden=new Set(controls.map(c=>c.id));return rows.map(({reply_sender_id,...m})=>({...m,reply:m.reply&&hidden.has(reply_sender_id)?{id:m.reply.id,removed:true}:m.reply}));
+}
+
+async function addMentions(tx,messageId,id,user,content){
+ const handles=handlesIn(content);
+  if(handles.length)await tx.q(`INSERT INTO room_mentions(message_id,user_id) SELECT $1,u.id FROM users u JOIN room_members rm ON rm.user_id=u.id
+   WHERE rm.room_id=$2 AND u.id<>$3 AND lower(u.handle)=ANY($4::text[]) ON CONFLICT DO NOTHING`,[messageId,id,user.id,handles]);
 }

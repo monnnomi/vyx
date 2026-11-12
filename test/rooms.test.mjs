@@ -62,6 +62,14 @@ test('leaving removes read and write access; rejoining restores existing history
  await mutate(db,bob,'room-join',{id:main.id});assert.ok((await roomThread(db,bob,main.id)).messages.length>=3);
  await rejects(mutate(db,alice,'room-leave',{id:main.id}),409);
 });
+test('only the author can edit a room message and the new text survives a reload',async()=>{
+ const message=await send(bob,main.id,'Draft text');
+ const edit=(user,body)=>mutate(db,user,'room-edit-message',{id:main.id,messageId:message.id,body});
+ await rejects(edit(alice,'Room owner overwrite'),404);
+ await edit(bob,'Corrected text');
+ const thread=await roomThread(db,alice,main.id);
+ assert.equal(thread.messages.find(m=>m.id===message.id).body,'Corrected text');
+});
 test('only sender or room owner can remove a message, with no cross-room bypass',async()=>{
  const a=await send(alice,main.id,'Owner message'),b=await send(bob,main.id,'Member message');
  await rejects(mutate(db,bob,'room-delete-message',{id:main.id,messageId:a.id}),403);

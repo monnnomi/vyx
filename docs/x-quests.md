@@ -51,3 +51,12 @@ https://docs.x.com/x-api/users/get-following
 https://docs.x.com/x-api/users/get-liked-posts
 https://docs.x.com/x-api/users/get-posts
 https://docs.x.com/x-api/getting-started/pricing
+
+
+## Shared-allowance feedback (13 November 2026)
+
+The owner kept the existing $1/day quest-verification cap after diagnosing 98 cents reserved and only two cents remaining, insufficient for a five-cent post-read reservation. Do not raise or reset that counter as a troubleshooting shortcut. News has a separate allowance.
+
+Task state exposes only ready/limited/paused/complete availability, per-task `canCheck`, and the next UTC reset, not the project's exact spending figures. A verification call that cannot fund any of its pending requested actions returns the unchanged state before contacting X or writing checks/rewards. Existing receipts remain authoritative. A one-cent profile lookup can still be available when a five-cent post lookup is not.
+
+Quests show an explicit pause and UTC reset time, disable unavailable Check buttons and offer **Refresh status**, a read-only state request. Returning from X checks only the task whose link was opened, rather than all tasks. Full-list verification remains an explicit action or the initial authorized connection check. A focus/visibility event after the reset refreshes availability without making a paid X verification call. Read-only scopes, the two-hour grant, per-account limits, daily cap and promotion reserve remain unchanged.

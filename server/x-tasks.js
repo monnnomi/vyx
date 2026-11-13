@@ -14,10 +14,14 @@ export const xTasks=Object.freeze([
  {id:'x-vyx-reply-2121127790556680479',kind:'reply',postId:campaignPosts[1],title:'Reply to the VYX product update',amount:1500,url:'https://x.com/vyxsocial/status/'+campaignPosts[1]}
 ]);
 export const xTaskTotal=xTasks.reduce((sum,t)=>sum+t.amount,0);
+function taskBudgetCap(){
+ const configured=Number(process.env.X_TASK_DAILY_BUDGET_CENTS||100);
+ return Number.isInteger(configured)&&configured>=1&&configured<=100000?configured:100;
+}
+const minimumTaskRead=task=>task.kind==='follow'?1:5;
 export async function reserveXCheckRead(db,url){
  // Conservative upper bounds at current X read rates: one user or up to ten posts.
- const configured=Number(process.env.X_TASK_DAILY_BUDGET_CENTS||100);
- const cap=Number.isInteger(configured)&&configured>=1&&configured<=100000?configured:100;
+ const cap=taskBudgetCap();
  const cents=url.includes('/users/by/username/')?1:url.includes('/following?')?10:5;
  const [row]=await db.q("INSERT INTO x_task_api_budget(day,reserved_cents) SELECT (clock_timestamp() AT TIME ZONE 'UTC')::date,$1::integer WHERE $1::integer<=$2::integer ON CONFLICT(day) DO UPDATE SET reserved_cents=x_task_api_budget.reserved_cents+EXCLUDED.reserved_cents WHERE x_task_api_budget.reserved_cents+EXCLUDED.reserved_cents<=$2::integer RETURNING day",[cents,cap]);
  if(!row)fail(503,'The daily X verification allowance has been reached. Your completed rewards remain safe; please check again later.');
@@ -27,7 +31,12 @@ export async function taskState(db,user){
  const awards=user?await db.q('SELECT task_id,amount,created_at FROM x_task_awards WHERE x_id=$1',[user.x_id]):[];
  const checks=user?await db.q('SELECT task_id,status,detail,checked_at FROM x_task_checks WHERE user_id=$1',[user.id]):[];
  const [access]=user?await db.q('SELECT expires_at FROM x_task_access WHERE user_id=$1 AND x_id=$2 AND expires_at>clock_timestamp()',[user.id,user.x_id]):[];
- return {connected:Boolean(access),expiresAt:access?.expires_at||null,total:xTaskTotal,earned:awards.reduce((n,a)=>n+a.amount,0),tasks:xTasks.map(t=>{const a=awards.find(a=>a.task_id===t.id),c=checks.find(c=>c.task_id===t.id);return {...t,status:a?'awarded':c?.status||'not-verified',detail:a?'Verified by X. VP added to your account.':c?.detail||'Complete the action on X, then return here.',awardedAt:a?.created_at||null,checkedAt:c?.checked_at||null};})};
+ const [budget]=await db.q("SELECT clock_timestamp() AS server_now,COALESCE((SELECT reserved_cents FROM x_task_api_budget WHERE day=(clock_timestamp() AT TIME ZONE 'UTC')::date),0) AS reserved_cents");
+ const remaining=Math.max(0,taskBudgetCap()-Number(budget.reserved_cents)),reset=new Date(budget.server_now);reset.setUTCHours(24,0,0,0);
+ const tasks=xTasks.map(t=>{const a=awards.find(a=>a.task_id===t.id),c=checks.find(c=>c.task_id===t.id);return {...t,status:a?'awarded':c?.status||'not-verified',canCheck:!a&&remaining>=minimumTaskRead(t),detail:a?'Verified by X. VP added to your account.':c?.detail||'Complete the action on X, then return here.',awardedAt:a?.created_at||null,checkedAt:c?.checked_at||null};});
+ const pending=tasks.filter(t=>t.status!=='awarded'),limited=pending.some(t=>!t.canCheck);
+ return {connected:Boolean(access),expiresAt:access?.expires_at||null,total:xTaskTotal,earned:awards.reduce((n,a)=>n+a.amount,0),tasks,
+  availability:{state:!pending.length?'complete':pending.every(t=>!t.canCheck)?'paused':limited?'limited':'ready',retryAt:limited?reset.toISOString():null}};
 }
 export async function awardTask(db,user,task,proof,now=new Date()){
  return db.tx(async tx=>{
@@ -69,6 +78,7 @@ export async function verifyTasks(db,user,input={},fetcher=fetch){
  const requested=input.taskId==='all'?xTasks:xTasks.filter(t=>t.id===input.taskId);if(!requested.length)fail(400,'Choose a valid task.');
  const state=await taskState(db,user),pending=requested.filter(t=>!state.tasks.find(a=>a.id===t.id&&a.status==='awarded'));
  if(!pending.length)return {...state,awarded:0};
+ if(pending.every(t=>state.tasks.find(s=>s.id===t.id)?.canCheck===false))return {...state,awarded:0};
  const access=await getTaskAccess(db,user);
  const providerFetcher=fetcher;fetcher=async(url,options)=>{await reserveXCheckRead(db,url);return providerFetcher(url,options);};
  const [run]=await db.q("INSERT INTO x_task_runs(user_id,locked_until,checked_at) VALUES($1,clock_timestamp()+interval '55 seconds',clock_timestamp()) ON CONFLICT(user_id) DO UPDATE SET locked_until=EXCLUDED.locked_until,checked_at=EXCLUDED.checked_at WHERE x_task_runs.locked_until<clock_timestamp() AND x_task_runs.checked_at<clock_timestamp()-interval '60 seconds' RETURNING user_id",[user.id]);

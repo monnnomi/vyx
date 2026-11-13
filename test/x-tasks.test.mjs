@@ -144,3 +144,28 @@ test('parallel duplicate claims for a new task debit the promotion pool once',as
  assert.equal(amounts.reduce((a,b)=>a+b,0),1500);assert.equal(Number((await db.q("SELECT spent FROM farm_pools WHERE id='promotions'"))[0].spent)-before,1500);
  assert.equal((await db.q('SELECT count(*)::int n FROM x_task_awards WHERE user_id=$1 AND task_id=$2',[account.user.id,task.id]))[0].n,1);
 });
+
+test('an exhausted usable allowance pauses pending actions without X calls or extra reward/check records',async()=>{
+ process.env.X_TASK_DAILY_BUDGET_CENTS='100';
+ const account=await make('7017');await saveTaskAccess(db,account.user,grant());
+ for(const task of xTasks.slice(0,5))await awardTask(db,account.user,task,'historical-'+task.kind);
+ await db.q("INSERT INTO x_task_api_budget(day,reserved_cents) VALUES((clock_timestamp() AT TIME ZONE 'UTC')::date,98) ON CONFLICT(day) DO UPDATE SET reserved_cents=98");
+ const before=await db.q('SELECT * FROM x_task_awards WHERE user_id=$1 ORDER BY task_id',[account.user.id]),state=await taskState(db,account.user);
+ assert.equal(state.connected,true);assert.equal(state.availability.state,'paused');assert.equal(state.earned,8500);
+ assert.ok(state.tasks.slice(5).every(t=>t.canCheck===false));assert.ok(new Date(state.availability.retryAt)>new Date());assert.equal(new Date(state.availability.retryAt).getUTCHours(),0);
+ const result=await verifyTasks(db,account.user,{taskId:'all'},()=>{throw Error('No paid reads while paused');});assert.equal(result.awarded,0);
+ assert.deepEqual(await db.q('SELECT * FROM x_task_awards WHERE user_id=$1 ORDER BY task_id',[account.user.id]),before);
+ assert.equal((await db.q('SELECT count(*)::int n FROM x_task_checks WHERE user_id=$1',[account.user.id]))[0].n,0);
+ assert.equal((await db.q('SELECT reserved_cents FROM x_task_api_budget WHERE day=(clock_timestamp() AT TIME ZONE \'UTC\')::date'))[0].reserved_cents,98);
+ process.env.X_TASK_DAILY_BUDGET_CENTS='10000';
+});
+
+test('remaining allowance may confirm a follow while more expensive post checks stay disabled',async()=>{
+ process.env.X_TASK_DAILY_BUDGET_CENTS='100';const account=await make('7018');await saveTaskAccess(db,account.user,grant());
+ const state=await taskState(db,account.user);assert.equal(state.availability.state,'limited');assert.equal(state.tasks[0].canCheck,true);assert.ok(state.tasks.slice(1).every(t=>!t.canCheck));let reads=0;
+ const provider=mock(account.user);
+ const result=await verifyTasks(db,account.user,{taskId:'all'},(url,options)=>{reads++;return provider(url,options);});
+ assert.equal(reads,1);assert.equal(result.awarded,1000);assert.equal(result.availability.state,'paused');
+ assert.equal((await db.q('SELECT reserved_cents FROM x_task_api_budget WHERE day=(clock_timestamp() AT TIME ZONE \'UTC\')::date'))[0].reserved_cents,99);
+ process.env.X_TASK_DAILY_BUDGET_CENTS='10000';
+});

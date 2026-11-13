@@ -92,6 +92,20 @@ test('X quests show the server-provided reward total, verified state and explici
  vm.runInContext(`data.user={id:'bob'}`,c);assert.doesNotMatch(c.renderTasks(),/Verified · VP added/);
 });
 
+test('a quota pause shows its UTC reset and disables checks without suggesting that proof failed',()=>{
+ const c=setup();
+ vm.runInContext(`xTaskOwner='alice';xTaskData={connected:true,total:13500,earned:8500,availability:{state:'paused',retryAt:'2026-11-14T00:00:00Z'},tasks:[{id:'new-like',title:'Like the update',amount:1500,url:'https://x.com/vyxsocial/status/2121127790556680479',status:'not-verified',canCheck:false,detail:'Complete the action on X.'}]};page='tasks';`,c);
+ const html=c.renderTasks();assert.match(html,/Verification is paused/);assert.match(html,/14 Nov 2026/);assert.match(html,/UTC/);assert.match(html,/Refresh status/);assert.match(html,/disabled>Check all tasks/);assert.match(html,/disabled>Check<\/button>/);
+ let calls=0;c.api=async()=>{calls++;};c.checkXTasks('new-like');c.checkXTasks('all');assert.equal(calls,0);
+});
+
+test('returning from X checks the opened task rather than every campaign task',()=>{
+ const c=setup();c.document.hidden=false;
+ vm.runInContext(`page='tasks';xTaskOwner='alice';xTaskData={connected:true,tasks:[{id:'new-reply',status:'not-verified',canCheck:true}]};xTaskPending={taskId:'new-reply',owner:'alice',at:Date.now()-6000};xTaskNextCheck=0;var returnedChecks=[];checkXTasks=id=>returnedChecks.push(id);`,c);
+ c.checkReturnedXTask();assert.deepEqual(Array.from(vm.runInContext('returnedChecks',c)),['new-reply']);
+ vm.runInContext(`xTaskPending={taskId:'new-reply',owner:'alice',at:Date.now()-6000};xTaskData.tasks[0].canCheck=false;`,c);c.checkReturnedXTask();assert.equal(vm.runInContext('returnedChecks.length',c),1);
+});
+
 test('whitelist shows qualified tiers with profile links and keeps personal progress owner-bound',()=>{
  const c=setup();
  vm.runInContext(`whitelistState='ready';whitelistData={counts:{free:1,halfPrice:1,total:2},pagination:{page:1,pages:1},members:[{id:'alice',name:'Alice',handle:'alice',tier:'free'},{id:'bob',name:'Bob',handle:'bob',tier:'half-price'}]};nftSelectionOwner='alice';nftSelectionState='ready';nftSelectionData={tier:'free'}`,c);

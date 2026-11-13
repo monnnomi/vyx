@@ -1,4 +1,5 @@
 import {fail} from './http.js';
+import {taskQueueHasWork} from './x-task-queue.js';
 
 export const newsClock=async db=>new Date((await db.q('SELECT clock_timestamp() AS news_now'))[0].news_now);
 const stamp=(day,hour)=>new Date(Date.parse(day+'T00:00:00Z')+hour*3600000).toISOString();
@@ -31,6 +32,7 @@ export async function reserveNewsCostTx(tx,kind,cents,{keepForAI=0,keepInWindow=
  if(!['x','ai'].includes(kind)||!Number.isInteger(cents)||cents<=0)throw Error('Invalid reservation');
  const [settings]=await tx.q('SELECT * FROM news_settings WHERE id=1 FOR UPDATE');
  if(!settings.enabled)fail(503,'Newsroom automation paused.');
+ if(await taskQueueHasWork(tx,{includeRunning:true}))fail(503,'News is waiting for automatic quest verification.');
  const state=await newsSpendState(tx,settings);
  if(cents>state.dailyRemainingCents)fail(503,'Daily news allowance reached.');
  if(kind==='x'&&cents+keepForAI>state.dailyRemainingCents)fail(503,'Collection allowance reached; funds held for the writer.');

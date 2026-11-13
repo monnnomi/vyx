@@ -4,7 +4,13 @@ import {runNewsPipeline} from './news-pipeline.js';
 import {collectNewsBatches,newsWriterReserve,newsWriterWindowReserve} from './news-batch.js';
 import {syncNewsPhotos} from './news-media-sync.js';
 import {newsSpendState,newsPublicationState} from './news-budget.js';
+import {runAutomaticTaskChecks,taskQueueHasWork} from './x-task-queue.js';
 export async function runNewsJobs(db,fetcher=fetch){
+ const tasks=await runAutomaticTaskChecks(db,fetcher);
+ if(tasks.status!=='idle'){
+  if(tasks.status!=='already-running')await db.q("UPDATE news_settings SET last_status='quest-priority' WHERE id=1");
+  return {status:tasks.status==='already-running'?'already-running':'quest-priority',tasks,collected:0,processed:0};
+ }
  const startedAt=Date.now(),[settings]=await db.q('SELECT collection_mode FROM news_settings WHERE id=1');
  const scan=settings.collection_mode==='batch'?await collectNewsBatches(db,fetcher,startedAt):null;
  const media=settings.collection_mode==='batch'?await syncNewsPhotos(db,fetcher,startedAt):null;
@@ -12,6 +18,7 @@ export async function runNewsJobs(db,fetcher=fetch){
  return {...result,...(scan?{scan,media}: {})};
 }
 export async function newsQueueHasWork(db){
+ if(await taskQueueHasWork(db,{includeRunning:true}))return false;
  if(!newsAIStatus().ready||!process.env.CRON_SECRET)return false;
  const [r]=await db.q(`SELECT EXISTS(SELECT 1 FROM news_items n JOIN news_sources s ON s.id=n.source_id
  WHERE n.status='pending' AND s.enabled AND NOT s.archived AND n.next_attempt_at<=clock_timestamp()
@@ -29,7 +36,7 @@ export async function newsQueueHasWork(db){
  return Boolean(scan||ai);
 }
 export async function dispatchNewsQueue(db,fetcher=fetch){
- if(!await newsQueueHasWork(db))return;
+ if(!await taskQueueHasWork(db)&&!await newsQueueHasWork(db))return;
  const r=await fetcher(new URL('/api/news-cron',appURL()).href,{method:'POST',redirect:'error',signal:AbortSignal.timeout(5000),headers:{Authorization:'Bearer '+process.env.CRON_SECRET}});
  if(!r.ok)throw Error('News worker dispatch failed');
 }

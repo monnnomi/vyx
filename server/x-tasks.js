@@ -1,6 +1,6 @@
-import {fail} from './http.js';
+import {fail,limit} from './http.js';
 import {calendar} from './config.js';
-import {getTaskAccess} from './x-task-access.js';
+import {getTaskAccess,taskAutomationStart} from './x-task-access.js';
 export const campaignPost='2119014238463152187';
 export const campaignPosts=Object.freeze([campaignPost,'2121127790556680479']);
 export const xTasks=Object.freeze([
@@ -14,7 +14,7 @@ export const xTasks=Object.freeze([
  {id:'x-vyx-reply-2121127790556680479',kind:'reply',postId:campaignPosts[1],title:'Reply to the VYX product update',amount:1500,url:'https://x.com/vyxsocial/status/'+campaignPosts[1]}
 ]);
 export const xTaskTotal=xTasks.reduce((sum,t)=>sum+t.amount,0);
-function taskBudgetCap(){
+export function taskBudgetCap(){
  const configured=Number(process.env.X_TASK_DAILY_BUDGET_CENTS||100);
  return Number.isInteger(configured)&&configured>=1&&configured<=100000?configured:100;
 }
@@ -35,7 +35,10 @@ export async function taskState(db,user){
  const remaining=Math.max(0,taskBudgetCap()-Number(budget.reserved_cents)),reset=new Date(budget.server_now);reset.setUTCHours(24,0,0,0);
  const tasks=xTasks.map(t=>{const a=awards.find(a=>a.task_id===t.id),c=checks.find(c=>c.task_id===t.id);return {...t,status:a?'awarded':c?.status||'not-verified',canCheck:!a&&remaining>=minimumTaskRead(t),detail:a?'Verified by X. VP added to your account.':c?.detail||'Complete the action on X, then return here.',awardedAt:a?.created_at||null,checkedAt:c?.checked_at||null};});
  const pending=tasks.filter(t=>t.status!=='awarded'),limited=pending.some(t=>!t.canCheck);
+ const [run]=user?await db.q('SELECT checked_at,locked_until FROM x_task_runs WHERE user_id=$1',[user.id]):[];
+ const nextAt=access&&pending.length?new Date(Math.max(Date.parse(taskAutomationStart()),new Date(budget.server_now).getTime(),run?new Date(run.checked_at).getTime()+900000:0,limited&&pending.every(t=>!t.canCheck)?reset.getTime():0)).toISOString():null;
  return {connected:Boolean(access),expiresAt:access?.expires_at||null,total:xTaskTotal,earned:awards.reduce((n,a)=>n+a.amount,0),tasks,
+  automation:{enabled:Boolean(access&&pending.length),startsAt:taskAutomationStart(),nextAt},
   availability:{state:!pending.length?'complete':pending.every(t=>!t.canCheck)?'paused':limited?'limited':'ready',retryAt:limited?reset.toISOString():null}};
 }
 export async function awardTask(db,user,task,proof,now=new Date()){
@@ -89,6 +92,7 @@ export async function verifyTasks(db,user,input={},fetcher=fetch){
  const timelineTasks=pending.filter(t=>referenceTypes[t.kind]);
  const sinceId=timelineTasks.map(t=>t.postId).reduce((a,b)=>!a||BigInt(b)<BigInt(a)?b:a,null);
  try{
+  await limit(db,'x-task-checks:'+user.id,20,86400);
   for(const task of pending){
    let proof=null,detail='Action not confirmed yet. X may take a moment to update; you can check again.',status='not-verified';
    try{

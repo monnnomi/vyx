@@ -1,6 +1,7 @@
 import {createCipheriv,createDecipheriv,randomBytes,createHash} from 'node:crypto';
 import {fail} from './http.js';
 export const taskScopes=['tweet.read','users.read','follows.read','like.read'];
+export const taskAutomationStart=()=>process.env.X_TASK_AUTOMATION_START_AT||'2026-11-14T00:00:00Z';
 function key(){if(!process.env.VYX_APP_SECRET)fail(503,'X verification is being configured.');return createHash('sha256').update('VYX X task token v1\0'+process.env.VYX_APP_SECRET).digest();}
 export function sealTaskToken(value,xId){const iv=randomBytes(12),c=createCipheriv('aes-256-gcm',key(),iv);c.setAAD(Buffer.from(xId));const data=Buffer.concat([c.update(value,'utf8'),c.final()]);return [iv,c.getAuthTag(),data].map(x=>x.toString('base64url')).join('.');}
 export function openTaskToken(value,xId){const [iv,tag,data]=value.split('.').map(x=>Buffer.from(x,'base64url'));const d=createDecipheriv('aes-256-gcm',key(),iv);d.setAAD(Buffer.from(xId));d.setAuthTag(tag);return Buffer.concat([d.update(data),d.final()]).toString('utf8');}

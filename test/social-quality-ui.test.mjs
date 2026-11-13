@@ -106,6 +106,15 @@ test('returning from X checks the opened task rather than every campaign task',(
  vm.runInContext(`xTaskPending={taskId:'new-reply',owner:'alice',at:Date.now()-6000};xTaskData.tasks[0].canCheck=false;`,c);c.checkReturnedXTask();assert.equal(vm.runInContext('returnedChecks.length',c),1);
 });
 
+test('automatic quest status refresh reads receipts without requesting a paid verification',async()=>{
+ const c=setup();c.document.hidden=false;let refreshes=0;const calls=[];
+ vm.runInContext(`page='tasks';xTaskOwner='alice';xTaskData={connected:true,earned:0,tasks:[]}`,c);
+ c.api=async action=>{calls.push(action);return {connected:true,earned:1500,tasks:[]};};c.refresh=async()=>refreshes++;
+ await c.refreshAutomaticTaskStatus();assert.deepEqual(calls,['tasks']);assert.equal(refreshes,1);
+ c.document.hidden=true;await c.refreshAutomaticTaskStatus();assert.equal(calls.length,1);
+ c.document.hidden=false;vm.runInContext("page='rooms'",c);await c.refreshAutomaticTaskStatus();assert.equal(calls.length,1);
+});
+
 test('whitelist shows qualified tiers with profile links and keeps personal progress owner-bound',()=>{
  const c=setup();
  vm.runInContext(`whitelistState='ready';whitelistData={counts:{free:1,halfPrice:1,total:2},pagination:{page:1,pages:1},members:[{id:'alice',name:'Alice',handle:'alice',tier:'free'},{id:'bob',name:'Bob',handle:'bob',tier:'half-price'}]};nftSelectionOwner='alice';nftSelectionState='ready';nftSelectionData={tier:'free'}`,c);

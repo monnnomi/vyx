@@ -59,7 +59,7 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
     await db.q('DELETE FROM sessions WHERE token_hash=$1',[hash(cookie(req,'vyx_session'))]);setCookie(res,'vyx_session','',0);return json(res,200,{ok:true});
    }
    const data=await body(req);
-   if(action==='verify-tasks'){await limit(db,'x-task-checks:'+user.id,20,86400);return json(res,200,await verifyTasks(db,user,data,taskFetcher));}
+   if(action==='verify-tasks')return json(res,200,await verifyTasks(db,user,data,taskFetcher));
    if(action==='disconnect-task-x'){await db.q('DELETE FROM x_task_access WHERE user_id=$1',[user.id]);return json(res,200,{ok:true});}
    if(action==='drop-reveal')return json(res,200,await revealDrop(db,user,data.id));
    if(action==='notifications-read')return json(res,200,await readNotifications(db,user));

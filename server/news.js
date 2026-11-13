@@ -4,6 +4,8 @@ import {newsAIStatus} from './news-ai.js';
 import {newsPublisher} from './news-policy.js';
 import {newsCommentCount} from './news-comments.js';
 import {cleanNewsPhotos} from './news-media.js';
+import {newsSpendState,newsPublicationState} from './news-budget.js';
+export {reserveNewsCost} from './news-budget.js';
 export const newsCategories=['updates','ecosystem','events','security','markets'];
 export function newsHandle(value){
  const handle=String(value||'').trim().replace(/^https:\/\/(?:www\.)?(?:x\.com|twitter\.com)\//i,'').replace(/^@/,'').replace(/\/$/,'');
@@ -35,7 +37,8 @@ export async function newsAdminState(db,user){
  const {lease_token,lease_until,scan_lease_token,scan_lease_until,...safeSettings}=settings;
  const ai=newsAIStatus();
  return {settings:safeSettings,sources,items,counts,usage:usage||{reserved_cents:0,x_cents:0,ai_cents:0},
- readiness:{x:Boolean(process.env.X_NEWS_BEARER_TOKEN),ai:ai.ready,sources:sources.some(s=>s.enabled),model:ai.model,provider:ai.provider},budgetNote:'Conservative request reservations in USD cents, not an invoice. Failed or uncertain requests keep their reservation. UTC daily reset.'};
+ pacing:await newsSpendState(db,settings),publication:await newsPublicationState(db,settings),
+ readiness:{x:Boolean(process.env.X_NEWS_BEARER_TOKEN),ai:ai.ready,sources:sources.some(s=>s.enabled),model:ai.model,provider:ai.provider},budgetNote:'Conservative request reservations in USD cents, not an invoice. Failed or uncertain requests keep their reservation. UTC daily reset. Scheduled funds are released every three hours; unused funds carry forward up to the window cap.'};
 }
 export async function newsAdminWrite(db,user,input){
  requireAdmin(user);
@@ -73,14 +76,4 @@ export async function newsAdminWrite(db,user,input){
  if(['source-add','source-add-many','source-toggle','source-remove'].includes(input.action))await db.q('UPDATE news_settings SET scan_dirty=true WHERE id=1');
  if(!['publish','reject','withdraw','retry'].includes(input.action))await db.q('INSERT INTO news_audit(actor_id,action) VALUES($1,$2)',[user.id,input.action]);
  return {ok:true};
-}
-export async function reserveNewsCost(db,kind,cents){
- if(!['x','ai'].includes(kind)||!Number.isInteger(cents)||cents<=0)throw Error('Invalid reservation');
- const [r]=await db.q(`INSERT INTO news_budget(day,reserved_cents,x_cents,ai_cents)
- SELECT (clock_timestamp() AT TIME ZONE 'UTC')::date,$1,CASE WHEN $2='x' THEN $1 ELSE 0 END,CASE WHEN $2='ai' THEN $1 ELSE 0 END
- FROM news_settings WHERE id=1 AND enabled AND daily_budget_cents>=$1
- ON CONFLICT(day) DO UPDATE SET reserved_cents=news_budget.reserved_cents+EXCLUDED.reserved_cents,x_cents=news_budget.x_cents+EXCLUDED.x_cents,ai_cents=news_budget.ai_cents+EXCLUDED.ai_cents
- WHERE news_budget.reserved_cents+EXCLUDED.reserved_cents<=(SELECT daily_budget_cents FROM news_settings WHERE id=1 AND enabled) RETURNING day::text AS day`,[cents,kind]);
- if(!r)fail(503,'Newsroom allowance reached or automation paused.');
- return r.day;
 }

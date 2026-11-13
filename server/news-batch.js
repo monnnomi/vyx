@@ -1,5 +1,5 @@
 import {createHash,randomUUID} from 'node:crypto';
-import {reserveNewsCost} from './news.js';
+import {reserveNewsCostTx,newsSpendState} from './news-budget.js';
 import {enqueueNewsPost} from './news-queue.js';
 import {newsAIConfig} from './news-ai.js';
 import {newsMediaFields} from './news-media.js';
@@ -22,20 +22,23 @@ async function xJSON(fetcher,url){
  const raw=await r.text();if(Buffer.byteLength(raw)>300000)throw Error('oversized-response');return JSON.parse(raw);
 }
 export const newsWriterReserve=budget=>Math.min(Math.floor(budget/4),Math.max(20,newsAIConfig().reservationCents*12));
+export const newsWriterWindowReserve=()=>newsAIConfig().reservationCents*3;
 export async function reserveBatchRead(db,cents,keepForAI=0){
  return db.tx(async tx=>{
-  const [settings]=await tx.q('SELECT daily_budget_cents FROM news_settings WHERE id=1 FOR UPDATE');
-  const [usage]=await tx.q("SELECT reserved_cents FROM news_budget WHERE day=(clock_timestamp() AT TIME ZONE 'UTC')::date FOR UPDATE");
-  if((usage?.reserved_cents||0)+cents>settings.daily_budget_cents-keepForAI)throw Object.assign(Error('Collection allowance reached.'),{status:503});
-  const day=await reserveNewsCost(tx,'x',cents),id=randomUUID();await tx.q('INSERT INTO news_read_reservations(id,day,cents) VALUES($1,$2,$3)',[id,day,cents]);return id;
+  const {day,slot}=await reserveNewsCostTx(tx,'x',cents,{keepForAI,keepInWindow:keepForAI?newsWriterWindowReserve():0}),id=randomUUID();
+  await tx.q('INSERT INTO news_read_reservations(id,day,cents,budget_slot) VALUES($1,$2,$3,$4)',[id,day,cents,slot]);return id;
  });
 }
 export async function settleBatchRead(db,id,count){
  if(!Number.isInteger(count)||count<0||count>10)throw Error('Invalid read settlement');
  return db.tx(async tx=>{
-  const [r]=await tx.q('UPDATE news_read_reservations SET settled=true,charged_cents=$2 WHERE id=$1 AND NOT settled RETURNING day,cents',[id,Math.ceil(count/2)]);
+  await tx.q('SELECT id FROM news_settings WHERE id=1 FOR UPDATE');
+  const [r]=await tx.q('UPDATE news_read_reservations SET settled=true,charged_cents=$2 WHERE id=$1 AND NOT settled RETURNING day,cents,budget_slot',[id,Math.ceil(count/2)]);
   if(!r)return;const refund=r.cents-Math.ceil(count/2);if(refund<0)throw Error('Read exceeded reservation');
-  if(refund)await tx.q('UPDATE news_budget SET reserved_cents=reserved_cents-$2,x_cents=x_cents-$2 WHERE day=$1',[r.day,refund]);
+  if(refund){
+   await tx.q('UPDATE news_budget SET reserved_cents=reserved_cents-$2,x_cents=x_cents-$2 WHERE day=$1',[r.day,refund]);
+   if(r.budget_slot!==null)await tx.q('UPDATE news_budget_windows SET reserved_cents=reserved_cents-$3,x_cents=x_cents-$3 WHERE day=$1 AND slot=$2',[r.day,r.budget_slot,refund]);
+  }
  });
 }
 export async function collectNewsBatches(db,fetcher=fetch,startedAt=Date.now()){
@@ -49,7 +52,9 @@ export async function collectNewsBatches(db,fetcher=fetch,startedAt=Date.now()){
   const [{daily_budget_cents}]=await db.q('SELECT daily_budget_cents FROM news_settings WHERE id=1');
   const writerReserve=newsWriterReserve(daily_budget_cents);
   // Identity lookups are cached, charged before use, and never repeated for quiet known accounts.
-  const unknown=sources.filter(s=>!s.x_user_id&&new Date(s.next_fetch_at)<=new Date()).slice(0,10);
+  const funds=await newsSpendState(db,settings);
+  const identityLimit=settings.pacing_enabled?Math.max(0,Math.min(10,funds.remainingCents-newsWriterWindowReserve()-5)):10;
+  const unknown=sources.filter(s=>!s.x_user_id&&new Date(s.next_fetch_at)<=new Date()).slice(0,identityLimit);
   if(unknown.length){
    try{
     const reservation=await reserveBatchRead(db,unknown.length,writerReserve);
@@ -59,7 +64,7 @@ export async function collectNewsBatches(db,fetcher=fetch,startedAt=Date.now()){
     for(const source of unknown)await db.q('UPDATE news_sources SET x_user_id=$2 WHERE id=$1',[source.id,source.x_user_id]);
     // Profile reads are one cent each; retain their full reservation.
     await db.q('UPDATE news_read_reservations SET settled=true,charged_cents=cents WHERE id=$1',[reservation]);
-   }catch(error){status=error.status===503?'daily-allowance-reached':'identity-check-failed';await db.q("UPDATE news_sources SET last_status=$2,next_fetch_at=clock_timestamp()+interval '15 minutes' WHERE id=ANY($1::uuid[])",[unknown.map(s=>s.id),status]);}
+   }catch(error){status=error.status===503?'allowance-wait':'identity-check-failed';await db.q("UPDATE news_sources SET last_status=$2,next_fetch_at=clock_timestamp()+interval '15 minutes' WHERE id=ANY($1::uuid[])",[unknown.map(s=>s.id),status]);}
   }
   const batches=buildNewsBatches(sources.filter(s=>s.x_user_id));
   await db.tx(async tx=>{
@@ -94,7 +99,7 @@ export async function collectNewsBatches(db,fetcher=fetch,startedAt=Date.now()){
     if(!next)await db.q("UPDATE news_sources SET since_id=COALESCE($2,since_id),last_fetched_at=clock_timestamp(),last_status='ok',next_fetch_at=clock_timestamp()+interval '15 minutes' WHERE id=ANY($1::uuid[])",[b.members.map(s=>s.id),latest==='0'?null:latest]);
     collected++;
    }catch(error){
-    status=error.status===503?'daily-allowance-reached':/^x-http-/.test(error.message)?error.message:'search-failed';
+    status=error.status===503?'allowance-wait':/^x-http-/.test(error.message)?error.message:'search-failed';
     await db.q("UPDATE news_scan_batches SET last_status=$2,next_fetch_at=clock_timestamp()+interval '15 minutes' WHERE id=$1",[row.id,status]);
     if(error.status===503)break;
    }

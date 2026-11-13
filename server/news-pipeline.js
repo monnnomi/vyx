@@ -5,6 +5,10 @@ import {newsAIConfig,newsAIStatus} from './news-ai.js';
 import {newsSourceContext,draftInstructions,verifyInstructions} from './news-policy.js';
 import {enqueueNewsPost} from './news-queue.js';
 import {newsMediaFields} from './news-media.js';
+import {newsAIRequest as ai} from './news-ai-client.js';
+import {newsSpendState,newsPublicationState} from './news-budget.js';
+import {selectNewsCandidates} from './news-selection.js';
+export {newsAITimeout} from './news-ai-client.js';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 export function requireNewsCron(req){const secret=process.env.CRON_SECRET;if(!secret||!timingSafeEqual(Buffer.from(hash(String(req.headers.authorization||'')),'hex'),Buffer.from(hash('Bearer '+secret),'hex')))fail(401,'Unauthorized.');}
 async function fetchJSON(fetcher,url,options={},timeoutMs=14000){
@@ -51,22 +55,6 @@ const str={type:'string'},bool={type:'boolean'};
 const schema=properties=>({type:'object',additionalProperties:false,properties,required:Object.keys(properties)});
 const draftSchema=schema({newsworthy:bool,selection_reason:str,kind:{type:'string',enum:['news','market-view']},highlights_en:{type:'array',items:str},headings_en:{type:'array',items:str},category:{type:'string',enum:newsCategories},risk:{type:'string',enum:['low','high']},title_en:str,summary_en:str,body_en:{type:'array',items:str},evidence:{type:'array',items:str},duplicate_of:{type:['string','null']}});
 const verifySchema=schema({supported:bool,english:bool,newsworthy:bool,low_risk:bool,confidence:{type:'integer'},reason:str});
-export function newsAITimeout(deadline,now=Date.now()){
- const remaining=Math.floor(Math.min(30000,deadline-now));
- if(!Number.isFinite(remaining)||remaining<4000)throw Error('news-run-deadline');
- return remaining;
-}
-async function ai(db,fetcher,name,format,payload,instructions,deadline){
- const config=newsAIConfig();if(!config.key)throw Error('AI credential missing');
- const input=JSON.stringify(payload);if(Buffer.byteLength(input+instructions)>48000)throw Error('input-too-large');
- const timeoutMs=newsAITimeout(deadline);
- // Conservative reservation for the two allowlisted models. Provider reference rates are documented.
- await reserveNewsCost(db,'ai',config.reservationCents);
- const r=await fetchJSON(fetcher,config.endpoint,{method:'POST',headers:{Authorization:'Bearer '+config.key,'Content-Type':'application/json'},body:JSON.stringify({model:config.model,store:false,instructions,input,max_output_tokens:3200,reasoning:{effort:'none'},text:{format:{type:'json_schema',name,strict:true,schema:format}}})},timeoutMs);
- if(r.status!=='completed')throw Error('incomplete-ai-output');
- const output=(r.output||[]).flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join('');
- return JSON.parse(output);
-}
 function clean(value,min,max){return typeof value==='string'&&value.trim().length>=min&&value.length<=max&&!/[<>]|https?:\/\//i.test(value);}
 export function validNewsDraft(d,sourceText){
  return d&&typeof d.newsworthy==='boolean'&&newsCategories.includes(d.category)&&['low','high'].includes(d.risk)
@@ -94,8 +82,8 @@ async function processItem(db,item,fetcher,lease,deadline){
   return await db.tx(async tx=>{
    const [settings]=await tx.q('SELECT * FROM news_settings WHERE id=1 FOR UPDATE');
    const [source]=await tx.q('SELECT enabled,archived FROM news_sources WHERE id=$1',[item.source_id]);
-   const [today]=await tx.q("SELECT count(*)::int AS n FROM news_items WHERE published_at>=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'");
-   const publish=settings.enabled&&settings.lease_token===lease&&source.enabled&&!source.archived&&settings.auto_publish&&today.n<6&&canAutoPublish(d,v,item.source_text);
+   const publication=await newsPublicationState(tx,settings);
+   const publish=settings.enabled&&settings.lease_token===lease&&source.enabled&&!source.archived&&settings.auto_publish&&publication.allowed&&canAutoPublish(d,v,item.source_text);
    // Bind encoded JSON as text: postgres.js otherwise encodes the string a second time for jsonb parameters.
    await tx.q(`UPDATE news_items SET title_en=$2,summary_en=$3,body_en=$4::text::jsonb,presentation=$5::text::jsonb,category=$6,verification=$7::text::jsonb,reason=$8,status=$9,published_at=CASE WHEN $9='published' THEN clock_timestamp() ELSE NULL END,processing_until=NULL,updated_at=clock_timestamp()
     WHERE id=$1 AND status='pending' AND processing_token=$10`,[item.id,d.title_en,d.summary_en,JSON.stringify(d.body_en),JSON.stringify({kind:d.kind,headings_en:d.headings_en,highlights_en:d.highlights_en}),d.category,JSON.stringify(v),v.reason,publish?'published':'review',lease]);
@@ -120,18 +108,35 @@ export async function runNewsPipeline(db,fetcher=fetch,{collectPosts=true,starte
   // One source and one story per run keep execution inside the serverless time limit.
   const [source]=collectPosts&&settings.collection_mode!=='batch'?await db.q('SELECT * FROM news_sources WHERE enabled AND NOT archived AND next_fetch_at<=clock_timestamp() ORDER BY next_fetch_at,id LIMIT 1'):[];
   if(source)await collect(db,source,fetcher);
-  const [{published}]=await db.q("SELECT count(*)::int AS published FROM news_items WHERE published_at>=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'");
-  if(published>=6){await db.q("UPDATE news_settings SET last_status='daily-publication-limit',last_completed_at=clock_timestamp() WHERE id=1 AND lease_token=$1",[lease]);return {status:'daily-publication-limit',collected:source?1:0,processed:0};}
+  const publication=await newsPublicationState(db,settings);
+  let waitStatus=publication.today>=6?'daily-publication-limit':settings.pacing_enabled&&settings.auto_publish&&!publication.allowed?'publication-window-wait':null;
+  let selection=null;
+  if(settings.pacing_enabled){
+   const funds=await newsSpendState(db,settings),cost=newsAIConfig().reservationCents;
+   if(funds.dailyRemainingCents<cost*2)waitStatus='daily-allowance-wait';
+   else if(funds.remainingCents<cost*2)waitStatus='budget-window-wait';
+   if(!waitStatus){
+    const [ready]=await db.q("SELECT EXISTS(SELECT 1 FROM news_items n JOIN news_sources s ON s.id=n.source_id WHERE n.status='pending' AND n.selection_status='selected' AND n.next_attempt_at<=clock_timestamp() AND n.source_published_at>clock_timestamp()-interval '48 hours' AND s.enabled AND NOT s.archived) AS present");
+    if(!ready.present){
+     if(funds.remainingCents<cost*3)waitStatus='budget-window-wait';
+     else selection=await selectNewsCandidates(db,fetcher,lease,started+52000);
+    }
+   }
+  }
+  if(waitStatus){await db.q('UPDATE news_settings SET last_status=$2,last_completed_at=clock_timestamp() WHERE id=1 AND lease_token=$1',[lease,waitStatus]);return {status:waitStatus,collected:source?1:0,processed:0};}
   let processed=0;
   for(let candidate=0;candidate<2&&Date.now()-started<25000;candidate++){
+  if(settings.pacing_enabled&&(await newsSpendState(db,settings)).remainingCents<newsAIConfig().reservationCents*2)break;
   const [item]=await db.q(`UPDATE news_items SET processing_token=$1,processing_until=clock_timestamp()+interval '3 minutes',attempts=attempts+1 WHERE id=(
    SELECT n.id FROM news_items n JOIN news_sources s ON s.id=n.source_id WHERE n.status='pending' AND s.enabled AND NOT s.archived
-   AND n.source_published_at>clock_timestamp()-interval '48 hours' AND n.next_attempt_at<=clock_timestamp() AND (n.processing_until IS NULL OR n.processing_until<clock_timestamp()) ORDER BY n.created_at LIMIT 1)
-   RETURNING *`,[lease]);
+   AND (NOT $2::boolean OR n.selection_status='selected')
+   AND n.source_published_at>clock_timestamp()-interval '48 hours' AND n.next_attempt_at<=clock_timestamp() AND (n.processing_until IS NULL OR n.processing_until<clock_timestamp())
+   ORDER BY CASE WHEN $2::boolean THEN n.source_published_at END DESC,n.created_at LIMIT 1)
+   RETURNING *`,[lease,settings.pacing_enabled]);
   if(!item)break;const [s]=await db.q('SELECT username FROM news_sources WHERE id=$1',[item.source_id]);processed++;const outcome=await processItem(db,{...item,username:s.username},fetcher,lease,started+52000);if(outcome!=='rejected')break;
   }
   await db.q("UPDATE news_items SET status='rejected',reason='Source update is older than 48 hours.' WHERE status='pending' AND source_published_at<=clock_timestamp()-interval '48 hours'");
   await db.q("UPDATE news_settings SET last_completed_at=clock_timestamp(),last_status='completed' WHERE id=1 AND lease_token=$1",[lease]);
-  return {status:'completed',collected:source?1:0,processed};
+  return {status:'completed',collected:source?1:0,processed,...(selection?{selection}: {})};
  }finally{await db.q('UPDATE news_settings SET lease_until=NULL,lease_token=NULL WHERE id=1 AND lease_token=$1',[lease]);}
 }

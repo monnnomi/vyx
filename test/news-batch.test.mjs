@@ -14,7 +14,7 @@ const owner=await db.tx(tx=>login(tx,{id:'9001',username:'owner',name:'Owner',av
 after(()=>pg.close());
 async function reset(n=0){
  await db.q('DELETE FROM news_audit');await db.q('DELETE FROM news_read_reservations');await db.q('DELETE FROM news_scan_batches');await db.q('DELETE FROM news_items');await db.q('DELETE FROM news_sources');await db.q('DELETE FROM news_budget');
- await db.q("UPDATE news_settings SET enabled=true,collection_mode='batch',daily_budget_cents=100,scan_dirty=true,lease_until=NULL,scan_lease_until=NULL");
+ await db.q("UPDATE news_settings SET pacing_enabled=false,enabled=true,collection_mode='batch',daily_budget_cents=100,scan_dirty=true,lease_until=NULL,scan_lease_until=NULL");
  for(let i=0;i<n;i++)await db.q('INSERT INTO news_sources(username,x_user_id) VALUES($1,$2)',['account_'+String(i).padStart(3,'0'),String(1000+i)]);
  return db.q('SELECT * FROM news_sources ORDER BY username');
 }

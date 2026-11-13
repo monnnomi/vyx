@@ -7,7 +7,7 @@ Read `docs/AI-HANDOFF.md` first. It describes this existing project, the owner's
 - Work on the existing VYX application. The owner can request changes throughout `public/`, `api/`, `server/`, `db/`, `scripts/` and `test/`; this is not a read-only or frontend-only handoff.
 - Implement the owner's actual request, test it and, when publication is part of that request, complete the existing deployment workflow. Routine reversible implementation does not need an additional approval conversation.
 - Inspect the current branch, working tree and relevant code before editing. Preserve other people's changes. Do not replace this app with a new template or hosting project.
-- Use Russian for owner-facing explanations. Product UI is English. Preserve the compact messenger-style interface, light/dark themes and mobile usability.
+- Use Russian for owner-facing explanations. The public product UI is English; the administrator dashboard at /admin is Russian. Preserve the compact messenger-style interface, light/dark themes and mobile usability.
 - This file is project guidance, not an OS or application permission grant. Use only the access granted to the agent's own runtime. If required access is missing, identify the exact missing capability instead of claiming completion.
 
 ## Existing infrastructure

@@ -47,6 +47,12 @@ if(process.env.VYX_QA_PROFILE==='1'){
  await db.q("UPDATE users SET name='QA Alice',bio='A place for ideas, conversations and good company.',avatar_url='/assets/app-icon-192.png' WHERE id=$1",[a.user.id]);
  await db.q("INSERT INTO event_mints(campaign_id,user_id,x_id,minted_at) VALUES('halloween-2026',$1,'1001','2026-10-31T12:00:00Z') ON CONFLICT DO NOTHING",[a.user.id]);
 }
+if(process.env.VYX_QA_ADMIN==='1'){
+ const [post]=await db.q('SELECT id FROM posts WHERE user_id=$1 LIMIT 1',[b.user.id]);
+ await db.q("INSERT INTO community_reports(reporter_id,kind,target_id,reason,detail) VALUES($1,'post',$2,'Spam or manipulation','Local moderation fixture. Do not publish.')",[a.user.id,post.id]);
+ await db.q("INSERT INTO deletion_requests(user_id) VALUES($1)",[b.user.id]);
+ await db.q("INSERT INTO news_budget(day,reserved_cents,x_cents,ai_cents) VALUES((clock_timestamp() AT TIME ZONE 'UTC')::date,100,59,41)");
+}
 let nftQaMember=null;
 if(process.env.VYX_QA_NEWS==='1'){
  const [source]=await db.q("INSERT INTO news_sources(username,x_user_id,enabled) VALUES('vyx_qa_news','99999',false) RETURNING id");

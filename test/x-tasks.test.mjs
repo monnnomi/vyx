@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {randomUUID} from 'node:crypto';
 import {login,startOAuth,consumeAttempt} from '../server/oauth.js';
-import {taskState,verifyTasks,xTasks,campaignPost,awardTask,reserveXCheckRead} from '../server/x-tasks.js';
+import {taskState,verifyTasks,xTasks,campaignPost,campaignPosts,awardTask,reserveXCheckRead} from '../server/x-tasks.js';
 import {taskScopes,saveTaskAccess,openTaskToken,sealTaskToken} from '../server/x-task-access.js';
 import {createHandler} from '../api/vyx.js';
 import {ownNftSelection} from '../server/nft-selection.js';
@@ -18,10 +18,10 @@ const alice=await make('7001'),bob=await make('7002');
 const grant=()=>({access_token:'PRIVATE-TOKEN',scope:taskScopes.join(' '),expires_in:7200});
 const response=(data,status=200)=>({ok:status===200,status,json:async()=>data});
 const timeline=(id,target=campaignPost)=>['retweeted','replied_to','quoted'].map((type,i)=>({id:String(BigInt(campaignPost)+BigInt(i+1)),author_id:id,referenced_tweets:[{type,id:target}]}));
-function mock(user,{following=true,liked=true,posts=timeline(user.x_id)}={}){return async(url,options)=>{assert.equal(options.headers.Authorization,'Bearer PRIVATE-TOKEN');assert.ok(!options.method||options.method==='GET');if(url.includes('by/username'))return response({data:{id:'1234',connection_status:following?['following']:[]}});if(url.includes('liked_tweets'))return response({data:liked?[{id:campaignPost}]:[],meta:{}});if(url.includes('/tweets?'))return response({data:posts,meta:{}});throw Error('Unexpected endpoint');};}
+function mock(user,{following=true,liked=true,likedPosts=campaignPosts,posts=campaignPosts.flatMap(postId=>timeline(user.x_id,postId))}={}){return async(url,options)=>{assert.equal(options.headers.Authorization,'Bearer PRIVATE-TOKEN');assert.ok(!options.method||options.method==='GET');if(url.includes('by/username'))return response({data:{id:'1234',connection_status:following?['following']:[]}});if(url.includes('liked_tweets'))return response({data:liked?likedPosts.map(id=>({id})):[],meta:{}});if(url.includes('/tweets?'))return response({data:posts,meta:{}});throw Error('Unexpected endpoint');};}
 async function unlock(user){await db.q('DELETE FROM x_task_runs WHERE user_id=$1',[user.id]);}
 
-test('task rewards exactly match the campaign and cannot be changed by callers',()=>{assert.deepEqual(xTasks.map(t=>t.amount),[1000,1500,2000,1500,2500]);assert.equal(xTasks.reduce((n,t)=>n+t.amount,0),8500);});
+test('task rewards exactly match the campaign and cannot be changed by callers',()=>{assert.deepEqual(xTasks.map(t=>t.amount),[1000,1500,2000,1500,2500,1500,2000,1500]);assert.equal(xTasks.reduce((n,t)=>n+t.amount,0),13500);assert.equal(new Set(xTasks.map(t=>t.id)).size,8);assert.ok(xTasks.slice(5).every(t=>t.postId==='2121127790556680479'&&t.url.endsWith(t.postId)));});
 test('task OAuth is read-only, bound to the signed-in X identity, with an allowlisted return',async()=>{
  const binding=token(),u=new URL(await startOAuth(db,binding,new Date(),'/tasks',null,alice.user.x_id));assert.equal(u.searchParams.get('scope'),taskScopes.join(' '));assert.doesNotMatch(u.searchParams.get('scope'),/write|offline|dm\./);
  const a=await consumeAttempt(db,u.searchParams.get('state'),binding);assert.equal(a.return_to,'/tasks');assert.equal(a.expected_x_id,alice.user.x_id);
@@ -35,12 +35,12 @@ test('short-lived verification tokens are encrypted and bound to their account; 
 });
 test('official positive proofs award exactly once, debit promotions and update the shared VP ledger',async()=>{
  const before=(await db.q("SELECT spent FROM farm_pools WHERE id='promotions'"))[0].spent;
- const r=await verifyTasks(db,alice.user,{taskId:'all',amount:999999,userId:bob.user.id},mock(alice.user));assert.equal(r.awarded,8500);assert.equal(r.earned,8500);assert.ok(r.tasks.every(t=>t.status==='awarded'));
+ const r=await verifyTasks(db,alice.user,{taskId:'all',amount:999999,userId:bob.user.id},mock(alice.user));assert.equal(r.awarded,13500);assert.equal(r.earned,13500);assert.ok(r.tasks.every(t=>t.status==='awarded'));
  const again=await verifyTasks(db,alice.user,{taskId:'all'},()=>{throw Error('Must not call X twice');});assert.equal(again.awarded,0);
- assert.equal(Number((await db.q("SELECT spent FROM farm_pools WHERE id='promotions'"))[0].spent)-Number(before),8500);
- assert.equal(Number((await db.q('SELECT sum(amount) AS n FROM reward_ledger WHERE user_id=$1',[alice.user.id]))[0].n),8500);
- assert.equal((await ownNftSelection(db,alice.user)).confirmedVP,8500);
- assert.equal((await members(db,alice.user,'season-1')).find(u=>u.id===alice.user.id).points,8500);
+ assert.equal(Number((await db.q("SELECT spent FROM farm_pools WHERE id='promotions'"))[0].spent)-Number(before),13500);
+ assert.equal(Number((await db.q('SELECT sum(amount) AS n FROM reward_ledger WHERE user_id=$1',[alice.user.id]))[0].n),13500);
+ assert.equal((await ownNftSelection(db,alice.user)).confirmedVP,13500);
+ assert.equal((await members(db,alice.user,'season-1')).find(u=>u.id===alice.user.id).points,13500);
 });
 test('wrong author, wrong target, likes, quotes and replies cannot masquerade as each other',async()=>{
  const r=await verifyTasks(db,bob.user,{taskId:'all'},mock(bob.user,{following:false,liked:false,posts:[...timeline(alice.user.x_id),...timeline(bob.user.x_id,'111')]}));assert.equal(r.awarded,0);assert.equal(r.earned,0);assert.ok(r.tasks.every(t=>t.status==='not-verified'));
@@ -76,4 +76,71 @@ test('verification reads have an atomic daily allowance before calling X',async(
  await reserveXCheckRead(db,'https://api.x.com/2/users/7001/tweets?max_results=10');
  await assert.rejects(reserveXCheckRead(db,'https://api.x.com/2/users/7001/liked_tweets?max_results=10'),e=>e.status===503);
  const [r]=await db.q('SELECT reserved_cents FROM x_task_api_budget');assert.equal(r.reserved_cents,6);process.env.X_TASK_DAILY_BUDGET_CENTS='10000';
+});
+
+test('historical task receipts stay intact and only the three new actions add another 5000 VP',async()=>{
+ const account=await make('7010');await saveTaskAccess(db,account.user,grant());
+ for(const task of xTasks.slice(0,5))await awardTask(db,account.user,task,'historical-'+task.kind);
+ const before=await db.q('SELECT * FROM x_task_awards WHERE user_id=$1 ORDER BY task_id',[account.user.id]);
+ const poolBefore=Number((await db.q("SELECT spent FROM farm_pools WHERE id='promotions'"))[0].spent),calls=[];
+ const provider=mock(account.user,{likedPosts:[campaignPosts[1]],posts:timeline(account.user.x_id,campaignPosts[1])});
+ const result=await verifyTasks(db,account.user,{taskId:'all',postId:campaignPost,amount:999999},async(url,options)=>{calls.push(url);return provider(url,options);});
+ assert.equal(result.awarded,5000);assert.equal(result.earned,13500);assert.equal(result.total,13500);assert.ok(result.tasks.every(t=>t.status==='awarded'));
+ assert.equal(calls.length,2);assert.equal(calls.filter(u=>u.includes('/liked_tweets')).length,1);assert.ok(calls.find(u=>u.includes('/tweets?')).includes('since_id='+campaignPosts[1]));
+ const after=await db.q('SELECT * FROM x_task_awards WHERE user_id=$1 ORDER BY task_id',[account.user.id]);
+ assert.deepEqual(after.filter(r=>before.some(old=>old.id===r.id)),before);
+ assert.equal(Number((await db.q("SELECT spent FROM farm_pools WHERE id='promotions'"))[0].spent)-poolBefore,5000);
+ assert.equal((await verifyTasks(db,account.user,{taskId:'all'},()=>{throw Error('Already awarded');})).awarded,0);
+});
+
+test('supporting either campaign post cannot complete tasks for the other post',async()=>{
+ for(const target of campaignPosts){
+  const account=await make(target===campaignPost?'7011':'7012');await saveTaskAccess(db,account.user,grant());
+  const result=await verifyTasks(db,account.user,{taskId:'all'},mock(account.user,{following:false,likedPosts:[target],posts:timeline(account.user.x_id,target)}));
+  assert.equal(result.awarded,target===campaignPost?7500:5000);
+  for(const task of result.tasks.filter(t=>t.postId))assert.equal(task.status,task.postId===target?'awarded':'not-verified');
+ }
+});
+
+test('shared pagination continues beyond the old post proofs and reads each likes/timeline page once',async()=>{
+ const account=await make('7013');await saveTaskAccess(db,account.user,grant());const calls=[];
+ const result=await verifyTasks(db,account.user,{taskId:'all'},async(url)=>{
+  const u=new URL(url);calls.push(u);
+  if(url.includes('/by/username/'))return response({data:{id:'1234',connection_status:['following']}});
+  if(url.includes('/liked_tweets'))return response(u.searchParams.has('pagination_token')?{data:[{id:campaignPost}],meta:{}}:{data:[{id:campaignPosts[1]}],meta:{next_token:'likes-page-2'}});
+  if(url.includes('/tweets?'))return response(u.searchParams.has('pagination_token')?{data:timeline(account.user.x_id,campaignPosts[1]),meta:{}}:{data:timeline(account.user.x_id,campaignPost),meta:{next_token:'posts-page-2'}});
+  throw Error('Unexpected request');
+ });
+ assert.equal(result.awarded,13500);assert.equal(calls.filter(u=>u.pathname.endsWith('/liked_tweets')).length,2);assert.equal(calls.filter(u=>u.pathname.endsWith('/tweets')).length,2);
+ assert.ok(calls.filter(u=>u.pathname.endsWith('/tweets')).every(u=>u.searchParams.get('since_id')===campaignPost));
+});
+
+test('a failed shared scan is not retried per task and partial timeline evidence cannot award VP',async()=>{
+ const account=await make('7014');await saveTaskAccess(db,account.user,grant());let likes=0,posts=0;
+ const result=await verifyTasks(db,account.user,{taskId:'all'},async url=>{
+  if(url.includes('/by/username/'))return response({data:{id:'1234',connection_status:[]}});
+  if(url.includes('/liked_tweets')){likes++;return response({},500);}
+  if(url.includes('/tweets?')){posts++;return posts===1?response({data:timeline(account.user.x_id,campaignPosts[1]),meta:{next_token:'more'}}):response({data:[],errors:[{message:'partial response'}]});}
+  throw Error('Unexpected request');
+ });
+ assert.equal(result.awarded,0);assert.equal(likes,1);assert.equal(posts,2);
+ assert.ok(result.tasks.filter(t=>t.kind==='like'||['reply','repost','quote'].includes(t.kind)).every(t=>t.status==='unavailable'));
+ assert.equal((await taskState(db,account.user)).earned,0);
+});
+
+test('a single new reply checks only its exact post/type and needs one bounded timeline page',async()=>{
+ const account=await make('7015');await saveTaskAccess(db,account.user,grant());const task=xTasks.find(t=>t.kind==='reply'&&t.postId===campaignPosts[1]);let reads=0;
+ const result=await verifyTasks(db,account.user,{taskId:task.id},async url=>{
+  const u=new URL(url);assert.equal(u.searchParams.get('since_id'),campaignPosts[1]);assert.ok(u.pathname.endsWith('/tweets'));reads++;
+  return response({data:timeline(account.user.x_id,campaignPosts[1]).filter(p=>p.referenced_tweets[0].type==='replied_to'),meta:{next_token:'unneeded-page'}});
+ });
+ assert.equal(reads,1);assert.equal(result.awarded,1500);assert.equal(result.tasks.filter(t=>t.status==='awarded').length,1);
+});
+
+test('parallel duplicate claims for a new task debit the promotion pool once',async()=>{
+ const account=await make('7016'),task=xTasks.find(t=>t.kind==='like'&&t.postId===campaignPosts[1]);
+ const before=Number((await db.q("SELECT spent FROM farm_pools WHERE id='promotions'"))[0].spent);
+ const amounts=await Promise.all(Array.from({length:5},()=>awardTask(db,account.user,task,campaignPosts[1])));
+ assert.equal(amounts.reduce((a,b)=>a+b,0),1500);assert.equal(Number((await db.q("SELECT spent FROM farm_pools WHERE id='promotions'"))[0].spent)-before,1500);
+ assert.equal((await db.q('SELECT count(*)::int n FROM x_task_awards WHERE user_id=$1 AND task_id=$2',[account.user.id,task.id]))[0].n,1);
 });

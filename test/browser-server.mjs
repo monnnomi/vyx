@@ -15,7 +15,7 @@ import {session} from '../server/http.js';
 import {createFarmHandler} from '../api/farm.js';
 import {login} from '../server/oauth.js';
 import {saveTaskAccess,taskScopes} from '../server/x-task-access.js';
-import {campaignPost} from '../server/x-tasks.js';
+import {campaignPosts} from '../server/x-tasks.js';
 const pg=new PGlite();
 await pg.exec(await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'));
 if(process.env.VYX_QA_RULES_V2==='1'){await pg.exec("UPDATE farm_rule_versions SET starts_at='2026-11-01T00:00:00Z' WHERE version=1; UPDATE farm_rule_versions SET starts_at='2026-11-01T00:00:01Z' WHERE version=2; UPDATE farm_windows SET rule_version=2");}
@@ -93,8 +93,8 @@ if(process.env.VYX_QA_X_TASKS==='1'){
  qaTaskFetcher=async url=>{
   let data;
   if(url.includes('/by/username/'))data={data:{id:'7000',connection_status:['following']}};
-  else if(url.includes('/liked_tweets'))data={data:[{id:campaignPost}],meta:{}};
-  else if(url.includes('/tweets?'))data={data:['retweeted','replied_to','quoted'].map((type,i)=>({id:String(BigInt(campaignPost)+BigInt(i+1)),author_id:a.user.x_id,referenced_tweets:[{type,id:campaignPost}]})),meta:{}};
+  else if(url.includes('/liked_tweets'))data={data:campaignPosts.map(id=>({id})),meta:{}};
+  else if(url.includes('/tweets?'))data={data:campaignPosts.flatMap(postId=>['retweeted','replied_to','quoted'].map((type,i)=>({id:String(BigInt(postId)+BigInt(i+1)),author_id:a.user.x_id,referenced_tweets:[{type,id:postId}]}))),meta:{}};
   else throw new Error('Unexpected QA X request');
   return {ok:true,status:200,json:async()=>data};
  };

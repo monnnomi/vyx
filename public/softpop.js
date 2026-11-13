@@ -151,15 +151,12 @@
     if(m)el.style.setProperty('--sp-round',Math.min(1,Math.max(0,1-((+m[1]*3600+ +m[2]*60+ +m[3])*1000)/ROUND_MS)).toFixed(4));
   }
 
-  // Quests: turn "N / 8,500 VP earned" into a progress value for the summary bar.
+  // Quests use the server-backed total, independent of text or number animations.
   function questProgress(){
     const box=document.querySelector('.x-task-summary');if(!box)return;
-    const strong=box.querySelector('strong');if(!strong)return;
-    const final=strong.querySelector('.sp-count');
-    const text=(final&&final.dataset.spFinal)||strong.textContent;
-    const nums=(text+' '+strong.textContent).replace(/,/g,'').match(/\d+/g)||[];
-    const total=8500,earned=Math.min(total,+(nums[0]||0));
-    box.style.setProperty('--sp-p',(earned/total).toFixed(4));
+    const total=Number(box.dataset.taskTotal)||0;
+    const earned=Math.min(total,Math.max(0,Number(box.dataset.taskEarned)||0));
+    box.style.setProperty('--sp-p',total>0?(earned/total).toFixed(4):'0');
   }
 
   // Legibility floor: older stylesheets set many labels at 6-10px. Lift any text below 12px,

@@ -2,13 +2,18 @@ import {fail} from './http.js';
 import {calendar} from './config.js';
 import {getTaskAccess} from './x-task-access.js';
 export const campaignPost='2119014238463152187';
+export const campaignPosts=Object.freeze([campaignPost,'2121127790556680479']);
 export const xTasks=Object.freeze([
  {id:'x-vyx-follow-v1',kind:'follow',title:'Follow VYX on X',amount:1000,url:'https://x.com/vyxsocial'},
- {id:'x-vyx-like-2119014238463152187',kind:'like',title:'Like the VYX post',amount:1500,url:'https://x.com/vyxsocial/status/'+campaignPost},
- {id:'x-vyx-repost-2119014238463152187',kind:'repost',title:'Repost the VYX post',amount:2000,url:'https://x.com/vyxsocial/status/'+campaignPost},
- {id:'x-vyx-reply-2119014238463152187',kind:'reply',title:'Comment on the VYX post',amount:1500,url:'https://x.com/vyxsocial/status/'+campaignPost},
- {id:'x-vyx-quote-2119014238463152187',kind:'quote',title:'Quote the VYX post',amount:2500,url:'https://x.com/intent/tweet?url='+encodeURIComponent('https://x.com/vyxsocial/status/'+campaignPost)}
+ {id:'x-vyx-like-2119014238463152187',kind:'like',postId:campaignPost,title:'Like the VYX post',amount:1500,url:'https://x.com/vyxsocial/status/'+campaignPost},
+ {id:'x-vyx-repost-2119014238463152187',kind:'repost',postId:campaignPost,title:'Repost the VYX post',amount:2000,url:'https://x.com/vyxsocial/status/'+campaignPost},
+ {id:'x-vyx-reply-2119014238463152187',kind:'reply',postId:campaignPost,title:'Comment on the VYX post',amount:1500,url:'https://x.com/vyxsocial/status/'+campaignPost},
+ {id:'x-vyx-quote-2119014238463152187',kind:'quote',postId:campaignPost,title:'Quote the VYX post',amount:2500,url:'https://x.com/intent/tweet?url='+encodeURIComponent('https://x.com/vyxsocial/status/'+campaignPost)},
+ {id:'x-vyx-like-2121127790556680479',kind:'like',postId:campaignPosts[1],title:'Like the VYX product update',amount:1500,url:'https://x.com/vyxsocial/status/'+campaignPosts[1]},
+ {id:'x-vyx-repost-2121127790556680479',kind:'repost',postId:campaignPosts[1],title:'Repost the VYX product update',amount:2000,url:'https://x.com/vyxsocial/status/'+campaignPosts[1]},
+ {id:'x-vyx-reply-2121127790556680479',kind:'reply',postId:campaignPosts[1],title:'Reply to the VYX product update',amount:1500,url:'https://x.com/vyxsocial/status/'+campaignPosts[1]}
 ]);
+export const xTaskTotal=xTasks.reduce((sum,t)=>sum+t.amount,0);
 export async function reserveXCheckRead(db,url){
  // Conservative upper bounds at current X read rates: one user or up to ten posts.
  const configured=Number(process.env.X_TASK_DAILY_BUDGET_CENTS||100);
@@ -22,7 +27,7 @@ export async function taskState(db,user){
  const awards=user?await db.q('SELECT task_id,amount,created_at FROM x_task_awards WHERE x_id=$1',[user.x_id]):[];
  const checks=user?await db.q('SELECT task_id,status,detail,checked_at FROM x_task_checks WHERE user_id=$1',[user.id]):[];
  const [access]=user?await db.q('SELECT expires_at FROM x_task_access WHERE user_id=$1 AND x_id=$2 AND expires_at>clock_timestamp()',[user.id,user.x_id]):[];
- return {connected:Boolean(access),expiresAt:access?.expires_at||null,total:8500,earned:awards.reduce((n,a)=>n+a.amount,0),tasks:xTasks.map(t=>{const a=awards.find(a=>a.task_id===t.id),c=checks.find(c=>c.task_id===t.id);return {...t,status:a?'awarded':c?.status||'not-verified',detail:a?'Verified by X. VP added to your account.':c?.detail||'Complete the action on X, then return here.',awardedAt:a?.created_at||null,checkedAt:c?.checked_at||null};})};
+ return {connected:Boolean(access),expiresAt:access?.expires_at||null,total:xTaskTotal,earned:awards.reduce((n,a)=>n+a.amount,0),tasks:xTasks.map(t=>{const a=awards.find(a=>a.task_id===t.id),c=checks.find(c=>c.task_id===t.id);return {...t,status:a?'awarded':c?.status||'not-verified',detail:a?'Verified by X. VP added to your account.':c?.detail||'Complete the action on X, then return here.',awardedAt:a?.created_at||null,checkedAt:c?.checked_at||null};})};
 }
 export async function awardTask(db,user,task,proof,now=new Date()){
  return db.tx(async tx=>{
@@ -44,15 +49,20 @@ async function xGet(path,token,fetcher){
  if(data.errors?.length)fail(503,'X returned an incomplete verification response.');return data;
 }
 // Limited pages keep checks bounded. Absence is never treated as proof of completion.
-async function scan(path,token,predicate,fetcher,pages=3){
- let next=null;
+async function scanMany(path,token,predicates,fetcher,pages=3){
+ let next=null;const items=[];
  for(let i=0;i<pages;i++){
   const r=await xGet(path+(next?'&pagination_token='+encodeURIComponent(next):''),token,fetcher);
   if(r.data!=null&&!Array.isArray(r.data))fail(503,'X returned an incomplete verification response.');
-  const found=(r.data||[]).find(predicate);if(found)return {proof:found.id};
-  next=r.meta?.next_token;if(!next)return {proof:null};
+  items.push(...(r.data||[]));
+  if(predicates.every(predicate=>items.some(predicate)))return {items,limited:false};
+  next=r.meta?.next_token;if(!next)return {items,limited:false};
  }
- return {proof:null,limited:true};
+ return {items,limited:true};
+}
+async function scan(path,token,predicate,fetcher,pages=3){
+ const result=await scanMany(path,token,[predicate],fetcher,pages);
+ return {proof:result.items.find(predicate)?.id||null,limited:result.limited};
 }
 export async function verifyTasks(db,user,input={},fetcher=fetch){
  if(!user?.x_id||user.is_system)fail(401,'Sign in with X to verify tasks.');
@@ -63,7 +73,11 @@ export async function verifyTasks(db,user,input={},fetcher=fetch){
  const providerFetcher=fetcher;fetcher=async(url,options)=>{await reserveXCheckRead(db,url);return providerFetcher(url,options);};
  const [run]=await db.q("INSERT INTO x_task_runs(user_id,locked_until,checked_at) VALUES($1,clock_timestamp()+interval '55 seconds',clock_timestamp()) ON CONFLICT(user_id) DO UPDATE SET locked_until=EXCLUDED.locked_until,checked_at=EXCLUDED.checked_at WHERE x_task_runs.locked_until<clock_timestamp() AND x_task_runs.checked_at<clock_timestamp()-interval '60 seconds' RETURNING user_id",[user.id]);
  if(!run)fail(429,'Please wait one minute between verification requests.');
- let awarded=0,timeline=null,halt=null;
+ let awarded=0,timeline=null,likes=null,halt=null;
+ const referenceTypes={repost:'retweeted',reply:'replied_to',quote:'quoted'};
+ const matches=(post,task)=>post.author_id===user.x_id&&post.referenced_tweets?.some(r=>r.id===task.postId&&r.type===referenceTypes[task.kind]);
+ const timelineTasks=pending.filter(t=>referenceTypes[t.kind]);
+ const sinceId=timelineTasks.map(t=>t.postId).reduce((a,b)=>!a||BigInt(b)<BigInt(a)?b:a,null);
  try{
   for(const task of pending){
    let proof=null,detail='Action not confirmed yet. X may take a moment to update; you can check again.',status='not-verified';
@@ -75,21 +89,14 @@ export async function verifyTasks(db,user,input={},fetcher=fetch){
      if(Array.isArray(r.data.connection_status)){if(r.data.connection_status.includes('following'))proof=r.data.id;}
      else {const match=await scan('users/'+user.x_id+'/following?max_results=10',access.token,p=>p.id===r.data.id,fetcher,2);proof=match.proof;if(match.limited)detail='Not found in the recent follows checked. Keep following VYX and try again later.';}
     }else if(task.kind==='like'){
-     const r=await scan('users/'+user.x_id+'/liked_tweets?max_results=10',access.token,p=>p.id===campaignPost,fetcher);proof=r.proof;
-     if(r.limited)detail='Not found in the recent likes checked. Keep the like in place and try again later.';
+     // Share one bounded scan across all pending like tasks, including failures.
+     likes||=scanMany('users/'+user.x_id+'/liked_tweets?max_results=10',access.token,pending.filter(t=>t.kind==='like').map(t=>p=>p.id===t.postId),fetcher);
+     const r=await likes;proof=r.items.find(p=>p.id===task.postId)?.id||null;
+     if(!proof&&r.limited)detail='Not found in the recent likes checked. Keep the like in place and try again later.';
     }else{
-     if(!timeline){
-      timeline=[];let next=null;
-      for(let i=0;i<3;i++){
-       const r=await xGet('users/'+user.x_id+'/tweets?max_results=10&since_id='+campaignPost+'&tweet.fields=author_id,referenced_tweets'+(next?'&pagination_token='+encodeURIComponent(next):''),access.token,fetcher);
-       if(r.data!=null&&!Array.isArray(r.data))fail(503,'X returned an incomplete verification response.');
-       timeline.push(...(r.data||[]));next=r.meta?.next_token;
-       const types=new Set(timeline.filter(p=>p.author_id===user.x_id).flatMap(p=>(p.referenced_tweets||[]).filter(r=>r.id===campaignPost).map(r=>r.type)));
-       if(!next||['retweeted','replied_to','quoted'].every(t=>types.has(t)))break;
-      }
-     }
-     const type={repost:'retweeted',reply:'replied_to',quote:'quoted'}[task.kind];
-     proof=timeline.find(p=>p.author_id===user.x_id&&p.referenced_tweets?.some(r=>r.id===campaignPost&&r.type===type))?.id||null;
+     // Each proof must match both the exact campaign post and reference type.
+     timeline||=scanMany('users/'+user.x_id+'/tweets?max_results=10&since_id='+sinceId+'&tweet.fields=author_id,referenced_tweets',access.token,timelineTasks.map(t=>p=>matches(p,t)),fetcher);
+     const result=await timeline;proof=result.items.find(p=>matches(p,task))?.id||null;
     }
     if(proof){awarded+=await awardTask(db,user,task,proof);status='verified';detail='Verified by X. VP added to your account.';}
    }catch(err){status='unavailable';detail=err.status?err.message:'Verification is temporarily unavailable.';if([409,429].includes(err.status)||/credits|daily X verification/.test(detail))halt=err;}

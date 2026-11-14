@@ -1,0 +1,10 @@
+[Unit]
+Description=VYX automatic quests and news
+After=vyx.service
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/vyx/current
+EnvironmentFile=/etc/vyx/vyx.env
+ExecStart=/usr/local/bin/node scripts/run-scheduled.mjs news
+NoNewPrivileges=true
+PrivateTmp=true

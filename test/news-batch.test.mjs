@@ -94,3 +94,11 @@ test('concurrent reservations never cross the daily ceiling, including failed re
  await reset();const results=await Promise.allSettled(Array.from({length:30},()=>reserveBatchRead(db,5)));
  assert.equal(results.filter(r=>r.status==='fulfilled').length,20);assert.equal((await db.q('SELECT reserved_cents FROM news_budget'))[0].reserved_cents,100);
 });
+test('missing news credentials do not recursively dispatch work or reserve paid reads',async()=>{
+ await reset(1);const previous=process.env.X_NEWS_BEARER_TOKEN;delete process.env.X_NEWS_BEARER_TOKEN;
+ try{
+  assert.equal(await newsQueueHasWork(db),false);
+  await dispatchNewsQueue(db,()=>{throw Error('Missing credentials must not start another worker');});
+  assert.equal((await db.q('SELECT count(*)::int AS n FROM news_budget'))[0].n,0);
+ }finally{process.env.X_NEWS_BEARER_TOKEN=previous;}
+});

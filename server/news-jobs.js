@@ -19,7 +19,7 @@ export async function runNewsJobs(db,fetcher=fetch){
 }
 export async function newsQueueHasWork(db){
  if(await taskQueueHasWork(db,{includeRunning:true}))return false;
- if(!newsAIStatus().ready||!process.env.CRON_SECRET)return false;
+ if(!process.env.X_NEWS_BEARER_TOKEN||!newsAIStatus().ready||!process.env.CRON_SECRET)return false;
  const [r]=await db.q(`SELECT EXISTS(SELECT 1 FROM news_items n JOIN news_sources s ON s.id=n.source_id
  WHERE n.status='pending' AND s.enabled AND NOT s.archived AND n.next_attempt_at<=clock_timestamp()
  AND (NOT pacing_enabled OR n.selection_status='selected' OR n.selection_next_at<=clock_timestamp())

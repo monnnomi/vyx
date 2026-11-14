@@ -1,0 +1,22 @@
+[Unit]
+Description=VYX social application
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+User=vyx
+Group=vyx
+WorkingDirectory=/opt/vyx/current
+EnvironmentFile=/etc/vyx/vyx.env
+ExecStart=/usr/local/bin/node scripts/serve.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=25
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/vyx
+UMask=0077
+[Install]
+WantedBy=multi-user.target

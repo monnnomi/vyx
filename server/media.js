@@ -2,7 +2,7 @@ import {randomUUID,createHash} from 'node:crypto';
 import {fail,text,uuid,limit} from './http.js';
 export const mediaLimits={maxPhotos:4,maxVideos:1,chunkBytes:2*1024*1024,imageBytes:10*1024*1024,videoBytes:50*1024*1024,dailyBytes:100*1024*1024,dailyFiles:20,storageBytes:512*1024*1024};
 export const mediaTypes={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','image/avif':'avif','video/mp4':'mp4','video/webm':'webm','video/quicktime':'mov'};
-export const mediaAvailable=()=>Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+export const mediaAvailable=()=>Boolean(process.env.MEDIA_STORAGE_DIR||process.env.BLOB_READ_WRITE_TOKEN);
 const parents={post:'post_id',comment:'comment_id',room:'room_message_id',message:'message_id'};
 export function mediaProjection(alias,column){
  if(!['p','m','c'].includes(alias)||!Object.values(parents).includes(column))throw new Error('Invalid media query.');

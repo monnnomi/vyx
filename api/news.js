@@ -3,7 +3,7 @@ import {body,fail,handleError,json,limit,sameOrigin,session,ipKey} from '../serv
 import {listNewsComments,writeNewsComment} from '../server/news-comments.js';
 import {listNews,newsAdminState,newsAdminWrite} from '../server/news.js';
 import {requireAdmin} from '../server/admin.js';
-import {waitUntil} from '@vercel/functions';
+import {waitUntil} from '../server/background.js';
 import {runNewsJobs,dispatchNewsQueue} from '../server/news-jobs.js';
 export function createNewsHandler(useDB=withDB,fetcher=fetch,background=waitUntil){return async(req,res)=>{
  try{

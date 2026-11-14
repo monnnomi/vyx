@@ -14,9 +14,9 @@ Read `docs/AI-HANDOFF.md` first. It describes this existing project, the owner's
 
 - Live: `https://joinvyx.com`; admin: `https://joinvyx.com/admin`.
 - Source: `https://github.com/monnnomi/vyx`, production branch `main`.
-- Vercel project: `vyx-social`, scope `monnnomis-projects`; local `.vercel/project.json` already links it.
-- Node.js 24, buildless browser JavaScript/CSS, Vercel Node endpoints, Neon PostgreSQL and private Vercel Blob.
-- Secrets are in ignored local environment files and Vercel. Never print their values, paste them into chats or put them in Git/public assets. Public documentation contains variable names only.
+- Hosting moved to the owner-authorized Zomro VPS on 14 November 2026. See `docs/zomro-hosting.md`; Vercel `vyx-social` is the retained legacy project, paused for quota.
+- Node.js 24, buildless browser JavaScript/CSS, standalone Node API behind nginx, existing Neon PostgreSQL and private filesystem media outside the public directory.
+- Production secrets are in `/etc/vyx/vyx.env` on the VPS; ignored local environment files are migration/development copies. Never print their values, paste them into chats or put them in Git/public assets. Public documentation contains variable names only.
 - On the owner's Mac, `.env.local` connects to the shared database. Use isolated fixtures for QA; `npm start` is not isolated just because its URL is localhost.
 
 ## Rules to preserve unless the owner explicitly changes them
@@ -34,6 +34,6 @@ Read `docs/AI-HANDOFF.md` first. It describes this existing project, the owner's
 - Use meaningful targeted tests; run the full suite when changing shared services, authentication, farming, media or database behavior. `npm test` uses isolated PGlite data.
 - Use `test/browser-server.mjs` for disposable browser QA. No fabricated production users, messages, views, referrals or rewards.
 - Test additive migrations before applying them. Maintain compatibility with the running version and preserve content, reactions, view receipts and VP balances.
-- Push to the existing GitHub repository when publishing; `main` is connected to Vercel production. Verify the deployment and the requested live behavior before reporting it as published.
+- Push reviewed code to the existing GitHub repository and deploy to Zomro using `deploy/zomro/deploy.sh`. Git push alone no longer publishes the live site. Verify HTTPS and the requested live behavior before reporting publication.
 - Distinguish implemented code, local verification, applied migrations and confirmed deployment. Report material blockers plainly.
 - The sibling `../design-previews/vyx-extrafazant/` is a separate local-only design experiment. It is not the production app and must not be deployed as part of unrelated work.

@@ -1,9 +1,10 @@
 import {head,del,put,BlobNotFoundError} from '@vercel/blob';
 import {Readable} from 'node:stream';
 import {fail} from './http.js';
+import {createLocalMediaStorage} from './local-media-storage.js';
 function privateURL(value){const u=new URL(value);if(u.protocol!=='https:'||!u.hostname.endsWith('.private.blob.vercel-storage.com')||u.port||u.username||u.password)throw new Error('Invalid media origin.');return u.href;}
 const headers=()=>({Authorization:'Bearer '+process.env.BLOB_READ_WRITE_TOKEN});
-export const blobStorage={
+const vercelBlobStorage={
  head:pathname=>head(pathname),del:pathname=>del(pathname),
  putPart:(pathname,bytes)=>put(pathname,bytes,{access:'private',contentType:'application/octet-stream',addRandomSuffix:false,allowOverwrite:true}),
  async assemble(asset,parts){
@@ -24,3 +25,4 @@ export const blobStorage={
   return r.body;
  }
 };
+export const blobStorage=process.env.MEDIA_STORAGE_DIR?createLocalMediaStorage(process.env.MEDIA_STORAGE_DIR):vercelBlobStorage;

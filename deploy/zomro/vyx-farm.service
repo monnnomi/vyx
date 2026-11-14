@@ -1,0 +1,10 @@
+[Unit]
+Description=VYX four-hour reward settlement
+After=vyx.service
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/vyx/current
+EnvironmentFile=/etc/vyx/vyx.env
+ExecStart=/usr/local/bin/node scripts/run-scheduled.mjs farm
+NoNewPrivileges=true
+PrivateTmp=true

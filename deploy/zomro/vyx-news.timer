@@ -1,0 +1,8 @@
+[Unit]
+Description=VYX quests and news every fifteen minutes
+[Timer]
+OnCalendar=*-*-* *:00,15,30,45:00 UTC
+Persistent=true
+RandomizedDelaySec=15
+[Install]
+WantedBy=timers.target

@@ -1,4 +1,4 @@
-import {waitUntil} from '@vercel/functions';
+import {waitUntil} from '../server/background.js';
 import {withDB} from '../server/db.js';
 import {fail,handleError,json} from '../server/http.js';
 import {requireNewsCron} from '../server/news-pipeline.js';

@@ -1,0 +1,15 @@
+[Unit]
+Description=VYX daily database and private media backup
+After=network-online.target
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/vyx/current
+EnvironmentFile=/etc/vyx/vyx.env
+ExecStart=/usr/local/bin/node scripts/backup.mjs
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/vyx

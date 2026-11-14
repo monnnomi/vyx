@@ -64,27 +64,54 @@ export async function revealDrop(db,user,id){
 }
 export async function notifications(db,user){
  signedIn(user);
- const [state]=await db.q('SELECT seen_at FROM inbox_state WHERE user_id=$1',[user.id]);
- const items=await db.q(`SELECT * FROM (
+ const [state]=await db.q('SELECT clock_timestamp() AS server_now,(SELECT seen_at FROM inbox_state WHERE user_id=$1) AS seen_at',[user.id]);
+ const items=await db.q(`WITH events AS (
  SELECT 'drop:'||w.starts_at::text AS id,'system' AS category,'drop' AS kind,
   'Your room drop is ready' AS title,sum(a.amount)::text||' VP recorded across '||count(*)::text||' room(s).' AS body,
-  w.settled_at AS created_at,w.starts_at::text AS target FROM farm_awards a JOIN farm_windows w ON w.starts_at=a.window_start
+  w.settled_at AS created_at,w.starts_at::text AS target,false AS viewed FROM farm_awards a JOIN farm_windows w ON w.starts_at=a.window_start
   WHERE a.user_id=$1 AND w.settled_at IS NOT NULL AND COALESCE((SELECT drops FROM notification_preferences WHERE user_id=$1),true) GROUP BY w.starts_at
  UNION ALL
- SELECT 'follow:'||f.follower_id::text,'social','follow',u.name||' followed you','A new connection in your circle.',f.created_at,u.id::text
+ SELECT 'follow:'||f.follower_id::text,'social','follow',u.name||' followed you','A new connection in your circle.',f.created_at,u.id::text,false
  FROM follows f JOIN users u ON u.id=f.follower_id WHERE f.following_id=$1 AND NOT u.is_system AND NOT ${hiddenBy('$1','u.id')} AND COALESCE((SELECT follows FROM notification_preferences WHERE user_id=$1),true)
  UNION ALL
- SELECT 'comment:'||c.id::text,'social','comment',u.name||' commented on your post',left(c.body,160),c.created_at,c.post_id::text
+ SELECT 'comment:'||c.id::text,'social','comment',u.name||' commented on your post',left(c.body,160),c.created_at,c.post_id::text,false
  FROM comments c JOIN posts p ON p.id=c.post_id JOIN users u ON u.id=c.user_id WHERE p.user_id=$1 AND c.user_id<>$1 AND NOT ${hiddenBy('$1','u.id')} AND COALESCE((SELECT comments FROM notification_preferences WHERE user_id=$1),true)
  UNION ALL
- SELECT 'mention:'||m.id::text,'social','room-mention',u.name||' mentioned you in '||r.name,left(m.body,160),m.created_at,r.id::text
+ SELECT 'like:'||l.user_id::text||':'||l.post_id::text,'social','like',u.name||' liked your post',left(p.body,160),l.created_at,p.id::text,false
+ FROM reactions l JOIN posts p ON p.id=l.post_id JOIN users u ON u.id=l.user_id
+ WHERE p.user_id=$1 AND l.user_id<>$1 AND NOT u.is_system AND NOT ${hiddenBy('$1','u.id')} AND COALESCE((SELECT likes FROM notification_preferences WHERE user_id=$1),true)
+ UNION ALL
+ SELECT 'message:'||m.id::text,'social','message',u.name||' sent you a message',COALESCE(NULLIF(left(m.body,160),''),'Sent an attachment'),m.created_at,u.id::text,EXISTS(SELECT 1 FROM message_views v WHERE v.message_id=m.id AND v.user_id=$1)
+ FROM messages m JOIN users u ON u.id=m.sender_id
+ WHERE m.recipient_id=$1 AND NOT u.is_system AND NOT ${hiddenBy('$1','u.id')} AND COALESCE((SELECT messages FROM notification_preferences WHERE user_id=$1),true)
+ UNION ALL
+ SELECT 'mention:'||m.id::text,'social','room-mention',u.name||' mentioned you in '||r.name,left(m.body,160),m.created_at,r.id::text,false
  FROM room_mentions n JOIN room_messages m ON m.id=n.message_id JOIN rooms r ON r.id=m.room_id
  JOIN users u ON u.id=m.sender_id JOIN room_members rm ON rm.room_id=r.id AND rm.user_id=n.user_id
  WHERE n.user_id=$1 AND m.deleted_at IS NULL AND r.archived_at IS NULL AND NOT ${hiddenBy('$1','u.id')} AND NOT EXISTS(SELECT 1 FROM room_mutes WHERE user_id=$1 AND room_id=r.id) AND COALESCE((SELECT mentions FROM notification_preferences WHERE user_id=$1),true)
- ) n ORDER BY created_at DESC,id LIMIT 50`,[user.id]);
- return {items:items.map(n=>({...n,created_at:iso(n.created_at),unread:!state||new Date(n.created_at)>new Date(state.seen_at)})),limit:50};
+ ), inbox AS (
+ SELECT n.*,((s.seen_at IS NULL OR n.created_at>s.seen_at) AND (r.event_at IS NULL OR date_trunc('milliseconds',n.created_at)>r.event_at) AND NOT n.viewed) AS unread
+ FROM events n LEFT JOIN inbox_state s ON s.user_id=$1
+ LEFT JOIN notification_reads r ON r.user_id=$1 AND r.notification_id=n.id
+ ) SELECT *,count(*) FILTER(WHERE unread) OVER()::int AS unread_count FROM inbox
+ ORDER BY created_at DESC,id LIMIT 50`,[user.id]);
+ return {items:items.map(({unread_count,viewed,...n})=>({...n,created_at:iso(n.created_at)})),unreadCount:items[0]?.unread_count||0,serverNow:iso(state.server_now),limit:50};
 }
-export async function readNotifications(db,user){
- signedIn(user);await db.q(`INSERT INTO inbox_state(user_id,seen_at) VALUES($1,clock_timestamp())
- ON CONFLICT(user_id) DO UPDATE SET seen_at=EXCLUDED.seen_at`,[user.id]);return {ok:true};
+export async function readNotifications(db,user,input={}){
+ signedIn(user);
+ if(input.id!==undefined){
+  if(typeof input.id!=='string'||input.id.length>160||typeof input.createdAt!=='string'||!Number.isFinite(Date.parse(input.createdAt)))fail(400,'Choose a notification.');
+  // Recheck the recipient and privacy filters. A caller cannot acknowledge another
+  // account's event or pre-acknowledge a future follow/like with the same ID.
+  const event=(await notifications(db,user)).items.find(n=>n.id===input.id&&n.created_at===input.createdAt);
+  if(!event)fail(404,'This notification is no longer available.');
+  await db.q(`INSERT INTO notification_reads(user_id,notification_id,event_at) VALUES($1,$2,$3)
+   ON CONFLICT(user_id,notification_id) DO UPDATE SET event_at=GREATEST(notification_reads.event_at,EXCLUDED.event_at)`,[user.id,event.id,event.created_at]);
+ }else{
+  // Optional cutoff prevents a newly arriving event from being cleared by an old screen.
+  const through=input.through===undefined?null:timestamp(input.through);
+  await db.q(`INSERT INTO inbox_state(user_id,seen_at) VALUES($1,LEAST(COALESCE($2::timestamptz,clock_timestamp()),clock_timestamp()))
+   ON CONFLICT(user_id) DO UPDATE SET seen_at=GREATEST(inbox_state.seen_at,EXCLUDED.seen_at)`,[user.id,through]);
+ }
+ return {ok:true};
 }

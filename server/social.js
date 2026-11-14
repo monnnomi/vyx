@@ -54,11 +54,11 @@ export async function handleAvailability(db,user,handle){
 }
 export async function memberPreferences(db,user){
  const [prefs,controls,rooms,deletion]=await Promise.all([
- db.q('SELECT follows,comments,mentions,drops FROM notification_preferences WHERE user_id=$1',[user.id]),
+ db.q('SELECT follows,comments,mentions,drops,likes,messages FROM notification_preferences WHERE user_id=$1',[user.id]),
  db.q('SELECT c.target_id,c.blocked,c.muted,u.name FROM member_controls c JOIN users u ON u.id=c.target_id WHERE c.user_id=$1 AND (c.blocked OR c.muted)',[user.id]),
  db.q('SELECT m.room_id,r.name FROM room_mutes m JOIN rooms r ON r.id=m.room_id WHERE m.user_id=$1',[user.id]),
  db.q('SELECT created_at,status FROM deletion_requests WHERE user_id=$1',[user.id])]);
- return {notifications:prefs[0]||{follows:true,comments:true,mentions:true,drops:true},controls,mutedRooms:rooms,deletion:deletion[0]||null};
+ return {notifications:prefs[0]||{follows:true,comments:true,mentions:true,drops:true,likes:true,messages:true},controls,mutedRooms:rooms,deletion:deletion[0]||null};
 }
 async function reportTarget(db,user,kind,id){
  const queries={user:'SELECT id FROM users WHERE id=$1',post:'SELECT id FROM posts WHERE id=$1',comment:'SELECT id FROM comments WHERE id=$1',room:'SELECT id FROM rooms WHERE id=$1 AND archived_at IS NULL',
@@ -103,7 +103,12 @@ export async function mutateSocial(tx,user,action,input){
  }
  if(action==='notification-preferences'){
   const keys=['follows','comments','mentions','drops'];if(keys.some(k=>typeof input[k]!=='boolean'))fail(400,'Choose notification categories.');
-  await tx.q('INSERT INTO notification_preferences(user_id,follows,comments,mentions,drops) VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id) DO UPDATE SET follows=EXCLUDED.follows,comments=EXCLUDED.comments,mentions=EXCLUDED.mentions,drops=EXCLUDED.drops',[user.id,...keys.map(k=>input[k])]);return {ok:true};
+  if(['likes','messages'].some(k=>input[k]!==undefined&&typeof input[k]!=='boolean'))fail(400,'Choose notification categories.');
+  await tx.q(`INSERT INTO notification_preferences(user_id,follows,comments,mentions,drops,likes,messages)
+   VALUES($1,$2,$3,$4,$5,COALESCE($6,true),COALESCE($7,true)) ON CONFLICT(user_id) DO UPDATE SET
+   follows=EXCLUDED.follows,comments=EXCLUDED.comments,mentions=EXCLUDED.mentions,drops=EXCLUDED.drops,
+   likes=COALESCE($6,notification_preferences.likes),messages=COALESCE($7,notification_preferences.messages)`,
+   [user.id,...keys.map(k=>input[k]),input.likes??null,input.messages??null]);return {ok:true};
  }
  if(action==='report'){
   const id=uuid(input.id),kind=input.kind,reason=text(input.reason,3,60),detail=text(input.detail??'',0,500);await reportTarget(tx,user,kind,id);

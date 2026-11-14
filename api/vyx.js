@@ -34,7 +34,12 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
     if(action==='preferences')return json(res,200,await memberPreferences(db,user));
     if(action==='drops')return json(res,200,await dropResults(db,user,{before:url.searchParams.get('before')}));
     if(action==='drop-result')return json(res,200,await dropResult(db,user,url.searchParams.get('id')));
-    if(action==='notifications')return json(res,200,await notifications(db,user));
+    if(action==='notifications'){
+     const result=await notifications(db,user),etag='"'+hash(user.id+JSON.stringify([result.items,result.unreadCount]))+'"';
+     res.setHeader('ETag',etag);res.setHeader('Cache-Control','private, no-store');res.setHeader('Vary','Cookie');
+     if(req.headers['if-none-match']===etag){res.statusCode=304;return res.end();}
+     res.setHeader('Content-Type','application/json; charset=utf-8');res.statusCode=200;return res.end(JSON.stringify(result));
+    }
     if(action==='room-thread')return json(res,200,await roomThread(db,user,url.searchParams.get('id'),url.searchParams.get('before')));
     if(action==='room-message')return json(res,200,await roomMessage(db,user,url.searchParams.get('id'),url.searchParams.get('messageId')));
     if(action==='room-mention-candidates')return json(res,200,await roomMentionCandidates(db,user,url.searchParams.get('id'),url.searchParams.get('search')||''));
@@ -62,7 +67,7 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
    if(action==='verify-tasks')return json(res,200,await verifyTasks(db,user,data,taskFetcher));
    if(action==='disconnect-task-x'){await db.q('DELETE FROM x_task_access WHERE user_id=$1',[user.id]);return json(res,200,{ok:true});}
    if(action==='drop-reveal')return json(res,200,await revealDrop(db,user,data.id));
-   if(action==='notifications-read')return json(res,200,await readNotifications(db,user));
+   if(action==='notifications-read')return json(res,200,await readNotifications(db,user,data));
    json(res,200,await mutate(db,user,action,data));
   });
  }catch(e){handleError(res,e);}

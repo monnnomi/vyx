@@ -17,14 +17,24 @@ release=$1
 old=$(readlink -f /opt/vyx/current)
 new=/opt/vyx/releases/$release
 mkdir -p "$new"
-tar -xzf "/root/vyx-release-$release.tar.gz" -C "$new"
+tar --no-same-owner -xzf "/root/vyx-release-$release.tar.gz" -C "$new"
 cd "$new"
 npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+# Mac-created assets can have mode 0600. The app needs read access to every
+# packaged file, while deployment code remains owned and writable by root.
+# Runtime secrets and private uploads are outside this release directory.
+chown -R root:vyx "$new"
+chmod -R g-w "$new"
+chmod -R g+rX "$new"
 ln -s "$new" /opt/vyx/current.next
 mv -Tf /opt/vyx/current.next /opt/vyx/current
 systemctl restart vyx
 for attempt in 1 2 3 4 5 6 7 8 9 10; do
- if curl -fsS http://127.0.0.1:4173/healthz >/dev/null; then echo 'VYX release is healthy'; exit 0; fi
+ if curl -fsS http://127.0.0.1:4173/healthz >/dev/null &&
+    curl -fsS -o /dev/null http://127.0.0.1:4173/softpop.css &&
+    curl -fsS -o /dev/null http://127.0.0.1:4173/softpop.js; then
+  echo 'VYX release and design assets are healthy'; exit 0
+ fi
  sleep 1
 done
 ln -s "$old" /opt/vyx/current.rollback

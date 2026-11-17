@@ -9,3 +9,7 @@ The fix keeps read-only scopes, two-hour grants, promotion accounting, task IDs,
 Deployment now validates OAuth credential shape before changing the running release and checks both the quest metadata endpoint and main state API after startup. It does not accept placeholder/masked credentials or log their values. No new identity provider, admin, scope or background News collection is enabled.
 
 A real end-to-end X verification remains dependent on restoring valid credentials and obtaining the owner's normal read-only connection. Do not call a fixture test or deployed UI a confirmed live award. Never create synthetic production proofs or manually mark pending tasks complete.
+
+## Applied result
+
+The owner supplied complete credentials through a loopback-only password form. Only `X_CLIENT_ID` and `X_CLIENT_SECRET` were restored in `/etc/vyx/vyx.env`; the previous configuration has a root-only backup. Temporary input copies were removed and the input server stopped. The fix was pushed as `7f8b24d` and deployed in `/opt/vyx/releases/20261117T072327Z`. All 301 tests passed. Live state and tasks returned HTTP 200, the owner's admin dashboard loaded, and an OAuth retry reached the correct VYX Social consent screen for @monnnomi_. The scope remained read-only with a two-hour grant. No paid verification or extra production reward had occurred at this checkpoint: the final owner consent was still pending. Existing 8,500 VP were preserved.

@@ -1,10 +1,12 @@
 import {withDB} from '../../server/db.js';
 import {fail,handleError,ipKey,limit,redirect,setCookie,token,session} from '../../server/http.js';
 import {startOAuth} from '../../server/oauth.js';
+import {validateXConfig} from '../../server/x-config.js';
 export default async function handler(req,res){
  try{
   if(req.method!=='GET')fail(405,'Method not allowed.');
   if(!process.env.X_CLIENT_ID||!process.env.X_CLIENT_SECRET||!process.env.VYX_APP_SECRET)return redirect(res,'/?auth=setup#feed');
+  if(process.env.NODE_ENV==='production')validateXConfig();
   await withDB(async db=>{
    await limit(db,'oauth:'+ipKey(req),12,600);
    const binding=token(),returnTo=new URL(req.url,'https://vyx.local').searchParams.get('returnTo');

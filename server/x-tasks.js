@@ -33,13 +33,20 @@ export async function taskState(db,user){
  const [access]=user?await db.q('SELECT expires_at FROM x_task_access WHERE user_id=$1 AND x_id=$2 AND expires_at>clock_timestamp()',[user.id,user.x_id]):[];
  const [budget]=await db.q("SELECT clock_timestamp() AS server_now,COALESCE((SELECT reserved_cents FROM x_task_api_budget WHERE day=(clock_timestamp() AT TIME ZONE 'UTC')::date),0) AS reserved_cents");
  const remaining=Math.max(0,taskBudgetCap()-Number(budget.reserved_cents)),reset=new Date(budget.server_now);reset.setUTCHours(24,0,0,0);
- const tasks=xTasks.map(t=>{const a=awards.find(a=>a.task_id===t.id),c=checks.find(c=>c.task_id===t.id);return {...t,status:a?'awarded':c?.status||'not-verified',canCheck:!a&&remaining>=minimumTaskRead(t),detail:a?'Verified by X. VP added to your account.':c?.detail||'Complete the action on X, then return here.',awardedAt:a?.created_at||null,checkedAt:c?.checked_at||null};});
- const pending=tasks.filter(t=>t.status!=='awarded'),limited=pending.some(t=>!t.canCheck);
+ const today=new Date(budget.server_now);today.setUTCHours(0,0,0,0);
+ const tasks=xTasks.map(t=>{
+  const a=awards.find(a=>a.task_id===t.id),c=checks.find(c=>c.task_id===t.id);
+  const staleLimit=c?.status==='unavailable'&&/daily X verification allowance/.test(c.detail)&&new Date(c.checked_at)<today&&remaining>=minimumTaskRead(t);
+  return {...t,status:a?'awarded':staleLimit?'not-verified':c?.status||'not-verified',canCheck:Boolean(!a&&access&&remaining>=minimumTaskRead(t)),
+   detail:a?'Verified by X. VP added to your account.':user&&!access?'Reconnect X to check this task. Your previous rewards are kept.':staleLimit?'The daily allowance has renewed. This task is ready to check.':c?.detail||'Complete the action on X, then return here.',
+   awardedAt:a?.created_at||null,checkedAt:c?.checked_at||null};
+ });
+ const pending=tasks.filter(t=>t.status!=='awarded'),limited=pending.some(t=>remaining<minimumTaskRead(t));
  const [run]=user?await db.q('SELECT checked_at,locked_until FROM x_task_runs WHERE user_id=$1',[user.id]):[];
- const nextAt=access&&pending.length?new Date(Math.max(Date.parse(taskAutomationStart()),new Date(budget.server_now).getTime(),run?new Date(run.checked_at).getTime()+900000:0,limited&&pending.every(t=>!t.canCheck)?reset.getTime():0)).toISOString():null;
+ const nextAt=access&&pending.length?new Date(Math.max(Date.parse(taskAutomationStart()),new Date(budget.server_now).getTime(),run?new Date(run.checked_at).getTime()+900000:0,limited&&pending.every(t=>remaining<minimumTaskRead(t))?reset.getTime():0)).toISOString():null;
  return {connected:Boolean(access),expiresAt:access?.expires_at||null,total:xTaskTotal,earned:awards.reduce((n,a)=>n+a.amount,0),tasks,
   automation:{enabled:Boolean(access&&pending.length),startsAt:taskAutomationStart(),nextAt},
-  availability:{state:!pending.length?'complete':pending.every(t=>!t.canCheck)?'paused':limited?'limited':'ready',retryAt:limited?reset.toISOString():null}};
+  availability:{state:!pending.length?'complete':pending.every(t=>remaining<minimumTaskRead(t))?'paused':limited?'limited':'ready',retryAt:limited?reset.toISOString():null}};
 }
 export async function awardTask(db,user,task,proof,now=new Date()){
  return db.tx(async tx=>{
@@ -53,7 +60,7 @@ export async function awardTask(db,user,task,proof,now=new Date()){
 }
 async function xGet(path,token,fetcher){
  let response;try{response=await fetcher('https://api.x.com/2/'+path,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(5000),redirect:'error'});}catch(err){if(err.status)throw err;fail(503,'X could not be reached. Please try again later.');}
- if(response.status===401)fail(409,'Reconnect X to continue task verification.');
+ if(response.status===401)throw Object.assign(new Error('Reconnect X to continue task verification.'),{status:409,xAuthExpired:true});
  if(response.status===402||response.status===403)fail(503,'X API access or credits are unavailable. The VYX team needs to check the developer account.');
  if(response.status===429)fail(429,'X is temporarily limiting checks. Please wait before trying again.');
  if(!response.ok)throw Object.assign(new Error('X could not confirm this action right now. Please try again later.'),{status:503,xStatus:response.status});
@@ -81,6 +88,7 @@ export async function verifyTasks(db,user,input={},fetcher=fetch){
  const requested=input.taskId==='all'?xTasks:xTasks.filter(t=>t.id===input.taskId);if(!requested.length)fail(400,'Choose a valid task.');
  const state=await taskState(db,user),pending=requested.filter(t=>!state.tasks.find(a=>a.id===t.id&&a.status==='awarded'));
  if(!pending.length)return {...state,awarded:0};
+ if(!state.connected)await getTaskAccess(db,user);
  if(pending.every(t=>state.tasks.find(s=>s.id===t.id)?.canCheck===false))return {...state,awarded:0};
  const access=await getTaskAccess(db,user);
  const providerFetcher=fetcher;fetcher=async(url,options)=>{await reserveXCheckRead(db,url);return providerFetcher(url,options);};
@@ -113,7 +121,7 @@ export async function verifyTasks(db,user,input={},fetcher=fetch){
      const result=await timeline;proof=result.items.find(p=>matches(p,task))?.id||null;
     }
     if(proof){awarded+=await awardTask(db,user,task,proof);status='verified';detail='Verified by X. VP added to your account.';}
-   }catch(err){status='unavailable';detail=err.status?err.message:'Verification is temporarily unavailable.';if([409,429].includes(err.status)||/credits|daily X verification/.test(detail))halt=err;}
+   }catch(err){if(err.xAuthExpired)await db.q('DELETE FROM x_task_access WHERE user_id=$1 AND sealed_token=$2',[user.id,access.sealed]);status='unavailable';detail=err.status?err.message:'Verification is temporarily unavailable.';if([409,429].includes(err.status)||/credits|daily X verification/.test(detail))halt=err;}
    await db.q('INSERT INTO x_task_checks(user_id,task_id,status,detail) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,task_id) DO UPDATE SET status=EXCLUDED.status,detail=EXCLUDED.detail,checked_at=clock_timestamp()',[user.id,task.id,status,detail]);
   }
  }finally{await db.q('UPDATE x_task_runs SET locked_until=clock_timestamp() WHERE user_id=$1',[user.id]);}

@@ -50,7 +50,7 @@ test('wrong author, wrong target, likes, quotes and replies cannot masquerade as
  const v=await verifyTasks(db,bob.user,{taskId:'all'},mock(bob.user,{following:false,liked:false,posts:onlyReply}));assert.equal(v.awarded,1500);assert.equal(v.tasks.find(t=>t.kind==='quote').status,'not-verified');
 });
 test('X failures, partial responses, missing relationship and pagination limits never create a reward',async()=>{
- for(const code of [401,402,403,429,500]){await unlock(bob.user);const r=await verifyTasks(db,bob.user,{taskId:xTasks[0].id},async()=>response({},code));assert.equal(r.awarded,0);assert.equal(r.tasks[0].status,'unavailable');}
+ for(const code of [401,402,403,429,500]){await saveTaskAccess(db,bob.user,grant());await unlock(bob.user);const r=await verifyTasks(db,bob.user,{taskId:xTasks[0].id},async()=>response({},code));assert.equal(r.awarded,0);assert.equal(r.tasks[0].status,'unavailable');}
  await unlock(bob.user);const partial=await verifyTasks(db,bob.user,{taskId:xTasks[0].id},async()=>response({data:{id:'1234'}}));assert.equal(partial.awarded,0);
  await unlock(bob.user);const broken=await verifyTasks(db,bob.user,{taskId:xTasks[1].id},async()=>response({data:[{id:campaignPost}],errors:[{message:'partial'}]}));assert.equal(broken.awarded,0);
  await unlock(bob.user);let calls=0;const limit=await verifyTasks(db,bob.user,{taskId:xTasks[1].id},async()=>{calls++;return response({data:[{id:'123'}],meta:{next_token:'next'}});});assert.equal(calls,3);assert.equal(limit.awarded,0);
@@ -168,4 +168,34 @@ test('remaining allowance may confirm a follow while more expensive post checks 
  assert.equal(reads,1);assert.equal(result.awarded,1000);assert.equal(result.availability.state,'paused');
  assert.equal((await db.q('SELECT reserved_cents FROM x_task_api_budget WHERE day=(clock_timestamp() AT TIME ZONE \'UTC\')::date'))[0].reserved_cents,99);
  process.env.X_TASK_DAILY_BUDGET_CENTS='10000';
+});
+
+test('expired verification access explains reconnection without hiding existing rewards or claiming the shared budget is exhausted',async()=>{
+ await db.q('DELETE FROM x_task_api_budget');
+ const account=await make('7021');await saveTaskAccess(db,account.user,grant());
+ await awardTask(db,account.user,xTasks[0],'previous-confirmed-proof');
+ await db.q("INSERT INTO x_task_checks(user_id,task_id,status,detail,checked_at) VALUES($1,$2,'unavailable',$3,clock_timestamp()-interval '2 days')",[account.user.id,xTasks[1].id,'The daily X verification allowance has been reached. Your completed rewards remain safe; please check again later.']);
+ await db.q("UPDATE x_task_access SET expires_at=clock_timestamp()-interval '1 second' WHERE user_id=$1",[account.user.id]);
+ const s=await taskState(db,account.user);assert.equal(s.connected,false);assert.equal(s.earned,1000);assert.equal(s.availability.state,'ready');assert.equal(s.availability.retryAt,null);
+ assert.ok(s.tasks.filter(t=>t.status!=='awarded').every(t=>!t.canCheck&&/Reconnect X/.test(t.detail)));assert.equal(s.tasks[0].status,'awarded');
+ let reads=0;await assert.rejects(verifyTasks(db,account.user,{taskId:'all'},()=>{reads++;}),e=>e.status===409);assert.equal(reads,0);
+});
+test('the next UTC allowance clears only stale display errors; historical checks and awards are unchanged',async()=>{
+ const account=await make('7022');await saveTaskAccess(db,account.user,grant());
+ await db.q("INSERT INTO x_task_checks(user_id,task_id,status,detail,checked_at) VALUES($1,$2,'unavailable',$3,clock_timestamp()-interval '1 day')",[account.user.id,xTasks[1].id,'The daily X verification allowance has been reached. Your completed rewards remain safe; please check again later.']);
+ const before=await db.q('SELECT * FROM x_task_checks WHERE user_id=$1',[account.user.id]),s=await taskState(db,account.user);
+ assert.equal(s.tasks[1].status,'not-verified');assert.equal(s.tasks[1].canCheck,true);assert.match(s.tasks[1].detail,/allowance has renewed/);
+ assert.deepEqual(await db.q('SELECT * FROM x_task_checks WHERE user_id=$1',[account.user.id]),before);
+ await db.q('UPDATE x_task_checks SET checked_at=clock_timestamp() WHERE user_id=$1',[account.user.id]);
+ assert.equal((await taskState(db,account.user)).tasks[1].status,'unavailable');
+});
+
+test('provider 401 disconnects only the rejected grant and prevents repeated paid retries',async()=>{
+ const account=await make('7023');await saveTaskAccess(db,account.user,grant());let reads=0;
+ const r=await verifyTasks(db,account.user,{taskId:'all'},async()=>{reads++;return response({},401);});
+ assert.equal(reads,1);assert.equal(r.connected,false);assert.equal(r.awarded,0);assert.ok(r.tasks.every(t=>/Reconnect X/.test(t.detail)));
+ await unlock(account.user);await assert.rejects(verifyTasks(db,account.user,{taskId:'all'},()=>{reads++;}),e=>e.status===409);assert.equal(reads,1);
+ const fresh=await make('7024');await saveTaskAccess(db,fresh.user,grant());
+ await verifyTasks(db,fresh.user,{taskId:xTasks[0].id},async()=>{await saveTaskAccess(db,fresh.user,{...grant(),access_token:'FRESH-RECONNECTED-TOKEN'});return response({},401);});
+ assert.equal((await taskState(db,fresh.user)).connected,true);
 });

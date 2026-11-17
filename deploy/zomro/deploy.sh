@@ -26,6 +26,7 @@ npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 chown -R root:vyx "$new"
 chmod -R g-w "$new"
 chmod -R g+rX "$new"
+node --env-file=/etc/vyx/vyx.env scripts/check-x-config.mjs
 node --env-file=/etc/vyx/vyx.env scripts/migrate-notifications.mjs
 ln -s "$new" /opt/vyx/current.next
 mv -Tf /opt/vyx/current.next /opt/vyx/current
@@ -33,7 +34,9 @@ systemctl restart vyx
 for attempt in 1 2 3 4 5 6 7 8 9 10; do
  if curl -fsS http://127.0.0.1:4173/healthz >/dev/null &&
     curl -fsS -o /dev/null http://127.0.0.1:4173/softpop.css &&
-    curl -fsS -o /dev/null http://127.0.0.1:4173/softpop.js; then
+    curl -fsS -o /dev/null http://127.0.0.1:4173/softpop.js &&
+    curl -fsS -o /dev/null 'http://127.0.0.1:4173/api/vyx?action=tasks' &&
+    curl -fsS -o /dev/null 'http://127.0.0.1:4173/api/vyx?action=state'; then
   echo 'VYX release and design assets are healthy'; exit 0
  fi
  sleep 1

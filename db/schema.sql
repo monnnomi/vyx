@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
  is_system boolean NOT NULL DEFAULT false, profile_completed boolean NOT NULL DEFAULT false,
  created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS interface_locale text NOT NULL DEFAULT 'en' CHECK (interface_locale IN ('en','ru'));
 CREATE TABLE IF NOT EXISTS sessions (
  token_hash text PRIMARY KEY, user_id uuid NOT NULL REFERENCES users(id),
  expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now()

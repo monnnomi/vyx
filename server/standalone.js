@@ -1,3 +1,4 @@
+import {serveOwnerPage} from './owner-interface.js';
 import http from 'node:http';
 import {readFile,stat} from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
@@ -30,6 +31,7 @@ export function createStandaloneServer({handlers=routes,publicDirectory=root}={}
    if(route){await route(req,res);return;}
    if(path.startsWith('/api/')){res.statusCode=404;return res.end('Not found');}
    if(!['GET','HEAD'].includes(req.method)){res.statusCode=405;return res.end('Method not allowed');}
+   if(await serveOwnerPage(path,req,res))return;
    const decoded=decodeURIComponent(path==='/'?'/index.html':path==='/admin'?'/admin.html':path);
    const file=resolve(staticRoot,'.'+decoded);
    if(!file.startsWith(staticRoot+'/')||decoded.includes('\0')||decoded.split('/').some(p=>p.startsWith('.'))){res.statusCode=403;return res.end('Forbidden');}

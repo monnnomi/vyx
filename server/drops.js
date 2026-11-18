@@ -1,3 +1,4 @@
+import {ownerLocale} from './owner-interface.js';
 import {hiddenBy} from './social.js';
 import {fail} from './http.js';
 import {settleDueWindows,farmingOverview,currentActivity} from './farming.js';
@@ -67,25 +68,25 @@ export async function notifications(db,user){
  const [state]=await db.q('SELECT clock_timestamp() AS server_now,(SELECT seen_at FROM inbox_state WHERE user_id=$1) AS seen_at',[user.id]);
  const items=await db.q(`WITH events AS (
  SELECT 'drop:'||w.starts_at::text AS id,'system' AS category,'drop' AS kind,
-  'Your room drop is ready' AS title,sum(a.amount)::text||' VP recorded across '||count(*)::text||' room(s).' AS body,
+  CASE WHEN $2 THEN 'Дроп комнаты готов' ELSE 'Your room drop is ready' END AS title,CASE WHEN $2 THEN 'Начислено '||sum(a.amount)::text||' VP · комнат: '||count(*)::text ELSE sum(a.amount)::text||' VP recorded across '||count(*)::text||' room(s).' END AS body,
   w.settled_at AS created_at,w.starts_at::text AS target,false AS viewed FROM farm_awards a JOIN farm_windows w ON w.starts_at=a.window_start
   WHERE a.user_id=$1 AND w.settled_at IS NOT NULL AND COALESCE((SELECT drops FROM notification_preferences WHERE user_id=$1),true) GROUP BY w.starts_at
  UNION ALL
- SELECT 'follow:'||f.follower_id::text,'social','follow',u.name||' followed you','A new connection in your circle.',f.created_at,u.id::text,false
+ SELECT 'follow:'||f.follower_id::text,'social','follow',u.name||CASE WHEN $2 THEN ' подписался на тебя' ELSE ' followed you' END,CASE WHEN $2 THEN 'У тебя новый подписчик.' ELSE 'A new connection in your circle.' END,f.created_at,u.id::text,false
  FROM follows f JOIN users u ON u.id=f.follower_id WHERE f.following_id=$1 AND NOT u.is_system AND NOT ${hiddenBy('$1','u.id')} AND COALESCE((SELECT follows FROM notification_preferences WHERE user_id=$1),true)
  UNION ALL
- SELECT 'comment:'||c.id::text,'social','comment',u.name||' commented on your post',left(c.body,160),c.created_at,c.post_id::text,false
+ SELECT 'comment:'||c.id::text,'social','comment',u.name||CASE WHEN $2 THEN ' оставил комментарий' ELSE ' commented on your post' END,left(c.body,160),c.created_at,c.post_id::text,false
  FROM comments c JOIN posts p ON p.id=c.post_id JOIN users u ON u.id=c.user_id WHERE p.user_id=$1 AND c.user_id<>$1 AND NOT ${hiddenBy('$1','u.id')} AND COALESCE((SELECT comments FROM notification_preferences WHERE user_id=$1),true)
  UNION ALL
- SELECT 'like:'||l.user_id::text||':'||l.post_id::text,'social','like',u.name||' liked your post',left(p.body,160),l.created_at,p.id::text,false
+ SELECT 'like:'||l.user_id::text||':'||l.post_id::text,'social','like',u.name||CASE WHEN $2 THEN ' оценил твою публикацию' ELSE ' liked your post' END,left(p.body,160),l.created_at,p.id::text,false
  FROM reactions l JOIN posts p ON p.id=l.post_id JOIN users u ON u.id=l.user_id
  WHERE p.user_id=$1 AND l.user_id<>$1 AND NOT u.is_system AND NOT ${hiddenBy('$1','u.id')} AND COALESCE((SELECT likes FROM notification_preferences WHERE user_id=$1),true)
  UNION ALL
- SELECT 'message:'||m.id::text,'social','message',u.name||' sent you a message',COALESCE(NULLIF(left(m.body,160),''),'Sent an attachment'),m.created_at,u.id::text,EXISTS(SELECT 1 FROM message_views v WHERE v.message_id=m.id AND v.user_id=$1)
+ SELECT 'message:'||m.id::text,'social','message',u.name||CASE WHEN $2 THEN ' написал тебе' ELSE ' sent you a message' END,COALESCE(NULLIF(left(m.body,160),''),CASE WHEN $2 THEN 'Вложение' ELSE 'Sent an attachment' END),m.created_at,u.id::text,EXISTS(SELECT 1 FROM message_views v WHERE v.message_id=m.id AND v.user_id=$1)
  FROM messages m JOIN users u ON u.id=m.sender_id
  WHERE m.recipient_id=$1 AND NOT u.is_system AND NOT ${hiddenBy('$1','u.id')} AND COALESCE((SELECT messages FROM notification_preferences WHERE user_id=$1),true)
  UNION ALL
- SELECT 'mention:'||m.id::text,'social','room-mention',u.name||' mentioned you in '||r.name,left(m.body,160),m.created_at,r.id::text,false
+ SELECT 'mention:'||m.id::text,'social','room-mention',u.name||CASE WHEN $2 THEN ' упомянул тебя в комнате ' ELSE ' mentioned you in ' END||r.name,left(m.body,160),m.created_at,r.id::text,false
  FROM room_mentions n JOIN room_messages m ON m.id=n.message_id JOIN rooms r ON r.id=m.room_id
  JOIN users u ON u.id=m.sender_id JOIN room_members rm ON rm.room_id=r.id AND rm.user_id=n.user_id
  WHERE n.user_id=$1 AND m.deleted_at IS NULL AND r.archived_at IS NULL AND NOT ${hiddenBy('$1','u.id')} AND NOT EXISTS(SELECT 1 FROM room_mutes WHERE user_id=$1 AND room_id=r.id) AND COALESCE((SELECT mentions FROM notification_preferences WHERE user_id=$1),true)
@@ -94,7 +95,7 @@ export async function notifications(db,user){
  FROM events n LEFT JOIN inbox_state s ON s.user_id=$1
  LEFT JOIN notification_reads r ON r.user_id=$1 AND r.notification_id=n.id
  ) SELECT *,count(*) FILTER(WHERE unread) OVER()::int AS unread_count FROM inbox
- ORDER BY created_at DESC,id LIMIT 50`,[user.id]);
+ ORDER BY created_at DESC,id LIMIT 50`,[user.id,ownerLocale(user)==='ru']);
  return {items:items.map(({unread_count,viewed,...n})=>({...n,created_at:iso(n.created_at)})),unreadCount:items[0]?.unread_count||0,serverNow:iso(state.server_now),limit:50};
 }
 export async function readNotifications(db,user,input={}){

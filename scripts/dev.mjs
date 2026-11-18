@@ -1,3 +1,4 @@
+import {serveOwnerPage} from '../server/owner-interface.js';
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
@@ -19,6 +20,7 @@ http.createServer(async(req,res)=>{
  const path=new URL(req.url,process.env.PUBLIC_APP_URL).pathname;
  if(routes[path])return routes[path](req,res);
  try{
+  if(await serveOwnerPage(path,req,res))return;
   const file=resolve(root,'.'+decodeURIComponent(path==='/'?'/index.html':path==='/admin'?'/admin.html':path));
   if(!file.startsWith(root+'/')){res.writeHead(403).end();return;}
   const bytes=await readFile(file);res.setHeader('Content-Type',types[extname(file)]||'application/octet-stream');res.setHeader('Cache-Control','no-store');res.end(bytes);

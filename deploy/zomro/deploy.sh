@@ -9,7 +9,8 @@ trap 'rm -f "$archive"' EXIT
 NODE_ENV=production VYX_RUNTIME=node node scripts/build-analytics.mjs
 node scripts/build-media.mjs
 node scripts/build-drop-audio.mjs
-COPYFILE_DISABLE=1 tar -czf "$archive" public api server scripts package.json package-lock.json analytics-settings.json vercel.json
+node scripts/build-interface-ru.mjs
+COPYFILE_DISABLE=1 tar -czf "$archive" public api server scripts locales package.json package-lock.json analytics-settings.json vercel.json
 scp -F "$config" "$archive" "$target:/root/vyx-release-$release.tar.gz"
 ssh -F "$config" "$target" sh -s -- "$release" <<'REMOTE'
 set -eu
@@ -29,6 +30,7 @@ chmod -R g+rX "$new"
 node --env-file=/etc/vyx/vyx.env scripts/check-x-config.mjs
 node --env-file=/etc/vyx/vyx.env scripts/migrate-notifications.mjs
 node --env-file=/etc/vyx/vyx.env scripts/migrate-x-task-refresh.mjs
+node --env-file=/etc/vyx/vyx.env scripts/migrate-owner-locale.mjs
 ln -s "$new" /opt/vyx/current.next
 mv -Tf /opt/vyx/current.next /opt/vyx/current
 systemctl restart vyx

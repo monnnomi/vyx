@@ -1,3 +1,4 @@
+import {ownerLocale} from './owner-interface.js';
 import {memberReputation} from './reputation.js';
 import {postViewProjection} from './post-views.js';
 import {reactionProjection,reactToMessage} from './message-reactions.js';
@@ -52,7 +53,7 @@ export async function state(db,user,now=null) {
    db.q('SELECT (SELECT count(*)::int FROM posts WHERE user_id=$1) AS posts,(SELECT count(*)::int FROM follows WHERE follower_id=$1) AS following,(SELECT count(*)::int FROM follows WHERE following_id=$1) AS followers',[user.id]),
    memberReputation(db,user.id)
   ]);
-  account={...publicUser(user),is_admin:isAdmin(user),...balance[0],inventory:[0,1,2,3].map(t=>inventory.find(i=>i.tier===t)?.n||0),history,...counts[0],reputation};
+  account={...publicUser(user),is_admin:isAdmin(user),...(ownerLocale(user)!==null?{owner_interface_locale:ownerLocale(user)}:{}),...balance[0],inventory:[0,1,2,3].map(t=>inventory.find(i=>i.tier===t)?.n||0),history,...counts[0],reputation};
  }
  return {calendar:c,mediaReady:mediaAvailable(),mediaLimits,user:account,members:people,posts,quests:tasks,event,farming:await farmingOverview(db,user),authReady:Boolean(process.env.X_CLIENT_ID&&process.env.X_CLIENT_SECRET&&process.env.VYX_APP_SECRET)};
 }

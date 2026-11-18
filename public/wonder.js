@@ -2,7 +2,7 @@
 let wonderSound=true,wonderAudio=null,wonderOwner=null,wonderReceipt=null,wonderFetch=null,wonderPreloaded=false;
 let wonderSoundFile=null,wonderSoundLoad=null,wonderSoundBuffer=null,wonderAudioVoice=null,wonderAudioEpoch=0,activeChestReveal=null;
 try{wonderSound=localStorage.getItem('vyx-drop-sound')!=='off';}catch{}
-function wonderSoundButton(){return `<button class="wonder-sound" data-wonder-sound aria-pressed="${wonderSound}" aria-label="${wonderSound?'Turn drop sound off':'Turn drop sound on'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4Z"/>${wonderSound?'<path d="M17 8c3 2 3 6 0 8m2-11c5 4 5 10 0 14"/>':'<path d="m17 9 5 6m0-6-5 6"/>'}</svg><span>Sound ${wonderSound?'on':'off'}</span></button>`;}
+function wonderSoundButton(){return `<button class="wonder-sound" data-wonder-sound aria-pressed="${wonderSound}" aria-label="${wonderSound?'Turn drop sound off':'Turn drop sound on'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4Z"/>${wonderSound?'<path d="M17 8c3 2 3 6 0 8m2-11c5 4 5 10 0 14"/>':'<path d="m17 9 5 6m0-6-5 6"/>'}</svg><span>${wonderSound?'Sound on':'Sound off'}</span></button>`;}
 function showWonder(html,keepAudio=false){showModal(html,{keepDropAudio:keepAudio});document.querySelector('#modal').classList.add('is-wonder');}
 function preloadWonderAudio(){
  if(wonderSoundFile)return Promise.resolve(wonderSoundFile);

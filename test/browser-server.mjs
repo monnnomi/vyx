@@ -1,3 +1,4 @@
+import {serveOwnerPage} from '../server/owner-interface.js';
 // Isolated UI fixtures, bound to loopback only. This file is excluded from deployment.
 import http from 'node:http';
 import {createNewsHandler} from '../api/news.js';
@@ -22,7 +23,9 @@ if(process.env.VYX_QA_RULES_V2==='1'){await pg.exec("UPDATE farm_rule_versions S
 let qaClock=null;
 const wrap=p=>({q:async(sql,params=[])=>{const values=[...params];if(qaClock&&sql.includes('clock_timestamp()')){values.push(qaClock);sql=sql.replaceAll('clock_timestamp()',`$${values.length}::timestamptz`);}return (await p.query(sql,values)).rows;},tx:fn=>p.transaction(tx=>fn(wrap(tx)))});
 const db=wrap(pg);
-const a=await db.tx(tx=>login(tx,{id:'1001',name:'QA Alice',username:'qa_alice',avatar:''}));
+const aliceX='1001';
+if(process.env.VYX_QA_OWNER_LOCALE==='1')process.env.VYX_OWNER_INTERFACE_X_ID=aliceX;
+const a=await db.tx(tx=>login(tx,{id:aliceX,name:'QA Alice',username:'qa_alice',avatar:''}));
 const b=await db.tx(tx=>login(tx,{id:'1002',name:'QA Bob',username:'qa_bob',avatar:''}));
 await db.q('INSERT INTO follows(follower_id,following_id) VALUES($1,$2),($2,$1)',[a.user.id,b.user.id]);
 await db.q('INSERT INTO posts(user_id,body) VALUES($1,$2)',[b.user.id,'A local QA story for checking the shared VYX interface.']);
@@ -86,7 +89,7 @@ const qaMediaStorage={
  open:async(a,r)=>new Response(qaMediaFiles.get(a.pathname).bytes.subarray(r.start,r.end+1)).body
 };
 const qaMedia=createMediaHandler(fn=>fn(db),qaMediaStorage);
-const qaPort=Number(process.env.VYX_QA_PORT||4174);process.env.PUBLIC_APP_URL='http://127.0.0.1:'+qaPort;process.env.VYX_ADMIN_X_IDS='1001';process.env.VYX_APP_SECRET=randomBytes(32).toString('base64url');
+const qaPort=Number(process.env.VYX_QA_PORT||4174);process.env.PUBLIC_APP_URL='http://127.0.0.1:'+qaPort;process.env.VYX_ADMIN_X_IDS=aliceX;process.env.VYX_APP_SECRET=randomBytes(32).toString('base64url');
 let qaTaskFetcher=fetch;
 if(process.env.VYX_QA_X_TASKS==='1'){
  await saveTaskAccess(db,a.user,{access_token:'isolated-qa-token',scope:taskScopes.join(' '),expires_in:7200});
@@ -132,5 +135,6 @@ http.createServer(async(req,res)=>{
  if(path==='/api/admin')return admin(req,res);
  if(path==='/api/presence')return presence(req,res);
  if(path==='/api/farm')return farm(req,res);
+ if(await serveOwnerPage(path,req,res,fn=>fn(db)))return;
  try{const f=resolve(root,'.'+(path==='/'?'/index.html':path==='/admin'?'/admin.html':path));if(!f.startsWith(root+'/'))throw new Error();res.setHeader('Content-Type',types[extname(f)]||'application/octet-stream');res.end(await readFile(f));}catch{res.writeHead(404).end();}
 }).listen(qaPort,'127.0.0.1',()=>console.log('Isolated UI test: http://127.0.0.1:'+qaPort+'/test-login'));

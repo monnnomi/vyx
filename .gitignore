@@ -7,3 +7,6 @@ node_modules/
 .data/
 
 .DS_Store
+
+public/assets/interface-ru/
+server/generated-interface-ru/

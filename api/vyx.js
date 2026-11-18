@@ -1,3 +1,4 @@
+import {localizeSystemResult,saveOwnerLocale} from '../server/owner-interface.js';
 import {recordPostViews} from '../server/post-views.js';
 import {taskState,verifyTasks} from '../server/x-tasks.js';
 import {recordMessageViews} from '../server/message-views.js';
@@ -16,15 +17,16 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
   if(req.method==='POST')sameOrigin(req);
   await useDB(async db=>{
    const user=await session(db,req);
+   const systemResult=result=>json(res,200,localizeSystemResult(action,result,user));
    if(req.method==='GET'){
-    if(action==='tasks')return json(res,200,await taskState(db,user));
+    if(action==='tasks')return systemResult(await taskState(db,user));
     if(action==='whitelist')return json(res,200,await nftWhitelist(db,{tier:url.searchParams.get('tier')||'all',page:url.searchParams.get('page')||1}));
     if(action==='referrals')return json(res,200,await referralBoard(db,user));
     if(action==='search')return json(res,200,await searchCommunity(db,user,url.searchParams.get('q')||''));
     if(action==='member-profile')return json(res,200,await memberProfile(db,user,url.searchParams.get('id')));
     if(action==='post-detail')return json(res,200,await postDetail(db,user,url.searchParams.get('id')));
     if(action==='handle-availability')return json(res,200,await handleAvailability(db,user,url.searchParams.get('handle')||''));
-    if(action==='state')return json(res,200,await state(db,user));
+    if(action==='state')return systemResult(await state(db,user));
     if(action==='feed')return json(res,200,{posts:await feed(db,user,{filter:url.searchParams.get('filter')||'all',author:url.searchParams.has('author')?uuid(url.searchParams.get('author')):null,cursor:url.searchParams.get('cursor')||null})});
     if(action==='comments')return json(res,200,{comments:await comments(db,url.searchParams.get('id'),user)});
     if(action==='rooms')return json(res,200,await listRooms(db,user,{filter:url.searchParams.get('filter')||'all',search:url.searchParams.get('search')||'',page:url.searchParams.get('page')||0}));
@@ -64,11 +66,12 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
     await db.q('DELETE FROM sessions WHERE token_hash=$1',[hash(cookie(req,'vyx_session'))]);setCookie(res,'vyx_session','',0);return json(res,200,{ok:true});
    }
    const data=await body(req);
-   if(action==='verify-tasks')return json(res,200,await verifyTasks(db,user,data,taskFetcher));
+   if(action==='interface-language')return json(res,200,await saveOwnerLocale(db,user,data.locale));
+   if(action==='verify-tasks')return systemResult(await verifyTasks(db,user,data,taskFetcher));
    if(action==='disconnect-task-x'){await db.q('DELETE FROM x_task_access WHERE user_id=$1',[user.id]);return json(res,200,{ok:true});}
    if(action==='drop-reveal')return json(res,200,await revealDrop(db,user,data.id));
    if(action==='notifications-read')return json(res,200,await readNotifications(db,user,data));
-   json(res,200,await mutate(db,user,action,data));
+   systemResult(await mutate(db,user,action,data));
   });
  }catch(e){handleError(res,e);}
 };}

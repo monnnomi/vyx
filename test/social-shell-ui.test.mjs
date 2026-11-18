@@ -21,3 +21,10 @@ test('a directory response from an old account does not replace the current acco
  const {ctx,directory}=setup();let finish;ctx.fetchRoomList=()=>new Promise(r=>finish=r);
  const pending=ctx.reloadRoomDirectory();ctx.data={user:{id:'bob'}};finish();await pending;assert.equal(directory.outerHTML,'original');
 });
+test('room avatars preserve the first visible character, including joined emoji',()=>{
+ const {ctx}=setup();
+ ctx.clubRoomTone=()=>0;ctx.e=value=>value;
+ for(const [name,initial] of [[' 🟩 Chat','🟩'],['👩🏽‍💻 Builders','👩🏽‍💻'],['𝙼embers','𝙼'],['lounge','L']]){
+  assert.ok(ctx.socialRoomAvatar({id:'room',name}).includes('>'+initial+'</span>'));
+ }
+});

@@ -39,7 +39,12 @@ function socialDirect(){
 }
 function socialMore(){showModal(`<h2 id="modal-title">More</h2><div class="simple-menu">${[['explore','search','Explore'],['drops','chest','Your drops'],['rewards','bookmark','Collection'],['leaderboard','trophy','Leaderboard'],['whitelist','check','Whitelist'],['settings','more','Settings']].map(([id,glyph,label])=>`<button data-action="${id}">${icon(glyph)}<span>${label}</span>${icon('arrow')}</button>`).join('')}<button data-action="rules">${icon('info')}<span>How VYX works</span></button>${data.user?.is_admin?'<a href="/admin">Admin dashboard ↗</a>':''}</div>`);}
 function socialMessageMenu(messageId){const m=roomMessages.find(m=>m.id===messageId);if(!m)return;showModal(`<h2 id="modal-title">Message</h2><p class="message-menu-excerpt">${e(m.body.slice(0,180))}</p><div class="simple-menu"><button data-room-modal-reply="${m.id}">${icon('reply')}<span>Reply to ${e(m.name)}</span></button>${m.sender_id!==data.user?.id?`<button data-report-kind="room-message" data-report-id="${m.id}">Report message</button><button data-control="blocked" data-control-id="${m.sender_id}" data-control-enabled="true">Block member</button><button data-control="muted" data-control-id="${m.sender_id}" data-control-enabled="true">Mute member</button>`:''}${roomInfo?.owner_id===data.user?.id?`<button data-room-pin="${m.id}">${icon('pin')}<span>${roomPinned?.id===m.id?'Unpin message':'Pin message'}</span></button>`:''}${m.sender_id===data.user?.id?`<button data-room-edit-message="${e(m.id)}"><span>Edit message</span></button>`:''}${m.sender_id===data.user?.id||roomInfo?.owner_id===data.user?.id?`<button class="danger-text" data-room-remove="${m.id}">${icon('trash')}<span>Remove message</span></button>`:''}</div>`);}
-function socialRoomAvatar(r){return `<span class="chat-room-avatar room-color-${clubRoomTone(r)}" aria-hidden="true">${e(r.name.slice(0,1).toUpperCase())}</span>`;}
+const roomNameSegments=typeof Intl.Segmenter==='function'?new Intl.Segmenter(undefined,{granularity:'grapheme'}):null;
+function socialRoomAvatar(r){
+ const name=r.name.trim();
+ const initial=roomNameSegments?roomNameSegments.segment(name).containing(0)?.segment:Array.from(name)[0];
+ return `<span class="chat-room-avatar room-color-${clubRoomTone(r)}" aria-hidden="true">${e((initial||'').toUpperCase())}</span>`;
+}
 function updateLatestButton(){const log=$('.room-chat-log'),button=$('[data-social-latest]');if(log&&button)button.hidden=log.scrollHeight-log.scrollTop-log.clientHeight<100;}
 document.addEventListener('click',ev=>{
  const b=ev.target.closest('button');if(!b)return;

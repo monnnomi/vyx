@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS x_task_access (
  sealed_token text NOT NULL, scopes text NOT NULL, expires_at timestamptz NOT NULL,
  connected_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
+ALTER TABLE x_task_access ADD COLUMN IF NOT EXISTS sealed_refresh_token text;
 CREATE TABLE IF NOT EXISTS x_task_awards (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id),
  x_id text NOT NULL, task_id text NOT NULL, season text NOT NULL,

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {login} from '../server/oauth.js';
-import {saveTaskAccess,taskScopes} from '../server/x-task-access.js';
+import {saveTaskAccess,taskScopes,openTaskToken} from '../server/x-task-access.js';
 import {xTasks,campaignPosts,awardTask,verifyTasks,taskState} from '../server/x-tasks.js';
 import {runAutomaticTaskChecks,taskQueueHasWork} from '../server/x-task-queue.js';
 import {runNewsJobs,dispatchNewsQueue} from '../server/news-jobs.js';
@@ -69,4 +69,65 @@ test('manual and automatic checks share the existing per-account daily cap',asyn
 test('expired provider credentials cannot mint rewards or spin an immediate background retry',async()=>{
  await reset();const user=await account(),p=provider(user,{status:401});assert.equal((await runAutomaticTaskChecks(db,p.fetcher)).awarded,0);assert.equal(p.calls.length,1);assert.equal(await taskQueueHasWork(db),false);
  assert.equal((await db.q('SELECT * FROM x_task_awards WHERE user_id=$1',[user.id])).length,0);
+});
+
+const renewableScopes = [...taskScopes, 'offline.access'].join(' ');
+async function expiredRenewable(user) {
+ await saveTaskAccess(db,user,{scope:renewableScopes,access_token:'old-access',refresh_token:'first-refresh',expires_in:7200});
+ await db.q("UPDATE x_task_access SET expires_at=clock_timestamp()-interval '1 second' WHERE user_id=$1",[user.id]);
+}
+
+test('expired renewable grant survives a status read, rotates once and awards from a scheduled check',async()=>{
+ await reset();
+ const user=await account();
+ await expiredRenewable(user);
+ const state=await taskState(db,user);
+ assert.equal(state.renewable,true);
+ assert.equal(state.connected,true);
+ assert.equal(await taskQueueHasWork(db),true);
+ const reads=provider(user);
+ let refreshes=0;
+ const result=await runAutomaticTaskChecks(db,async(url,options)=>{
+  if(url!=='https://api.x.com/2/oauth2/token')return reads.fetcher(url,options);
+  refreshes++;
+  assert.equal(options.body.get('refresh_token'),'first-refresh');
+  assert.equal(options.body.get('grant_type'),'refresh_token');
+  return Response.json({access_token:'fixture-task-token',refresh_token:'second-refresh',expires_in:7200});
+ });
+ assert.equal(result.awarded,13500);
+ assert.equal(refreshes,1);
+ const [row]=await db.q('SELECT * FROM x_task_access WHERE user_id=$1',[user.id]);
+ assert.equal(openTaskToken(row.sealed_refresh_token,'refresh:'+user.x_id),'second-refresh');
+ assert.equal((await db.q('SELECT reserved_cents FROM x_task_api_budget'))[0].reserved_cents,11);
+});
+
+test('transient refresh failures preserve consent and a revoked refresh grant requires reconnection',async()=>{
+ await reset();
+ const user=await account();
+ await expiredRenewable(user);
+ for(const [status,error,connected] of [[503,'temporarily_unavailable',true],[400,'invalid_grant',false]]) {
+  await assert.rejects(verifyTasks(db,user,{taskId:'all'},()=>Promise.resolve(Response.json({error},{status}))),e=>e.status===(connected?503:409));
+  assert.equal((await taskState(db,user)).connected,connected);
+  await db.q('DELETE FROM x_task_runs WHERE user_id=$1',[user.id]);
+ }
+ assert.equal(await taskQueueHasWork(db),false);
+ assert.equal((await db.q('SELECT * FROM x_task_api_budget')).length,0);
+});
+
+test('early access rejection renews once, meters the retry, and keeps an unrotated refresh token',async()=>{
+ await reset();
+ const user=await account();
+ await saveTaskAccess(db,user,{scope:renewableScopes,access_token:'early-expiry',refresh_token:'still-valid',expires_in:7200});
+ const calls=[];
+ const result=await verifyTasks(db,user,{taskId:xTasks[1].id},async(url,options)=>{
+  calls.push(url);
+  if(url.endsWith('/oauth2/token'))return Response.json({access_token:'replaced',expires_in:7200});
+  if(options.headers.Authorization==='Bearer early-expiry')return Response.json({},{status:401});
+  assert.equal(options.headers.Authorization,'Bearer replaced');
+  return Response.json({data:[{id:campaignPosts[0]}]});
+ });
+ assert.equal(calls.length,3);
+ assert.equal(result.awarded,1500);
+ assert.equal(result.renewable,true);
+ assert.equal((await db.q('SELECT reserved_cents FROM x_task_api_budget'))[0].reserved_cents,10);
 });

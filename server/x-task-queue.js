@@ -6,7 +6,7 @@ const definitions=JSON.stringify(xTasks.map(({id,kind})=>({id,kind})));
 async function candidate(db,includeRunning=false){
  const [row]=await db.q(`SELECT u.id,u.x_id,u.is_system FROM x_task_access a
  JOIN users u ON u.id=a.user_id LEFT JOIN x_task_runs r ON r.user_id=u.id
- WHERE clock_timestamp()>=$1::timestamptz AND a.expires_at>clock_timestamp()
+ WHERE clock_timestamp()>=$1::timestamptz AND (a.expires_at>clock_timestamp() OR a.sealed_refresh_token IS NOT NULL)
  AND a.x_id=u.x_id AND NOT u.is_system AND string_to_array(a.scopes,' ') @> $2::text[]
  AND (COALESCE(r.locked_until,'epoch')<clock_timestamp() AND COALESCE(r.checked_at,'epoch')<=clock_timestamp()-interval '15 minutes'
    OR $5::boolean AND r.locked_until>=clock_timestamp())

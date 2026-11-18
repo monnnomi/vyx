@@ -8,7 +8,7 @@ export async function startOAuth(db,binding,now=new Date(),returnTo='/',ref=null
  const state=token(),verifier=token();
  await db.q('INSERT INTO oauth_attempts(state_hash,cookie_hash,verifier,expires_at,return_to,inviter_id,expected_x_id) VALUES($1,$2,$3,$4,$5,$6,$7)',[hash(state),hash(binding),verifier,new Date(now.getTime()+600000),['/admin','/tasks'].includes(returnTo)?returnTo:'/',inviter?.id||null,returnTo==='/tasks'?expectedXId:null]);
  const url=new URL('https://x.com/i/oauth2/authorize');
- url.search=new URLSearchParams({response_type:'code',client_id:process.env.X_CLIENT_ID,redirect_uri:appURL()+'/api/auth/callback/x',scope:returnTo==='/tasks'?taskScopes.join(' '):'tweet.read users.read',state,code_challenge:challenge(verifier),code_challenge_method:'S256'});
+ url.search=new URLSearchParams({response_type:'code',client_id:process.env.X_CLIENT_ID,redirect_uri:appURL()+'/api/auth/callback/x',scope:returnTo==='/tasks'?[...taskScopes,'offline.access'].join(' '):'tweet.read users.read',state,code_challenge:challenge(verifier),code_challenge_method:'S256'});
  return url.toString();
 }
 export async function consumeAttempt(db,state,binding){

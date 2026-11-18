@@ -27,10 +27,10 @@ export async function reserveXCheckRead(db,url){
  if(!row)fail(503,'The daily X verification allowance has been reached. Your completed rewards remain safe; please check again later.');
 }
 export async function taskState(db,user){
- if(user)await db.q('DELETE FROM x_task_access WHERE user_id=$1 AND expires_at<=clock_timestamp()',[user.id]);
+ if(user)await db.q('DELETE FROM x_task_access WHERE user_id=$1 AND expires_at<=clock_timestamp() AND sealed_refresh_token IS NULL',[user.id]);
  const awards=user?await db.q('SELECT task_id,amount,created_at FROM x_task_awards WHERE x_id=$1',[user.x_id]):[];
  const checks=user?await db.q('SELECT task_id,status,detail,checked_at FROM x_task_checks WHERE user_id=$1',[user.id]):[];
- const [access]=user?await db.q('SELECT expires_at FROM x_task_access WHERE user_id=$1 AND x_id=$2 AND expires_at>clock_timestamp()',[user.id,user.x_id]):[];
+ const [access]=user?await db.q('SELECT expires_at, sealed_refresh_token IS NOT NULL AS renewable FROM x_task_access WHERE user_id=$1 AND x_id=$2 AND (expires_at>clock_timestamp() OR sealed_refresh_token IS NOT NULL)',[user.id,user.x_id]):[];
  const [budget]=await db.q("SELECT clock_timestamp() AS server_now,COALESCE((SELECT reserved_cents FROM x_task_api_budget WHERE day=(clock_timestamp() AT TIME ZONE 'UTC')::date),0) AS reserved_cents");
  const remaining=Math.max(0,taskBudgetCap()-Number(budget.reserved_cents)),reset=new Date(budget.server_now);reset.setUTCHours(24,0,0,0);
  const today=new Date(budget.server_now);today.setUTCHours(0,0,0,0);
@@ -44,7 +44,7 @@ export async function taskState(db,user){
  const pending=tasks.filter(t=>t.status!=='awarded'),limited=pending.some(t=>remaining<minimumTaskRead(t));
  const [run]=user?await db.q('SELECT checked_at,locked_until FROM x_task_runs WHERE user_id=$1',[user.id]):[];
  const nextAt=access&&pending.length?new Date(Math.max(Date.parse(taskAutomationStart()),new Date(budget.server_now).getTime(),run?new Date(run.checked_at).getTime()+900000:0,limited&&pending.every(t=>remaining<minimumTaskRead(t))?reset.getTime():0)).toISOString():null;
- return {connected:Boolean(access),expiresAt:access?.expires_at||null,total:xTaskTotal,earned:awards.reduce((n,a)=>n+a.amount,0),tasks,
+ return {connected:Boolean(access),renewable:Boolean(access?.renewable),expiresAt:access?.expires_at||null,total:xTaskTotal,earned:awards.reduce((n,a)=>n+a.amount,0),tasks,
   automation:{enabled:Boolean(access&&pending.length),startsAt:taskAutomationStart(),nextAt},
   availability:{state:!pending.length?'complete':pending.every(t=>remaining<minimumTaskRead(t))?'paused':limited?'limited':'ready',retryAt:limited?reset.toISOString():null}};
 }
@@ -88,10 +88,9 @@ export async function verifyTasks(db,user,input={},fetcher=fetch){
  const requested=input.taskId==='all'?xTasks:xTasks.filter(t=>t.id===input.taskId);if(!requested.length)fail(400,'Choose a valid task.');
  const state=await taskState(db,user),pending=requested.filter(t=>!state.tasks.find(a=>a.id===t.id&&a.status==='awarded'));
  if(!pending.length)return {...state,awarded:0};
- if(!state.connected)await getTaskAccess(db,user);
+ if(!state.connected)fail(409,'Reconnect X to enable automatic task verification.');
  if(pending.every(t=>state.tasks.find(s=>s.id===t.id)?.canCheck===false))return {...state,awarded:0};
- const access=await getTaskAccess(db,user);
- const providerFetcher=fetcher;fetcher=async(url,options)=>{await reserveXCheckRead(db,url);return providerFetcher(url,options);};
+ const providerFetcher=fetcher;
  const [run]=await db.q("INSERT INTO x_task_runs(user_id,locked_until,checked_at) VALUES($1,clock_timestamp()+interval '55 seconds',clock_timestamp()) ON CONFLICT(user_id) DO UPDATE SET locked_until=EXCLUDED.locked_until,checked_at=EXCLUDED.checked_at WHERE x_task_runs.locked_until<clock_timestamp() AND x_task_runs.checked_at<clock_timestamp()-interval '60 seconds' RETURNING user_id",[user.id]);
  if(!run)fail(429,'Please wait one minute between verification requests.');
  let awarded=0,timeline=null,likes=null,halt=null;
@@ -101,6 +100,24 @@ export async function verifyTasks(db,user,input={},fetcher=fetch){
  const sinceId=timelineTasks.map(t=>t.postId).reduce((a,b)=>!a||BigInt(b)<BigInt(a)?b:a,null);
  try{
   await limit(db,'x-task-checks:'+user.id,20,86400);
+  let access=await getTaskAccess(db,user,providerFetcher);
+  let retried=false;
+  const readFromX=async (url,options) => {
+   await reserveXCheckRead(db,url);
+   return providerFetcher(url,{...options,headers:{...options.headers,Authorization:'Bearer '+access.token}});
+  };
+  fetcher=async (url,options) => {
+   const response=await readFromX(url,options);
+   if(response.status!==401 || !access.renewable || retried)return response;
+   retried=true;
+   try {
+    access=await getTaskAccess(db,user,providerFetcher,access.sealed);
+   } catch (error) {
+    halt=error;
+    throw error;
+   }
+   return readFromX(url,options);
+  };
   for(const task of pending){
    let proof=null,detail='Action not confirmed yet. X may take a moment to update; you can check again.',status='not-verified';
    try{

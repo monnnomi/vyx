@@ -28,6 +28,7 @@ chmod -R g-w "$new"
 chmod -R g+rX "$new"
 node --env-file=/etc/vyx/vyx.env scripts/check-x-config.mjs
 node --env-file=/etc/vyx/vyx.env scripts/migrate-notifications.mjs
+node --env-file=/etc/vyx/vyx.env scripts/migrate-x-task-refresh.mjs
 ln -s "$new" /opt/vyx/current.next
 mv -Tf /opt/vyx/current.next /opt/vyx/current
 systemctl restart vyx

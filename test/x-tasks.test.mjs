@@ -23,7 +23,7 @@ async function unlock(user){await db.q('DELETE FROM x_task_runs WHERE user_id=$1
 
 test('task rewards exactly match the campaign and cannot be changed by callers',()=>{assert.deepEqual(xTasks.map(t=>t.amount),[1000,1500,2000,1500,2500,1500,2000,1500]);assert.equal(xTasks.reduce((n,t)=>n+t.amount,0),13500);assert.equal(new Set(xTasks.map(t=>t.id)).size,8);assert.ok(xTasks.slice(5).every(t=>t.postId==='2121127790556680479'&&t.url.endsWith(t.postId)));});
 test('task OAuth is read-only, bound to the signed-in X identity, with an allowlisted return',async()=>{
- const binding=token(),u=new URL(await startOAuth(db,binding,new Date(),'/tasks',null,alice.user.x_id));assert.equal(u.searchParams.get('scope'),taskScopes.join(' '));assert.doesNotMatch(u.searchParams.get('scope'),/write|offline|dm\./);
+ const binding=token(),u=new URL(await startOAuth(db,binding,new Date(),'/tasks',null,alice.user.x_id));assert.equal(u.searchParams.get('scope'),[...taskScopes,'offline.access'].join(' '));assert.doesNotMatch(u.searchParams.get('scope'),/write|dm\./);
  const a=await consumeAttempt(db,u.searchParams.get('state'),binding);assert.equal(a.return_to,'/tasks');assert.equal(a.expected_x_id,alice.user.x_id);
  const normal=new URL(await startOAuth(db,token()));assert.equal(normal.searchParams.get('scope'),'tweet.read users.read');
 });

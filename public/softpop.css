@@ -1,24 +1,26 @@
-/* VYX "Soft Pop" redesign layer. Loaded last; overrides tokens and surfaces only.
-   No behaviour changes: every selector targets existing markup. */
-
-/* ---------- Tokens ---------- */
+/* Public VYX themes. The chat, feed and personal pages share the same surfaces. */
 html body[data-interface=social][data-appearance=light]{
-  --bg:#eceef6;--panel:#fff;--panel-hover:#f3f4fa;--line:#dadde9;--text:#15172b;--muted:#555a75;
-  --accent:#5b3df5;--accent-rgb:91,61,245;--purple:#5b3df5;--blue-soft:#e7e2ff;--soft:#f3f4fa;
-  --gold:#15172b;--gold-soft:#ffd84d;--chat-bg:#fff;--bubble:#eceef6;--bubble-own:#5b3df5;--rail:#eceef6;
-  --wallpaper:none;--surface-shadow:none;--bubble-edge:transparent;--surface-highlight:transparent;
-  --sp-ink:#15172b;--sp-on-ink:#fff;--sp-sun:#ffd84d;--sp-on-sun:#15172b;--sp-own-text:#fff;--sp-card:#fff;
-  --vyx-coral:#d81b4a;--vyx-coral-soft:#ffe3ea;
+  color-scheme:light;
+  --bg:#f7f5f0; --panel:#fffefa; --panel-hover:#f1eee7; --line:#dcd8cf;
+  --text:#262823; --muted:#62665e; --accent:#92394b; --accent-rgb:146,57,75;
+  --blue-soft:#f2e5e6; --soft:#efeee8; --gold:#765827; --gold-soft:#f3ead7;
+  --chat-bg:#fbfaf6; --bubble:#eeeee8; --bubble-own:#ede1e4; --rail:#f2f0ea;
+  --chair-green:#e1e9dd; --chair-green-ink:#3c5944; --chair-ochre:#f1e6d2; --chair-ochre-ink:#765424;
 }
 html body[data-interface=social][data-appearance=dark]{
-  --bg:#0f1020;--panel:#1a1c33;--panel-hover:#24274a;--line:#2c2f52;--text:#f1f2fa;--muted:#a9aec8;
-  --accent:#a394ff;--accent-rgb:163,148,255;--purple:#a394ff;--blue-soft:#2a2659;--soft:#15172b;
-  --gold:#ffd84d;--gold-soft:#3a3413;--chat-bg:#1a1c33;--bubble:#24274a;--bubble-own:#6a4ff7;--rail:#0f1020;
-  --wallpaper:none;--surface-shadow:none;--bubble-edge:transparent;--surface-highlight:transparent;
-  --sp-ink:#f1f2fa;--sp-on-ink:#15172b;--sp-sun:#ffd84d;--sp-on-sun:#15172b;--sp-own-text:#fff;--sp-card:#1a1c33;
-  --vyx-coral:#ff6b8b;--vyx-coral-soft:#3a1826;
+  color-scheme:dark;
+  --bg:#1c1e1c; --panel:#252825; --panel-hover:#313530; --line:#41463e;
+  --text:#f3f1e9; --muted:#b5b9ad; --accent:#f0a5b2; --accent-rgb:240,165,178;
+  --blue-soft:#402f34; --soft:#30332e; --gold:#e6c992; --gold-soft:#41392a;
+  --chat-bg:#212420; --bubble:#30352f; --bubble-own:#47343b; --rail:#191c19;
+  --chair-green:#333f34; --chair-green-ink:#bed2ba; --chair-ochre:#433b2c; --chair-ochre-ink:#e5cb98;
 }
-
+html body[data-interface=social]{
+  --purple:var(--accent); --vyx-coral:var(--accent); --vyx-coral-soft:var(--blue-soft);
+  --wallpaper:none; --surface-shadow:none; --bubble-edge:transparent; --surface-highlight:transparent;
+  --sp-ink:var(--text); --sp-on-ink:var(--panel); --sp-sun:var(--gold-soft);
+  --sp-on-sun:var(--text); --sp-own-text:var(--text); --sp-card:var(--panel); --sp-edge:var(--line);
+}
 /* ---------- Base type and controls ---------- */
 html body[data-interface=social]{font-size:15px;letter-spacing:-.005em}
 html body[data-interface=social] h1,html body[data-interface=social] h2{font-weight:800;letter-spacing:-.03em}
@@ -94,11 +96,6 @@ html body[data-interface=social] .post{background:var(--panel);border:0;border-r
 html body[data-interface=social] .feed-tabs{border:0;gap:6px;padding:4px 0 14px}
 html body[data-interface=social] .feed-tab{border-radius:999px;padding:9px 18px;font-size:14px;font-weight:600;color:var(--muted);min-height:40px}
 html body[data-interface=social] .feed-tab.active{background:var(--sp-ink);color:var(--sp-on-ink)}
-html body[data-interface=social] .feed-tab.active:after{display:none}
-html body[data-interface=social] .vyx-official{background:var(--sp-sun);color:var(--sp-on-sun);border:0;border-radius:28px;box-shadow:none}
-html body[data-interface=social] .vyx-official *{color:var(--sp-on-sun)}
-html body[data-interface=social] .vyx-guide-links button{background:var(--sp-ink);color:var(--sp-on-ink);border:0;border-radius:999px;min-height:40px;padding:0 16px;font-weight:600}
-
 /* ---------- Shared page furniture ---------- */
 html body[data-interface=social] .product-heading h1,
 html body[data-interface=social] .ranking-heading h1,
@@ -125,17 +122,7 @@ html body[data-interface=social] .vyx-primary,
 html body[data-interface=social] .x-task-actions .primary,
 html body[data-interface=social] .x-task-actions a.primary{background:var(--accent);color:#fff;box-shadow:none}
 html body[data-interface=social][data-appearance=dark] .vyx-primary,
-html body[data-interface=social][data-appearance=dark] .x-task-actions .primary{background:#6a4ff7;color:#fff}
-
-/* ---------- Home (welcome) ---------- */
-html body[data-interface=social] .vyx-welcome h1{font-weight:800;letter-spacing:-.04em}
-html body[data-interface=social] .vyx-welcome h1 em,html body[data-interface=social] .vyx-welcome h1 span,
-html body[data-interface=social] .vyx-welcome h1 strong{color:var(--accent)}
-html body[data-interface=social] .vyx-quick-start{background:var(--bg);background-image:none;border:0;border-radius:28px;box-shadow:none}
-html body[data-interface=social] .vyx-first-steps li{font-size:14px}
-html body[data-interface=social] .vyx-community-note{background:var(--bg);border:0;border-radius:28px}
-html body[data-interface=social] .vyx-round-teaser{font-size:14px}
-html body[data-interface=social] .vyx-round-teaser strong{font-variant-numeric:tabular-nums}
+html body[data-interface=social][data-appearance=dark] .x-task-actions .primary{background:var(--text);color:var(--panel)}
 
 /* ---------- Messages detail ---------- */
 html body[data-interface=social] .room-message-by{font-size:12px}
@@ -155,10 +142,6 @@ html body[data-interface=social] .feed-heading{padding-inline:4px}
 html body[data-interface=social] .post-text{font-size:16px;line-height:1.5}
 html body[data-interface=social] .post-name{color:var(--text);font-weight:700;font-size:15px}
 html body[data-interface=social] .vyx-reward-summary{padding:22px;background:var(--sp-ink);color:var(--sp-on-ink)}
-html body[data-interface=social] .vyx-reward-summary *{color:var(--sp-on-ink)}
-html body[data-interface=social] .vyx-reward-summary strong,html body[data-interface=social] .vyx-reward-summary b{color:var(--sp-sun);font-size:30px;font-weight:800;letter-spacing:-.03em}
-html body[data-interface=social] .vyx-reward-summary .text-link{color:var(--sp-sun)}
-html body[data-interface=social] .quiet-rewards{padding:18px}
 html body[data-interface=social] .quiet-person{border-radius:18px}
 
 /* ---------- Quests ---------- */
@@ -213,248 +196,17 @@ html body[data-interface=social] .setting-toggle,html body[data-interface=social
  html body[data-interface=social] .mobile-nav{background:var(--panel);border:0;border-radius:28px 28px 0 0;box-shadow:0 -6px 24px #15172b12}
  html body[data-interface=social] .mobile-nav .nav-link{flex-direction:column;min-height:52px;border-radius:18px;font-size:11px}
  html body[data-interface=social] .mobile-nav .nav-link.active{background:var(--sp-ink);color:var(--sp-on-ink)}
- html body[data-interface=social] .vyx-mobile-start{background:var(--sp-sun);background-image:none;color:var(--sp-on-sun);border:0;border-radius:28px;margin:4px 12px 12px;padding:22px}
- html body[data-interface=social] .vyx-mobile-start *{color:var(--sp-on-sun)}
- html body[data-interface=social] .vyx-mobile-start h2{font-size:28px;font-weight:800;letter-spacing:-.035em}
- html body[data-interface=social] .vyx-mobile-start .vyx-primary{background:var(--sp-ink);color:var(--sp-on-ink)}
- html body[data-interface=social] .vyx-mobile-start .vyx-primary *{color:var(--sp-on-ink)}
  html body[data-interface=social] .room-thread-header{height:72px;min-height:72px;padding-inline:12px}
  html body[data-interface=social] .room-thread-header h1{font-size:17px}
  html body[data-interface=social] .room-message-content{max-width:86%}
  html body[data-interface=social] .composer,html body[data-interface=social] .post{border-radius:24px;margin-inline:10px;padding:18px}
  html body[data-interface=social] .product-heading h1{font-size:28px}
 }
-
-/* ---------- Polish ---------- */
-html body[data-interface=social] .primary.vyx-primary,
-html body[data-interface=social] .primary.vyx-primary:hover{background:var(--accent);color:#fff;box-shadow:none;font-weight:700}
-html body[data-interface=social][data-appearance=dark] .primary.vyx-primary{background:#6a4ff7;color:#fff}
-html body[data-interface=social] .primary.vyx-primary *{color:#fff}
-html body[data-interface=social] .secondary{background:var(--blue-soft);color:var(--accent)}
-html body[data-interface=social] .secondary:hover{background:var(--accent);color:#fff}
-html body[data-interface=social] .x-task-summary small{letter-spacing:0;font-size:14px;font-weight:500;color:var(--sp-on-ink)}
-html body[data-interface=social] .x-task-summary>span{font-size:13px}
-@media(max-width:720px){
- html body[data-interface=social] .room-thread-header{height:auto;min-height:72px;padding-block:8px}
- html body[data-interface=social] .vyx-mobile-start .primary.vyx-primary{background:var(--sp-ink);color:var(--sp-on-ink)}
- html body[data-interface=social] .vyx-mobile-start .primary.vyx-primary *{color:var(--sp-on-ink)}
- html body[data-interface=social] .vyx-mobile-start .text-link{color:var(--sp-on-sun);text-decoration:underline}
-}
-
-/* Feature cards stay dark in both themes so the yellow VP figure keeps its contrast. */
-html body[data-interface=social] .x-task-summary,
-html body[data-interface=social] .vyx-reward-summary,
-html body[data-interface=social] .chat-directory-footer{background:#15172b;color:#fff}
-html body[data-interface=social][data-appearance=dark] .x-task-summary,
-html body[data-interface=social][data-appearance=dark] .vyx-reward-summary,
-html body[data-interface=social][data-appearance=dark] .chat-directory-footer{background:#24274a}
-html body[data-interface=social] .x-task-summary *,
-html body[data-interface=social] .vyx-reward-summary *,
-html body[data-interface=social] .chat-directory-footer button,
-html body[data-interface=social] .chat-directory-footer .icon{color:#fff}
-html body[data-interface=social] .x-task-summary strong,
-html body[data-interface=social] .vyx-reward-summary strong,html body[data-interface=social] .vyx-reward-summary b,
-html body[data-interface=social] .vyx-reward-summary .text-link{color:#ffd84d}
-html body[data-interface=social] .x-task-summary small{color:#fff}
-html body[data-interface=social] .chat-directory-footer b{color:#15172b;background:#ffd84d}
-
-/* =====================================================================
-   Soft Pop v2 — character: ink outlines, hard offset shadows, colour
-   tiles, a bento home screen and motion. softpop.js adds the live bits.
-   ===================================================================== */
-html body[data-interface=social][data-appearance=light]{--sp-edge:#15172b;--sp-drop:#15172b;--sp-mint:#7ee0c3;--sp-coral:#ff8f73;--sp-sky:#8fc7ff;--sp-violet:#5b3df5}
-html body[data-interface=social][data-appearance=dark]{--sp-edge:#f1f2fa;--sp-drop:#000;--sp-mint:#7ee0c3;--sp-coral:#ff8f73;--sp-sky:#8fc7ff;--sp-violet:#6a4ff7}
-
-@keyframes sp-rise{from{opacity:0;transform:translateY(18px) scale(.985)}to{opacity:1;transform:none}}
-@keyframes sp-pop{0%{opacity:0;transform:scale(.9)}60%{transform:scale(1.03)}100%{opacity:1;transform:none}}
-@keyframes sp-float{0%,100%{transform:translateY(0) rotate(var(--r,0deg))}50%{transform:translateY(-12px) rotate(calc(var(--r,0deg) + 6deg))}}
-@keyframes sp-spin{to{transform:rotate(360deg)}}
-@keyframes sp-pulse{0%,100%{box-shadow:0 0 0 0 rgba(216,27,74,.5)}50%{box-shadow:0 0 0 8px rgba(216,27,74,0)}}
-
-/* --- Pop surfaces: outline + hard shadow, press to sink --- */
-html body[data-interface=social] .primary,
-html body[data-interface=social] .secondary{border:2px solid var(--sp-edge);box-shadow:3px 3px 0 var(--sp-drop);transition:transform .12s ease,box-shadow .12s ease,background .15s}
-html body[data-interface=social] .primary:hover,
-html body[data-interface=social] .secondary:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--sp-drop);opacity:1}
-html body[data-interface=social] .primary:active,
-html body[data-interface=social] .secondary:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--sp-drop)}
-html body[data-interface=social] .secondary{background:var(--panel);color:var(--text)}
-html body[data-interface=social] .secondary:hover{background:var(--sp-sun);color:var(--sp-on-sun)}
-html body[data-interface=social] .room-chat-form .primary{box-shadow:2px 2px 0 var(--sp-drop)}
-
-/* --- Rail --- */
-html body[data-interface=social] .nav-link{transition:transform .15s ease,background .15s}
-html body[data-interface=social] .nav-link:hover{transform:translateY(-2px)}
-html body[data-interface=social] .nav-link.active{border:2px solid var(--sp-edge);box-shadow:3px 3px 0 var(--sp-violet)}
-html body[data-interface=social] .brand img,html body[data-interface=social] .brand svg{transition:transform .3s cubic-bezier(.3,1.6,.5,1)}
-html body[data-interface=social] .brand:hover img,html body[data-interface=social] .brand:hover svg{transform:rotate(-8deg) scale(1.08)}
-
-/* --- Room list: colour tiles --- */
-html body[data-interface=social] .chat-room-list .room-list-item{animation:sp-rise .45s cubic-bezier(.2,.8,.2,1) both}
-html body[data-interface=social] .chat-room-list .room-list-item:nth-child(2){animation-delay:.05s}
-html body[data-interface=social] .chat-room-list .room-list-item:nth-child(3){animation-delay:.1s}
-html body[data-interface=social] .chat-room-list .room-list-item:nth-child(4){animation-delay:.15s}
-html body[data-interface=social] .chat-room-list .room-list-item:nth-child(n+5){animation-delay:.2s}
-html body[data-interface=social] .chat-room-list .room-row{border:2px solid transparent;transition:transform .15s ease,box-shadow .15s ease,border-color .15s}
-html body[data-interface=social] .chat-room-list .room-row:hover{transform:translate(-2px,-2px);border-color:var(--sp-edge);box-shadow:5px 5px 0 var(--sp-drop);background:var(--panel)}
-html body[data-interface=social] .chat-room-list .room-row.selected,
-html body[data-interface=social] .chat-room-list .room-row.selected:hover{border-color:var(--sp-edge);box-shadow:5px 5px 0 var(--sp-drop);transform:none}
-html body[data-interface=social] .chat-room-avatar{border:2px solid var(--sp-edge);border-radius:16px;color:#15172b!important;background:var(--sp-sun)!important;transform:rotate(-4deg)}
-html body[data-interface=social] .room-list-item:nth-child(5n+2) .chat-room-avatar{background:var(--sp-mint)!important;transform:rotate(3deg)}
-html body[data-interface=social] .room-list-item:nth-child(5n+3) .chat-room-avatar{background:var(--sp-coral)!important;transform:rotate(-2deg)}
-html body[data-interface=social] .room-list-item:nth-child(5n+4) .chat-room-avatar{background:var(--sp-sky)!important;transform:rotate(4deg)}
-html body[data-interface=social] .room-list-item:nth-child(5n+5) .chat-room-avatar{background:#c9bcff!important;transform:rotate(-3deg)}
-html body[data-interface=social] .room-row.selected .chat-room-avatar{background:#fff!important}
-html body[data-interface=social] .room-unread-badge{animation:sp-pop .4s .3s both}
-html body[data-interface=social] .chat-directory-footer{border:2px solid var(--sp-edge);box-shadow:5px 5px 0 var(--sp-violet);transition:transform .15s}
-html body[data-interface=social] .chat-directory-footer:hover{transform:translate(-2px,-2px)}
-html body[data-interface=social] .chat-directory-footer b{transform:rotate(-2deg);display:inline-block;border:2px solid #15172b}
-
-/* --- Conversation --- */
-html body[data-interface=social] .conversation-stage{border:2px solid var(--sp-edge);box-shadow:6px 6px 0 var(--sp-drop);margin:12px 20px 18px 0;height:calc(100% - 30px)}
-html body[data-interface=social] .room-message{animation:sp-rise .35s cubic-bezier(.2,.8,.2,1) both}
-html body[data-interface=social] .room-message.mine .room-message-content{border:2px solid var(--sp-edge);box-shadow:3px 3px 0 var(--sp-drop)}
-html body[data-interface=social] .vyx-room-progress{border:2px solid var(--sp-edge);background:var(--sp-sun);color:var(--sp-on-sun)}
-html body[data-interface=social] .vyx-room-progress *{color:var(--sp-on-sun)}
-html body[data-interface=social] .vyx-room-progress .text-link{text-decoration:underline}
-html body[data-interface=social] .vyx-room-progress.is-collapsed{background:transparent;border:0;padding:0;min-height:44px;margin-bottom:0}
-html body[data-interface=social] .vyx-room-progress.is-collapsed .vyx-room-progress-toggle,
-html body[data-interface=social] .vyx-room-progress.is-collapsed .vyx-room-progress-toggle *{color:var(--muted)}
-html body[data-interface=social] .vyx-room-progress.is-collapsed .vyx-room-progress-toggle:hover{background:var(--blue-soft);color:var(--accent)}
-html body[data-interface=social] .vyx-live-dot,html body[data-interface=social] .vyx-beta-label::before{animation:sp-pulse 1.8s infinite}
-html body[data-interface=social] .reaction-add{transition:transform .15s cubic-bezier(.3,1.6,.5,1)}
-html body[data-interface=social] .reaction-add:hover{transform:scale(1.12) rotate(-4deg)}
-
-/* --- Home: bento --- */
-html body[data-interface=social] .vyx-welcome{display:grid!important;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);grid-auto-rows:min-content;gap:18px;align-items:stretch!important;align-content:start;text-align:left;max-width:none!important;padding:36px 40px 40px!important;position:relative;overflow:auto;height:100%}
-html body[data-interface=social] .vyx-welcome>*{margin:0!important;max-width:none!important;min-width:0}
-html body[data-interface=social] .vyx-welcome .vyx-beta-label{grid-column:1;justify-self:start;background:var(--sp-ink);color:var(--sp-on-ink);border-radius:999px;padding:8px 16px;font-size:12px;letter-spacing:.1em;transform:rotate(-2deg);animation:sp-pop .5s both}
-html body[data-interface=social] .vyx-welcome h1{grid-column:1;font-size:clamp(44px,5.6vw,88px)!important;line-height:.96!important;letter-spacing:-.055em!important;font-weight:800;animation:sp-rise .6s .05s both;text-shadow:none}
-html body[data-interface=social] .vyx-welcome h1>span{color:var(--accent);position:relative;display:inline-block}
-html body[data-interface=social] .vyx-welcome h1>span::after{content:"";position:absolute;left:0;right:0;bottom:.02em;height:.16em;background:var(--sp-sun);z-index:-1;border-radius:999px;transform:scaleX(0);transform-origin:left;animation:sp-under .7s .7s cubic-bezier(.2,.8,.2,1) forwards}
-@keyframes sp-under{to{transform:scaleX(1)}}
-html body[data-interface=social] .vyx-welcome>p{grid-column:1;font-size:18px!important;line-height:1.5!important;max-width:520px!important;color:var(--muted);animation:sp-rise .6s .12s both}
-html body[data-interface=social] .vyx-welcome .welcome-actions{grid-column:1;display:flex;gap:12px;animation:sp-rise .6s .18s both}
-html body[data-interface=social] .vyx-welcome .welcome-actions .primary{min-height:56px;font-size:16px;padding-inline:28px}
-html body[data-interface=social] .vyx-welcome .welcome-actions .secondary{min-height:56px;font-size:16px;padding-inline:24px}
-/* round tile */
-html body[data-interface=social] .vyx-welcome>.vyx-round-teaser{grid-column:2;grid-row:1/5;background:var(--sp-violet);color:#fff;border:2px solid var(--sp-edge);box-shadow:6px 6px 0 var(--sp-drop);border-radius:32px;padding:28px;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;position:relative;overflow:hidden;min-height:300px;animation:sp-rise .6s .1s both}
-html body[data-interface=social] .vyx-welcome>.vyx-round-teaser>span{font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff;display:flex;flex-direction:column;gap:6px}
-html body[data-interface=social] .vyx-welcome>.vyx-round-teaser strong{font-size:clamp(48px,6vw,92px);line-height:.95;font-weight:800;letter-spacing:-.05em;color:#fff;text-transform:none}
-html body[data-interface=social] .vyx-welcome>.vyx-round-teaser small{font-size:13px;color:#e4dfff;max-width:320px}
-html body[data-interface=social] .vyx-welcome>.vyx-round-teaser::before{content:"";position:absolute;top:24px;right:24px;width:112px;height:112px;border-radius:50%;background:conic-gradient(var(--sp-sun) calc(var(--sp-round,0)*1turn),#ffffff33 0);-webkit-mask:radial-gradient(circle,transparent 38px,#000 39px);mask:radial-gradient(circle,transparent 38px,#000 39px)}
-html body[data-interface=social] .vyx-welcome>.vyx-round-teaser::after{content:"";position:absolute;top:-70px;left:-50px;width:210px;height:210px;border-radius:50%;border:2px dashed #ffffff55;animation:sp-spin 40s linear infinite}
-/* lower tiles */
-html body[data-interface=social] .vyx-welcome>.vyx-quick-start{grid-column:1/-1;background:var(--panel);border:2px solid var(--sp-edge);box-shadow:6px 6px 0 var(--sp-drop);border-radius:32px;padding:26px 28px;display:grid;grid-template-columns:1fr auto;gap:18px 24px;align-items:center;animation:sp-rise .6s .22s both}
-html body[data-interface=social] .vyx-quick-start .vyx-section-label{grid-column:1/-1;font-size:12px}
-html body[data-interface=social] .vyx-first-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:0;padding:0}
-html body[data-interface=social] .vyx-first-steps li{background:var(--bg);border-radius:22px;padding:16px;align-items:flex-start;gap:12px;border:0}
-html body[data-interface=social] .vyx-first-steps li b{font-size:16px;font-weight:800;letter-spacing:-.01em}
-html body[data-interface=social] .vyx-first-steps li small{font-size:13px;line-height:1.4;color:var(--muted)}
-html body[data-interface=social] .vyx-first-steps li>span{width:32px;height:32px;flex:0 0 32px;border-radius:50%;background:var(--panel);border:2px solid var(--sp-edge);color:var(--text);font-weight:800;display:flex;align-items:center;justify-content:center}
-html body[data-interface=social] .vyx-first-steps li.is-done>span{background:var(--sp-mint);color:#15172b}
-html body[data-interface=social] .vyx-welcome>.vyx-welcome-bottom{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;animation:sp-rise .6s .3s both}
-html body[data-interface=social] .vyx-welcome .vyx-official,
-html body[data-interface=social] .vyx-welcome .vyx-community-note{border:2px solid var(--sp-edge);box-shadow:6px 6px 0 var(--sp-drop);border-radius:32px;padding:26px 28px;margin:0}
-html body[data-interface=social] .vyx-welcome .vyx-official h2,html body[data-interface=social] .vyx-welcome .vyx-community-note h2{font-size:24px;line-height:1.1}
-html body[data-interface=social] .vyx-welcome .vyx-official p,html body[data-interface=social] .vyx-welcome .vyx-community-note p{font-size:14px;line-height:1.5}
-html body[data-interface=social] .vyx-welcome .vyx-community-note{background:var(--sp-mint);color:#15172b}
-html body[data-interface=social] .vyx-welcome .vyx-community-note *{color:#15172b}
-html body[data-interface=social] .vyx-guide-links button{transition:transform .15s}
-html body[data-interface=social] .vyx-guide-links button:hover{transform:translateY(-2px) rotate(-2deg)}
-/* floating shapes injected by softpop.js */
-html body[data-interface=social] .sp-shape{position:absolute;pointer-events:none;z-index:0;animation:sp-float 7s ease-in-out infinite;will-change:transform}
-html body[data-interface=social] .vyx-welcome>*:not(.sp-shape){position:relative;z-index:1}
-html body[data-interface=social] .sp-shape.s1{--r:-12deg;width:54px;height:54px;border-radius:16px;background:var(--sp-coral);border:2px solid var(--sp-edge);left:46%;top:34px}
-html body[data-interface=social] .sp-shape.s2{--r:10deg;width:34px;height:34px;border-radius:50%;background:var(--sp-sun);border:2px solid var(--sp-edge);left:40%;top:230px;animation-delay:-2.5s}
-html body[data-interface=social] .sp-shape.s3{--r:20deg;width:26px;height:26px;background:var(--sp-mint);border:2px solid var(--sp-edge);left:50%;top:300px;animation-delay:-4s;clip-path:none;border-radius:6px}
-
-/* --- Cards that matter: outline + shadow --- */
-html body[data-interface=social] .x-task-card,html body[data-interface=social] .x-task-summary,
-html body[data-interface=social] .account-card,html body[data-interface=social] .nft-selection,
-html body[data-interface=social] .referral-invite,html body[data-interface=social] .drop-metrics,
-html body[data-interface=social] .current-round,html body[data-interface=social] .drop-feature,
-html body[data-interface=social] .ranking-podium-card,html body[data-interface=social] .vyx-reward-summary,
-html body[data-interface=social] .social-feed>.vyx-official,html body[data-interface=social] .composer{border:2px solid var(--sp-edge);box-shadow:6px 6px 0 var(--sp-drop)}
-html body[data-interface=social] .x-task-card{transition:transform .18s ease,box-shadow .18s ease;animation:sp-rise .5s both}
-html body[data-interface=social] .x-task-card:nth-child(2){animation-delay:.06s}html body[data-interface=social] .x-task-card:nth-child(3){animation-delay:.12s}
-html body[data-interface=social] .x-task-card:nth-child(4){animation-delay:.18s}html body[data-interface=social] .x-task-card:nth-child(5){animation-delay:.24s}
-html body[data-interface=social] .x-task-card:hover{transform:translate(-3px,-3px);box-shadow:9px 9px 0 var(--sp-drop)}
-html body[data-interface=social] .x-task-amount{border:2px solid #15172b;transform:rotate(-3deg);font-size:17px;padding:5px 16px}
-html body[data-interface=social] .x-task-card:nth-child(even) .x-task-amount{transform:rotate(2deg)}
-html body[data-interface=social] .x-task-card:nth-child(3n+1) .x-task-number{background:var(--sp-violet);color:#fff}
-html body[data-interface=social] .x-task-card:nth-child(3n+2) .x-task-number{background:var(--sp-coral);color:#15172b}
-html body[data-interface=social] .x-task-card:nth-child(3n+3) .x-task-number{background:var(--sp-mint);color:#15172b}
-html body[data-interface=social] .x-task-number{border:2px solid var(--sp-edge)}
-html body[data-interface=social] .post{transition:transform .18s ease;animation:sp-rise .45s both}
-html body[data-interface=social] .post:hover{transform:translateY(-2px)}
-html body[data-interface=social] .account-avatar{border:3px solid var(--sp-edge)!important;box-shadow:4px 4px 0 var(--sp-drop)}
-html body[data-interface=social] .ranking-row.is-you{border-block:2px solid var(--sp-edge)}
-html body[data-interface=social] .product-heading h1{font-size:clamp(34px,4vw,56px);letter-spacing:-.045em;line-height:1}
-html body[data-interface=social] .product-heading{animation:sp-rise .5s both}
-html body[data-interface=social] .sp-count{display:inline-block;font-variant-numeric:tabular-nums}
-
-@media(max-width:1100px){
- html body[data-interface=social] .vyx-welcome{grid-template-columns:1fr;padding:24px!important}
- html body[data-interface=social] .vyx-welcome>.vyx-round-teaser{grid-column:1;grid-row:auto;min-height:220px}
- html body[data-interface=social] .vyx-welcome>.vyx-welcome-bottom{grid-template-columns:1fr}
- html body[data-interface=social] .vyx-first-steps{grid-template-columns:1fr}
- html body[data-interface=social] .vyx-welcome>.vyx-quick-start{grid-template-columns:1fr}
- html body[data-interface=social] .sp-shape{display:none}
-}
-@media(max-width:720px){
- html body[data-interface=social] .conversation-stage{border:0;box-shadow:none;margin:0;height:100%}
- html body[data-interface=social] .vyx-mobile-start{border:2px solid var(--sp-edge);box-shadow:5px 5px 0 var(--sp-drop)}
- html body[data-interface=social] .mobile-nav .nav-link.active{box-shadow:2px 2px 0 var(--sp-violet)}
-}
-@media(prefers-reduced-motion:reduce){
- html body[data-interface=social] *,html body[data-interface=social] *::before,html body[data-interface=social] *::after{animation:none!important;transition:none!important}
- html body[data-interface=social] .vyx-welcome h1>span::after{transform:none}
-}
-html body[data-interface=social][data-motion=reduced] *,html body[data-interface=social][data-motion=reduced] *::before,html body[data-interface=social][data-motion=reduced] *::after{animation:none!important;transition:none!important}
-html body[data-interface=social][data-motion=reduced] .vyx-welcome h1>span::after{transform:none}
-
-/* --- v2 fixes --- */
-html body[data-interface=social] .vyx-welcome h1{font-size:clamp(34px,3.7vw,54px)!important;line-height:1!important}
-html body[data-interface=social] .vyx-welcome>.vyx-quick-start{grid-template-columns:1fr}
-html body[data-interface=social] .vyx-welcome>.vyx-quick-start>.primary{justify-self:start}
-html body[data-interface=social] .sp-shape.s1{left:49%;top:28px}
-html body[data-interface=social] .sp-shape.s2{left:50%;top:340px}
-html body[data-interface=social] .sp-shape.s3{display:none}
-html body[data-interface=social] .x-task-summary .sp-count{color:#ffd84d;margin-right:10px}
-html body[data-interface=social] .x-task-summary,html body[data-interface=social] .vyx-reward-summary{box-shadow:6px 6px 0 var(--sp-violet)}
-html body[data-interface=social] .sp-count{font:inherit;color:inherit;letter-spacing:inherit;margin-right:.25em}
-html body[data-interface=social] .x-task-summary .sp-count{color:#ffd84d}
-html body[data-interface=social] .drop-metrics strong{font-size:30px}
-
-/* --- Dialogs, explore, whitelist and dark-theme details --- */
-html body[data-interface=social] .modal:not(.is-wonder){background:var(--panel);border:2px solid var(--sp-edge);border-radius:32px;box-shadow:8px 8px 0 var(--sp-drop);animation:sp-pop .3s both}
 html body[data-interface=social] .modal:not(.is-wonder) h1,html body[data-interface=social] .modal:not(.is-wonder) h2{font-size:28px;letter-spacing:-.035em;line-height:1.05}
 html body[data-interface=social] .modal:not(.is-wonder) p,html body[data-interface=social] .modal:not(.is-wonder) li{font-size:14px;line-height:1.55}
 html body[data-interface=social] .vyx-guide-tabs{gap:6px;border:0}
 html body[data-interface=social] .vyx-guide-tabs button{border:0;border-radius:999px;min-height:40px;padding:0 16px;font-size:13px;font-weight:600;background:var(--bg);color:var(--muted)}
 html body[data-interface=social] .vyx-guide-tabs button.active,html body[data-interface=social] .vyx-guide-tabs button[aria-selected=true]{background:var(--sp-ink);color:var(--sp-on-ink)}
-html body[data-interface=social] .nav-more{border-radius:22px}
-html body[data-interface=social] .discovery-room-card .room-row-cover{background:none;border:0}
-html body[data-interface=social] .discovery-room-card{border:2px solid transparent;transition:transform .15s ease,box-shadow .15s ease,border-color .15s}
-html body[data-interface=social] .discovery-room-card:hover{transform:translate(-2px,-2px);border-color:var(--sp-edge);box-shadow:5px 5px 0 var(--sp-drop)}
-html body[data-interface=social] .discovery-room-card:nth-child(5n+2) .chat-room-avatar{background:var(--sp-mint)!important}
-html body[data-interface=social] .discovery-room-card:nth-child(5n+3) .chat-room-avatar{background:var(--sp-coral)!important}
-html body[data-interface=social] .discovery-room-card:nth-child(5n+4) .chat-room-avatar{background:var(--sp-sky)!important}
-html body[data-interface=social] .whitelist-edition,html body[data-interface=social] .whitelist-personal,
-html body[data-interface=social] .whitelist-members{background:var(--panel);background-image:none;border:0;border-radius:28px;box-shadow:none}
-html body[data-interface=social] .whitelist-edition{border:2px solid var(--sp-edge);box-shadow:6px 6px 0 var(--sp-drop)}
-html body[data-interface=social] .whitelist-edition:first-child{background:var(--sp-sun);color:var(--sp-on-sun)}
-html body[data-interface=social] .whitelist-edition:first-child *{color:var(--sp-on-sun)}
-html body[data-interface=social] .whitelist-edition:nth-child(2){background:var(--sp-mint);color:#15172b}
-html body[data-interface=social] .whitelist-edition:nth-child(2) *{color:#15172b}
-html body[data-interface=social] .whitelist-members{overflow:hidden}
-html body[data-interface=social] .vyx-room-progress small,html body[data-interface=social] .vyx-room-progress .vyx-send-feedback,
-html body[data-interface=social] .vyx-room-progress p{color:var(--sp-on-sun)}
-html body[data-interface=social] .vyx-guide-tabs button[aria-pressed=true],
-html body[data-interface=social] .vyx-interest-options button[aria-pressed=true]{background:var(--sp-ink);color:var(--sp-on-ink);border-color:transparent}
-html body[data-interface=social] .vyx-interest-options button{border-radius:999px;min-height:40px;padding:0 16px;font-size:13px;font-weight:600}
-
 /* Profile recognition: a permanent social status, separate from VP. */
 html body[data-interface=social] .account-social-counts{flex-wrap:wrap;align-items:flex-start;gap:18px 28px}
 html body[data-interface=social] .account-social-counts .account-reputation-count{align-items:baseline}
@@ -465,126 +217,7 @@ html body[data-interface=social] .public-social-counts{gap:16px 24px;margin:20px
 html body[data-interface=social] .public-profile .reputation-explanation{font-size:13px;line-height:1.65}
 @media(max-width:480px){html body[data-interface=social] .account-social-counts{gap:16px 22px}html body[data-interface=social] .account-social-counts>div{min-width:calc(50% - 22px);justify-content:flex-end}html body[data-interface=social] .reputation-explanation{font-size:12px;line-height:1.65}}
 
-/* =====================================================================
-   Living first screen: masked headline, cursor-reactive stickers,
-   a tilting round tile and a marquee of the real rooms.
-   ===================================================================== */
-@keyframes sp-line-up{from{transform:translateY(110%) rotate(4deg)}to{transform:none}}
-@keyframes sp-rise-t{from{opacity:0;translate:0 22px}to{opacity:1;translate:0 0}}
-@keyframes sp-marquee{to{transform:translateX(-50%)}}
-@keyframes sp-coin{0%,100%{transform:rotateY(0)}50%{transform:rotateY(180deg)}}
-@keyframes sp-wobble{0%,100%{transform:rotate(-8deg) translateY(0)}50%{transform:rotate(8deg) translateY(-10px)}}
-@keyframes sp-shine{0%,70%{transform:translateX(-140%) skewX(-20deg)}100%{transform:translateX(260%) skewX(-20deg)}}
-@keyframes sp-sweep{to{transform:rotate(360deg)}}
-
-html body[data-interface=social] .vyx-welcome h1{animation:none}
-html body[data-interface=social] .vyx-welcome h1 .sp-line{display:block;overflow:hidden;padding-bottom:.08em;margin-bottom:-.08em}
-html body[data-interface=social] .vyx-welcome h1 .sp-line-in{display:inline-block;color:inherit;animation:sp-line-up .8s cubic-bezier(.2,.9,.2,1) both;transform-origin:left bottom}
-html body[data-interface=social] .vyx-welcome h1 .sp-line-in>span{color:var(--accent);position:relative;display:inline-block}
-html body[data-interface=social] .vyx-welcome h1 .sp-line-in>span::after{content:"";position:absolute;left:0;right:0;bottom:.04em;height:.16em;background:var(--sp-sun);z-index:-1;border-radius:999px;transform:scaleX(0);transform-origin:left;animation:sp-under .7s .9s cubic-bezier(.2,.8,.2,1) forwards}
-
-/* stickers */
-html body[data-interface=social] .vyx-welcome .sp-shape{animation:none;width:56px;height:56px;border:0;background:none;border-radius:0;display:block;transform:translate3d(calc(var(--mx,0)*var(--d,20)*1px),calc(var(--my,0)*var(--d,20)*1px),0);transition:transform .35s cubic-bezier(.2,.8,.2,1)}
-html body[data-interface=social] .vyx-welcome .sp-shape>b{display:block;width:100%;height:100%;animation:sp-wobble 6s ease-in-out infinite;filter:drop-shadow(3px 3px 0 var(--sp-drop))}
-html body[data-interface=social] .vyx-welcome .sp-shape svg{display:block;width:100%;height:100%;overflow:visible}
-html body[data-interface=social] .vyx-welcome .sp-shape.s1{left:48%;top:18px;width:52px;height:52px}
-html body[data-interface=social] .vyx-welcome .sp-shape.s2{left:47.5%;top:300px;width:68px;height:68px;display:block}
-html body[data-interface=social] .vyx-welcome .sp-shape.s2>b{animation:sp-coin 5s ease-in-out infinite}
-html body[data-interface=social] .vyx-welcome .sp-shape.s3{left:calc(55% - 34px);top:236px;width:64px;height:64px;display:block;z-index:2}
-html body[data-interface=social] .vyx-welcome .sp-shape.s3>b{animation:sp-sweep 14s linear infinite}
-html body[data-interface=social] .vyx-welcome .sp-shape.s4{left:44%;top:176px;width:58px;height:58px}
-html body[data-interface=social] .vyx-welcome .sp-shape.s4>b{animation-delay:-2s}
-html body[data-interface=social] .vyx-welcome .sp-shape.s5{right:18px;top:8px;width:44px;height:44px;z-index:2}
-html body[data-interface=social] .vyx-welcome .sp-shape.s5>b{animation-delay:-4s}
-
-/* round tile: tilt toward the cursor, sweeping second hand */
-html body[data-interface=social] .vyx-welcome>.vyx-round-teaser{animation:sp-rise-t .7s .1s both;transform:perspective(1100px) rotateY(calc(var(--mx,0)*7deg)) rotateX(calc(var(--my,0)*-7deg));transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s;transform-style:preserve-3d;will-change:transform}
-html body[data-interface=social] .vyx-welcome>.vyx-round-teaser:hover{box-shadow:10px 10px 0 var(--sp-drop)}
-html body[data-interface=social] .vyx-welcome>.vyx-round-teaser strong{display:inline-block;transform:translateZ(30px)}
-
-/* call to action */
-html body[data-interface=social] .vyx-welcome .welcome-actions .primary{position:relative;overflow:hidden}
-html body[data-interface=social] .vyx-welcome .welcome-actions .primary::after{content:"";position:absolute;inset:0;width:40%;background:#ffffff40;animation:sp-shine 4.5s ease-in-out infinite;pointer-events:none}
-
-/* marquee */
-html body[data-interface=social] .vyx-welcome>.sp-marquee{grid-column:1/-1;margin:6px -44px!important;padding:14px 0;background:var(--sp-ink);border-block:2px solid var(--sp-edge);transform:rotate(-1.2deg);display:flex;flex-direction:column;gap:10px;overflow:hidden;animation:sp-rise-t .7s .25s both}
-html body[data-interface=social] .sp-track{display:flex;gap:10px;width:max-content;animation:sp-marquee 40s linear infinite}
-html body[data-interface=social] .sp-track.rev{animation-direction:reverse}
-html body[data-interface=social] .sp-marquee:hover .sp-track{animation-play-state:paused}
-html body[data-interface=social] .sp-pill{flex:none;border:2px solid #15172b;border-radius:999px;min-height:44px;padding:0 20px;font:inherit;font-size:15px;font-weight:800;letter-spacing:-.01em;color:#15172b;background:var(--sp-sun);cursor:pointer;white-space:nowrap;transition:transform .15s cubic-bezier(.3,1.6,.5,1)}
-html body[data-interface=social] .sp-pill.c1{background:var(--sp-mint)}
-html body[data-interface=social] .sp-pill.c2{background:var(--sp-coral)}
-html body[data-interface=social] .sp-pill.c3{background:var(--sp-sky)}
-html body[data-interface=social] .sp-pill.c4{background:#c9bcff}
-html body[data-interface=social] .sp-pill:hover{transform:scale(1.08) rotate(-3deg)}
-
-@media(max-width:1100px){
- html body[data-interface=social] .vyx-welcome .sp-shape{display:none!important}
- html body[data-interface=social] .vyx-welcome>.vyx-round-teaser{transform:none}
- html body[data-interface=social] .vyx-welcome>.sp-marquee{margin-inline:-24px!important}
-}
-@media(prefers-reduced-motion:reduce){
- html body[data-interface=social] .vyx-welcome>.vyx-round-teaser,html body[data-interface=social] .vyx-welcome .sp-shape{transform:none!important}
- html body[data-interface=social] .sp-track{flex-wrap:wrap;width:auto;justify-content:center}
- html body[data-interface=social] .vyx-welcome h1 .sp-line-in>span::after{transform:none}
-}
-html body[data-interface=social][data-motion=reduced] .vyx-welcome>.vyx-round-teaser,html body[data-interface=social][data-motion=reduced] .vyx-welcome .sp-shape{transform:none!important}
-html body[data-interface=social][data-motion=reduced] .sp-track{flex-wrap:wrap;width:auto;justify-content:center}
-html body[data-interface=social][data-motion=reduced] .vyx-welcome h1 .sp-line-in>span::after{transform:none}
-html body[data-interface=social] .vyx-welcome h1>.sp-line{color:var(--text);position:static}
-html body[data-interface=social] .vyx-welcome h1>.sp-line::after{display:none}
-html body[data-interface=social] .vyx-welcome .sp-shape.s4{left:calc(55% - 36px);top:96px;z-index:2}
-html body[data-interface=social] .vyx-welcome .sp-shape.s3{left:auto;right:22px;top:372px}
-html body[data-interface=social] .vyx-welcome .sp-shape.s2{left:48.5%;top:348px}
-
-/* =====================================================================
-   Phone home: the round island, a quieter pitch, a floating tab bar.
-   One bold object per screen; everything else steps back.
-   ===================================================================== */
-html body[data-interface=social]{--sp-bar:#15172b}
-html body[data-interface=social][data-appearance=dark]{--sp-bar:#262a52}
-html body[data-interface=social] .sp-island{display:none}
-@media(max-width:720px){
- /* island */
- html body[data-interface=social] .sp-island{display:flex;align-items:center;gap:12px;width:calc(100% - 24px);margin:2px 12px 14px;padding:10px 10px 10px 12px;min-height:64px;border:0;border-radius:24px;background:var(--sp-bar);color:#fff;font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .15s ease}
- html body[data-interface=social] .sp-island[hidden]{display:none}
- html body[data-interface=social] .sp-island:active{transform:scale(.98)}
- html body[data-interface=social] .sp-island-ring{flex:0 0 40px;height:40px;border-radius:50%;background:conic-gradient(#ffd84d calc(var(--sp-round,0)*1turn),#ffffff2e 0);-webkit-mask:radial-gradient(circle,transparent 12px,#000 13px);mask:radial-gradient(circle,transparent 12px,#000 13px)}
- html body[data-interface=social] .sp-island-copy{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.15}
- html body[data-interface=social] .sp-island-label{font-size:12px;font-weight:500;color:#c5c8e0}
- html body[data-interface=social] .sp-island-time{font-size:22px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:#fff}
- html body[data-interface=social] .sp-island-chip{flex:none;display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:16px;background:#ffd84d;color:#15172b;font-size:15px;font-weight:800;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
- html body[data-interface=social] .chat-directory-footer{display:none}
-
- /* pitch: type on the page, no card; members skip it */
- html body[data-interface=social] .vyx-mobile-start{background:none;border:0;box-shadow:none;border-radius:0;margin:0 0 6px;padding:6px 16px 14px;color:var(--text)}
- html body[data-interface=social] .vyx-mobile-start *{color:inherit}
- html body[data-interface=social] .vyx-mobile-start .vyx-section-label,
- html body[data-interface=social] .vyx-mobile-start .vyx-round-teaser{display:none}
- html body[data-interface=social] .vyx-mobile-start h2{font-size:clamp(34px,10.5vw,44px);line-height:.98;letter-spacing:-.05em;font-weight:800;margin:0 0 10px;max-width:9em}
- html body[data-interface=social] .vyx-mobile-start p{font-size:16px;line-height:1.45;color:var(--muted);margin:0 0 16px;max-width:30em}
- html body[data-interface=social] .vyx-mobile-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
- html body[data-interface=social] .vyx-mobile-start .primary.vyx-primary{background:var(--accent);color:#fff;min-height:52px;padding-inline:26px;font-size:16px;border:0;box-shadow:none}
- html body[data-interface=social][data-appearance=dark] .vyx-mobile-start .primary.vyx-primary{background:#6a4ff7}
- html body[data-interface=social] .vyx-mobile-start .primary.vyx-primary *{color:#fff}
- html body[data-interface=social] .vyx-mobile-start .text-link{color:var(--text);font-size:15px;font-weight:600;text-decoration:underline;text-underline-offset:4px;min-height:44px}
- html body.sp-member[data-interface=social] .vyx-mobile-start{display:none}
-
- /* list chrome */
- html body[data-interface=social] .chat-directory-heading h1{font-size:28px}
- html body[data-interface=social] .chat-room-list .room-row,
- html body[data-interface=social] .chat-room-list .room-row:hover{box-shadow:none;transform:none;border-color:transparent}
- html body[data-interface=social] .chat-room-list .room-list-item{animation:none}
- html body[data-interface=social] .chat-directory-scroll{padding-bottom:16px}
-
- /* floating tab bar */
- html body[data-interface=social] .mobile-nav{left:10px;right:10px;bottom:calc(8px + env(safe-area-inset-bottom));width:auto;height:60px;padding:6px;gap:2px;border:0;border-radius:30px;background:var(--sp-bar);box-shadow:0 10px 30px #15172b33;align-items:center}
- html body[data-interface=social] .mobile-nav .nav-link{flex:1 1 0;height:48px;min-height:48px;flex-direction:row;gap:7px;border-radius:24px;color:#b9bdd8;background:none;box-shadow:none;border:0;font-size:13px;font-weight:700;padding:0;transition:flex-grow .25s cubic-bezier(.2,.8,.2,1),background .2s,color .2s}
- html body[data-interface=social] .mobile-nav .nav-link .nav-text{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
- html body[data-interface=social] .mobile-nav .nav-link.active{flex:2.2 1 0;background:#ffd84d;color:#15172b;box-shadow:none;border:0}
- html body[data-interface=social] .mobile-nav .nav-link.active .nav-text{position:static;width:auto;height:auto;overflow:visible;clip-path:none}
- html body[data-interface=social] .mobile-nav .nav-link .icon,html body[data-interface=social] .mobile-nav .nav-link svg{width:22px;height:22px}
-
+@media(max-width:760px){
  /* room header */
  html body[data-interface=social] .room-thread-header{align-items:center;gap:10px}
  html body[data-interface=social] .room-thread-header>div:not(.conversation-header-actions){flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
@@ -593,26 +226,6 @@ html body[data-interface=social] .sp-island{display:none}
  html body[data-interface=social] .room-thread-header .chat-room-avatar{width:40px;height:40px;flex-basis:40px;font-size:16px}
  html body[data-interface=social] .room-thread-header .icon-button{width:40px;height:40px}
 }
-@media(max-width:720px) and (prefers-reduced-motion:reduce){html body[data-interface=social] .mobile-nav .nav-link{transition:none}}
-@media(max-width:720px){
- html body[data-interface=social] .vyx-mobile-start h2{font-size:clamp(32px,9.6vw,40px);max-width:7em}
-}
-
-/* =====================================================================
-   v3 — restraint. One bold object per screen; cards go flat; motion only
-   where it answers an action or on the home sequence.
-   ===================================================================== */
-/* flat cards */
-html body[data-interface=social] .x-task-card,html body[data-interface=social] .nft-selection,
-html body[data-interface=social] .referral-invite,html body[data-interface=social] .drop-metrics,
-html body[data-interface=social] .current-round,html body[data-interface=social] .ranking-podium-card,
-html body[data-interface=social] .composer,html body[data-interface=social] .social-feed>.vyx-official,
-html body[data-interface=social] .whitelist-edition,html body[data-interface=social] .news-intro{border:0;box-shadow:none}
-html body[data-interface=social] .x-task-card,html body[data-interface=social] .x-task-card:hover,
-html body[data-interface=social] .post,html body[data-interface=social] .post:hover,
-html body[data-interface=social] .product-heading,html body[data-interface=social] .room-message{animation:none;transform:none}
-html body[data-interface=social] .x-task-card:hover{box-shadow:none}
-html body[data-interface=social] .chat-room-list .room-list-item{animation:none}
 /* page-title labels say nothing the title does not */
 html body[data-interface=social] .product-heading .eyebrow,
 html body[data-interface=social] .news-heading .eyebrow{display:none}
@@ -650,10 +263,6 @@ html body[data-interface=social] .room-chat-form{border:2px solid transparent;tr
 html body[data-interface=social] .room-chat-form:focus-within{border-color:var(--accent)}
 html body[data-interface=social] .room-chat-form .primary{border:0;box-shadow:none}
 
-/* ---------- Feed ---------- */
-html body[data-interface=social] .social-feed>.vyx-official{border-radius:24px;padding:18px 20px}
-html body[data-interface=social] .social-feed>.vyx-official h2{font-size:19px;line-height:1.2;margin:10px 0 6px}
-html body[data-interface=social] .social-feed>.vyx-official p{font-size:13px;line-height:1.5;margin:0 0 12px}
 html body[data-interface=social] .composer{border-radius:24px;padding:16px 18px}
 html body[data-interface=social] .composer textarea{font-size:16px}
 html body[data-interface=social] .composer:focus-within{outline:2px solid var(--accent);outline-offset:-2px}
@@ -668,14 +277,10 @@ html body[data-interface=social] .post-actions button:hover{background:var(--bg)
 html body[data-interface=social] .post-actions button[aria-pressed=true]{color:var(--vyx-coral)}
 html body[data-interface=social] .quiet-intro h2,html body[data-interface=social] .quiet-intro h3{font-size:22px;letter-spacing:-.03em}
 
-/* ---------- News ---------- */
-html body[data-interface=social] .news-intro{border-radius:24px}
-html body[data-interface=social] .news-filters button{border:0;box-shadow:none}
-
 /* ---------- Quests ---------- */
 html body[data-interface=social] .x-task-summary{position:relative;padding-bottom:40px;box-shadow:none;border:0}
-html body[data-interface=social] .x-task-summary::before,html body[data-interface=social] .x-task-summary::after{content:"";position:absolute;left:26px;right:26px;bottom:20px;height:8px;border-radius:4px;background:#ffffff26}
-html body[data-interface=social] .x-task-summary::after{right:auto;width:calc((100% - 52px)*var(--sp-p,0));min-width:8px;background:#ffd84d;transition:width .8s cubic-bezier(.2,.8,.2,1)}
+html body[data-interface=social] .x-task-summary::before,html body[data-interface=social] .x-task-summary::after{content:"";position:absolute;left:26px;right:26px;bottom:20px;height:8px;border-radius:4px;background:var(--line)}
+html body[data-interface=social] .x-task-summary::after{right:auto;width:calc((100% - 52px)*var(--sp-p,0));background:var(--accent);transition:width .8s cubic-bezier(.2,.8,.2,1)}
 html body[data-interface=social] .x-task-card{border-radius:24px;padding:22px}
 html body[data-interface=social] .x-task-connect{border-radius:24px}
 
@@ -708,7 +313,6 @@ html body[data-interface=social] .ranking-row.is-you *{color:var(--text)}
 
 /* v3 fixes */
 html body[data-interface=social] .drop-metrics strong{font-size:30px}
-html body[data-interface=social] .drop-metrics strong .sp-count{font-size:inherit}
 html body[data-interface=social] .vyx-room-progress-toggle{order:2}
 html body[data-interface=social] #vyx-room-progress-content{order:1}
 html body[data-interface=social] .ranking-podium-card:first-child .ranking-you{background:#15172b;color:#fff}
@@ -717,13 +321,6 @@ html body[data-interface=social] .ranking-row.is-you{border-left:0;box-shadow:no
  html body[data-interface=social] .vyx-room-progress .vyx-send-feedback{display:none}
  html body[data-interface=social] .vyx-room-progress{align-items:center}
  html body[data-interface=social] #vyx-room-progress-content{padding-top:0}
- html body[data-interface=social] .social-feed>.vyx-official{margin:4px 10px 10px;padding:14px 16px}
- html body[data-interface=social] .social-feed>.vyx-official p{display:none}
- html body[data-interface=social] .social-feed>.vyx-official h2{font-size:17px;margin:8px 0 10px}
- html body[data-interface=social] .social-feed>.vyx-official .vyx-guide-links{flex-wrap:nowrap;overflow-x:auto;margin-inline:-16px;padding-inline:16px;scrollbar-width:none}
- html body[data-interface=social] .social-feed>.vyx-official .vyx-guide-links::-webkit-scrollbar{display:none}
- html body[data-interface=social] .social-feed>.vyx-official .vyx-guide-links button{flex:none}
- html body[data-interface=social] .direct-thread .chat-bubbles{max-height:none;flex:1 1 0}
  html body[data-interface=social] .settings-panel .setting-item{gap:12px}
  html body[data-interface=social] .settings-panel .setting-item>div{min-width:0;flex:1}
  html body[data-interface=social] .settings-panel .secondary{flex:none;padding-inline:14px;font-size:13px;max-width:46%;white-space:normal}
@@ -754,4 +351,122 @@ html body[data-interface=social] .context-members{border-radius:16px;background:
 @media(max-width:720px){
  html body[data-interface=social] .public-social-counts,html body[data-interface=social] .public-profile .account-social-counts{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
-html body[data-interface=social] .room-context{width:min(360px,100%)}
+
+/* Welcome spread. The header and points note stay outside the photograph. */
+.club-welcome {
+  container-type:inline-size;
+  width:min(100%,1120px); margin:auto; padding:clamp(26px,4vw,74px);
+  text-align:left; color:var(--text);
+}
+.club-issue {display:flex; align-items:center; gap:13px; padding-bottom:18px; border-bottom:1px solid var(--line); font-size:13px; color:var(--muted)}
+.club-wordmark {color:var(--text); font-size:23px; font-weight:800; letter-spacing:-.09em; line-height:1; padding-right:14px; border-right:1px solid var(--line)}
+.club-feature {display:grid; grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr); gap:clamp(24px,4cqw,64px); align-items:center; margin:30px 0}
+html body[data-interface=social] .club-feature h1 {
+  font:400 clamp(54px,8.8cqw,96px)/.99 'Instrument Serif',Georgia,serif;
+  letter-spacing:-.035em; margin:0; color:var(--text);
+}
+.club-feature h1 em {display:block; color:var(--accent); font-weight:400}
+.club-feature-copy>p {max-width:36ch; margin:22px 0 26px; color:var(--muted); font-size:clamp(15px,2.1cqw,18px); line-height:1.55}
+.club-photo {display:block; overflow:hidden; border-radius:clamp(12px,2cqw,24px); background:var(--gold-soft)}
+.club-photo img {display:block; width:100%; height:clamp(310px,44cqw,490px); object-fit:cover; object-position:50% 58%}
+.club-actions {display:flex; align-items:center; flex-wrap:wrap; gap:8px 17px}
+.club-actions .primary {display:inline-flex; align-items:center; gap:11px}
+.club-signin,.club-points button,.club-mobile-intro button {border:0; background:none; min-height:44px; padding:4px 0; color:var(--accent); font-size:14px; font-weight:600}
+.club-signin:hover,.club-points button:hover,.club-mobile-intro button:hover {text-decoration:underline; text-underline-offset:4px}
+.club-points {display:flex; align-items:center; justify-content:space-between; gap:16px; border-top:1px solid var(--line); padding-top:16px}
+.club-points strong {font-size:15px; font-weight:600}
+.club-points p {color:var(--muted); font-size:14px; line-height:1.5; margin:4px 0 0}
+.club-points button {display:inline-flex; align-items:center; gap:7px; white-space:nowrap}
+.club-mobile-intro {display:none}
+@container (max-width:520px) {
+  .club-feature {grid-template-columns:1fr; gap:22px; margin:22px 0}
+  .club-photo img {height:clamp(160px,43cqw,240px)}
+  .club-feature-copy>p {max-width:45ch; margin:14px 0}
+  .club-points {align-items:start; flex-wrap:wrap; gap:2px 12px}
+}
+
+/* A quiet directory, with consistent room colours in both list and thread. */
+html body[data-interface=social] .sidebar {background:var(--rail); border-right:1px solid var(--line)}
+html body[data-interface=social] .nav-link {border-radius:12px; font-size:12px; min-height:51px; font-weight:500}
+html body[data-interface=social] .nav-link.active {background:var(--blue-soft); color:var(--accent); box-shadow:none}
+html body[data-interface=social] .nav-settings {border-radius:12px; background:var(--panel)}
+html body[data-interface=social] .chat-directory {padding-top:0; border-right:1px solid var(--line); background:var(--panel)}
+html body[data-interface=social] .chat-directory-heading {height:78px; padding:19px 20px 12px}
+html body[data-interface=social] .chat-directory-heading h1,html body[data-interface=social] .feed-heading h1 {font-weight:600; font-size:28px; letter-spacing:-.045em}
+html body[data-interface=social] .room-search {background:var(--soft); border-radius:11px; min-height:43px}
+html body[data-interface=social] .chat-list-tabs button {padding:7px 13px; font-weight:500}
+html body[data-interface=social] .chat-list-tabs button.active {background:var(--panel-hover); color:var(--text); font-weight:650}
+html body[data-interface=social] .chat-room-list .room-list-item {margin:0; border-bottom:1px solid var(--line)}
+html body[data-interface=social] .chat-room-list .room-row {border-radius:10px; background:none; padding:13px 11px; min-height:72px}
+html body[data-interface=social] .chat-room-list .room-row:hover {background:var(--panel-hover)}
+html body[data-interface=social] .chat-room-list .room-row.selected,html body[data-interface=social] .chat-room-list .room-row.selected:hover {background:var(--blue-soft); box-shadow:inset 3px 0 var(--accent)}
+html body[data-interface=social] .chat-room-list .room-row-name {color:var(--text); font-size:15px; font-weight:600; line-height:1.35}
+html body[data-interface=social] .chat-room-list :is(.room-row-description,.room-row-preview,.room-current-topic,.room-row-byline,.room-row-tail time) {color:var(--muted); font-size:13px; line-height:1.45}
+html body[data-interface=social] .chat-room-avatar {border:0; border-radius:12px; font-weight:600; background:var(--blue-soft); color:var(--accent)}
+html body[data-interface=social] .chat-room-avatar.room-color-1 {background:var(--chair-green); color:var(--chair-green-ink)}
+html body[data-interface=social] .chat-room-avatar.room-color-2 {background:var(--chair-ochre); color:var(--chair-ochre-ink)}
+html body[data-interface=social] .room-row-cover {background:none; border:0; border-radius:12px}
+html body[data-interface=social] .chat-directory-footer {border-top:1px solid var(--line); border-radius:0; margin:0; padding:6px 18px; background:var(--panel)}
+html body[data-interface=social] .chat-directory-footer :is(button,.icon,b) {color:var(--text)}
+html body[data-interface=social] .chat-directory-footer b {background:var(--soft); font-weight:600}
+html body[data-interface=social] .conversation-stage {border:0; border-radius:0; margin:0; height:100%; background:var(--chat-bg)}
+html body[data-interface=social] .conversation-stage:has(>.club-welcome) {display:flex; flex-direction:column; overflow-y:auto}
+html body[data-interface=social] .room-thread-header {border-bottom:1px solid var(--line)}
+html body[data-interface=social] .room-message-content>p {font-size:15px; line-height:1.55}
+html body[data-interface=social] .room-message.mine .reaction-add {background:var(--soft); color:var(--text)}
+html body[data-interface=social] :is(.nav-more,.chat-list-order,.room-history-tools,.account-body small,.room-message time,.room-message-by time,.vyx-guide-list,.setting-item small) {font-size:12px}
+html body[data-interface=social] .room-chat-form .primary {background:var(--text); color:var(--panel)}
+html body[data-interface=social] .modal:not(.is-wonder) {background:var(--panel); border:1px solid var(--line); border-radius:18px; box-shadow:0 14px 55px #1112}
+html body[data-interface=social] :is(.post,.composer,.account-card,.referral-invite,.nft-selection,.settings-panel,.x-task-card,.ranking-podium-card,.news-card) {border:1px solid var(--line); border-radius:16px; box-shadow:none}
+html body[data-interface=social] .x-task-summary {background:var(--panel); border:1px solid var(--line); border-radius:16px; color:var(--text)}
+html body[data-interface=social] .x-task-summary :is(strong,b,small,span) {color:var(--text)}
+html body[data-interface=social] .vyx-guide-tabs button[aria-pressed=true] {background:var(--blue-soft); color:var(--accent)}
+html body[data-interface=social] .primary.vyx-primary,html body[data-interface=social] .x-task-actions .primary {background:var(--text); color:var(--panel)}
+html body[data-interface=social] .ranking-row.is-you {background:var(--blue-soft); box-shadow:inset 3px 0 var(--accent)}
+html body[data-interface=social] .account-cover {background:linear-gradient(110deg,var(--chair-green),var(--soft) 52%,var(--blue-soft))}
+@media(max-width:760px){
+  html body[data-interface=social] .messenger-workspace:not(.has-active) .conversation-stage {display:none}
+  html body[data-interface=social] .chat-directory {border:0}
+  html body[data-interface=social] .chat-directory-heading {height:64px; padding:10px 19px}
+  .club-mobile-intro {display:block; border-block:1px solid var(--line); margin-bottom:15px; padding:14px 20px 6px; background:var(--bg)}
+  html body[data-interface=social] .club-mobile-intro h2 {font:400 34px/1.07 'Instrument Serif',Georgia,serif; margin:0; letter-spacing:-.025em}
+  .club-mobile-intro p {font-size:14px; color:var(--muted); line-height:1.45; margin:6px 0 0; max-width:45ch}
+  .chat-directory:has(.club-mobile-intro) .chat-directory-footer {display:none}
+  html body[data-interface=social] .mobile-nav {background:var(--panel); border:0; border-top:1px solid var(--line); box-shadow:none; border-radius:0}
+  html body[data-interface=social] .mobile-nav .nav-link {min-width:0; min-height:48px; gap:4px; padding:5px 1px; font-size:11px; font-weight:500}
+  html body[data-interface=social] .mobile-nav .nav-link.active {background:var(--blue-soft); color:var(--accent)}
+  html body[data-interface=social] .room-search input,html body[data-interface=social] .room-chat-form textarea {font-size:16px}
+}
+@media(max-width:760px) and (max-height:620px){
+  .club-mobile-intro {padding-block:4px; margin-bottom:6px}
+  .club-mobile-intro h2 {display:none}
+  html body[data-interface=social] .chat-directory-heading {height:51px}
+}
+html body[data-interface=social] .chat-room-list .room-row-info .room-row-name {font-size:16px; font-weight:600}
+@media(min-height:621px) and (max-width:760px){
+  .club-mobile-intro {
+    display:grid; grid-template-columns:minmax(0,1fr) clamp(74px,23vw,110px);
+    column-gap:14px; align-items:start;
+  }
+  .club-mobile-intro::after {
+    content:""; grid-area:1/2/4/3; align-self:center; width:100%; aspect-ratio:1/1.12;
+    border-radius:45% 45% 8px 8px; background:var(--soft) url('/assets/conversation-club-small-v1.webp') 52% 55%/cover;
+  }
+  .club-mobile-intro>* {grid-column:1}
+  .club-mobile-intro button {justify-self:start}
+}
+/* Leave an independent hit area beside the views indicator. */
+html body[data-interface=social] .room-message-content .message-reactions {padding-inline-end:41px; min-height:36px}
+html body[data-interface=social] .room-message-actions {bottom:6px; right:4px}
+html body[data-interface=social] .room-message-actions button {width:36px; min-width:36px; height:36px; min-height:36px; align-items:center; justify-content:center}
+html body[data-interface=social] .room-message:hover .room-message-actions,html body[data-interface=social] .room-message:focus-within .room-message-actions {opacity:1}
+html body[data-interface=social] .room-wonder-invitation strong {font-size:14px; font-weight:600}
+html body[data-interface=social] .room-wonder-invitation span>span {font-size:12px; line-height:1.45}
+html body[data-interface=social] .vyx-room-progress .vyx-send-feedback[role=status] {display:block; white-space:normal}
+@media(max-width:760px) {
+  html body[data-interface=social] .room-message-actions {opacity:1}
+  html body[data-interface=social] .room-message-actions button {width:44px; height:44px}
+  html body[data-interface=social] .room-message-content .message-reactions {padding-inline-end:46px}
+}
+
+html body[data-interface=social] .chat-room-list .room-row.selected :is(.room-unread-badge,.room-mention-badge) {color:var(--sp-on-ink)}

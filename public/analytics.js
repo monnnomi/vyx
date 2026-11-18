@@ -95,7 +95,7 @@
  function open(){
   if(document.getElementById('analytics-consent'))return;
   const box=document.createElement('aside');box.id='analytics-consent';box.className='analytics-consent';box.setAttribute('aria-label','Analytics preferences');box.setAttribute('role','region');
-  box.innerHTML='<strong>Help us understand VYX.</strong><p>Allow Google Analytics, Yandex Metrica and Vercel Analytics to measure visits and app sections, plus anonymous VYX action counts to improve search and conversations. We do not send your messages or profile details. <a href="/privacy.html#analytics">Privacy</a></p><div><button class="secondary" data-analytics-choice="denied">No thanks</button><button class="primary" data-analytics-choice="granted">Allow analytics</button></div>';
+  box.innerHTML='<strong>Optional analytics</strong><p>Allow Google Analytics, Yandex Metrica and Vercel Analytics to count visits and actions? Messages and profile details stay private. <a href="/privacy.html#analytics">Privacy</a></p><div><button class="secondary" data-analytics-choice="denied">No thanks</button><button class="primary" data-analytics-choice="granted">Allow analytics</button></div>';
   document.body.appendChild(box);
  }
  window.VYXAnalytics={open,preference,track};

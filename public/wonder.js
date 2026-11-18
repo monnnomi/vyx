@@ -59,7 +59,7 @@ async function hydrateRoomWonder(d,owner){
 function roomWonderHTML(id){
  if(!data.user||wonderOwner!==data.user.id||wonderReceipt?.revealedAt||!wonderReceipt)return '';
  const own=wonderReceipt.rooms.find(r=>r.id===id);if(!own)return '';
- return `<button class="room-wonder-invitation" data-drop-open="${e(wonderReceipt.id)}"><span class="room-wonder-art"><img src="/assets/wonder/reliquary-closed.webp" width="120" height="80" alt=""></span><span><small>YOUR ROOM DROP HAS ARRIVED</small><strong>A moment you made together.</strong><span>${fmt(own.amount)} VP recorded · Reveal your round</span></span><b aria-hidden="true">↗</b></button>`;
+ return `<button class="room-wonder-invitation" data-drop-open="${e(wonderReceipt.id)}"><span class="room-wonder-art"><img src="/assets/wonder/reliquary-closed.webp" width="120" height="80" alt=""></span><span><small>YOUR ROOM DROP HAS ARRIVED</small><strong>Your room drop is ready</strong><span>${fmt(own.amount)} VP recorded · Reveal your round</span></span><b aria-hidden="true">↗</b></button>`;
 }
 function updateRoomWonder(){
  const slot=document.querySelector('[data-room-wonder-slot]');if(slot&&typeof activeRoom!=='undefined'){const log=document.querySelector('.room-chat-log'),bottom=log&&log.scrollHeight-log.scrollTop-log.clientHeight<65;slot.innerHTML=roomWonderHTML(activeRoom);if(bottom)log.scrollTop=log.scrollHeight;}

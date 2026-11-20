@@ -14,7 +14,7 @@ function socialLiveBoard(){
  if(!live&&!rooms.length)return '';
  return `<section class="club-live" aria-label="Live on VYX">
    ${live?`<div class="club-live-round"><span>Round closes in</span><strong data-farm-end="${farmEscape(f.current.endsAt)}">${farmCountdown(f.current.endsAt)}</strong><small>Eligible room messages share each round’s VP.</small></div>`:''}
-   ${rooms.length?`<div class="club-live-rooms"><h3>Most active rooms</h3>${rooms.map(r=>`<button class="club-live-room" data-room-open="${r.id}"><span class="club-live-avatar" aria-hidden="true">${socialRoomAvatar(r)}</span><span class="club-live-name"><b>${e(r.name)}</b><small>${fmt(r.member_count)} ${Number(r.member_count)===1?'member':'members'}</small></span>${icon('arrow')}</button>`).join('')}</div>`:''}
+   ${rooms.length?`<div class="club-live-rooms"><h3>Most active rooms</h3>${rooms.map(r=>`<button class="club-live-room" data-room-open="${r.id}"><span class="club-live-avatar" aria-hidden="true">${socialRoomAvatar(r)}</span><span class="club-live-name"><b>${e(r.name)}</b><span class="club-live-intro">${roomIntro(r)}</span><small>${fmt(r.member_count)} ${Number(r.member_count)===1?'member':'members'}</small></span>${icon('arrow')}</button>`).join('')}</div>`:''}
  </section>`;
 }
 function socialWelcome(){

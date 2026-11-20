@@ -1,5 +1,5 @@
 [Unit]
-Description=VYX automatic quests and news
+Description=VYX automatic quest checks
 After=vyx.service
 [Service]
 Type=oneshot

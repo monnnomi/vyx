@@ -6,9 +6,14 @@ import {login} from '../server/oauth.js';
 import {saveTaskAccess,taskScopes,openTaskToken} from '../server/x-task-access.js';
 import {xTasks,campaignPosts,awardTask,verifyTasks,taskState} from '../server/x-tasks.js';
 import {runAutomaticTaskChecks,taskQueueHasWork} from '../server/x-task-queue.js';
-import {runNewsJobs,dispatchNewsQueue} from '../server/news-jobs.js';
-import {reserveNewsCost} from '../server/news-budget.js';
+import {createNewsCronHandler} from '../api/news-cron.js';
 
+async function scheduled(fetcher){
+ const res={setHeader(){},end(s){this.result=JSON.parse(s);}};
+ await createNewsCronHandler(fn=>fn(db),fetcher)({method:'GET',headers:{authorization:'Bearer fixture-cron'}},res);
+ assert.equal(res.statusCode,200);
+ return res.result;
+}
 const pg=new PGlite();await pg.exec(await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'));
 const wrap=p=>({q:async(s,a=[])=>(await p.query(s,a)).rows,tx:fn=>p.transaction(t=>fn(wrap(t)))}),db=wrap(pg);
 process.env.VYX_APP_SECRET='isolated-queue-secret';process.env.X_TASK_DAILY_BUDGET_CENTS='100';process.env.X_TASK_AUTOMATION_START_AT='2000-01-01T00:00:00Z';process.env.CRON_SECRET='fixture-cron';process.env.PUBLIC_APP_URL='https://joinvyx.com';
@@ -42,24 +47,25 @@ test('unconfirmed actions back off for fifteen minutes; disconnecting cancels ba
  await db.q("UPDATE x_task_runs SET checked_at=clock_timestamp()-interval '16 minutes' WHERE user_id=$1",[user.id]);assert.equal(await taskQueueHasWork(db),true);
  await db.q('DELETE FROM x_task_access WHERE user_id=$1',[user.id]);assert.equal(await taskQueueHasWork(db),false);
 });
-test('quest checks run before news and delay new news reservations only while a fundable check is due',async()=>{
- await reset();const user=await account(),p=provider(user);await db.q('UPDATE news_settings SET enabled=true');
- await assert.rejects(reserveNewsCost(db,'ai',1),/waiting for automatic quest/);assert.equal((await db.q('SELECT * FROM news_budget')).length,0);
- const result=await runNewsJobs(db,p.fetcher);assert.equal(result.status,'quest-priority');assert.equal(result.tasks.awarded,13500);assert.equal(result.processed,0);assert.equal(p.calls.length,3);
- await reserveNewsCost(db,'ai',1);assert.equal((await db.q('SELECT reserved_cents FROM news_budget'))[0].reserved_cents,1);
+test('scheduled checks award verified quests without touching archived news funds',async()=>{
+ await reset();const user=await account(),p=provider(user);
+ await db.q('UPDATE news_settings SET enabled=true,auto_publish=true');
+ const result=await scheduled(p.fetcher);
+ assert.equal(result.awarded,13500);assert.equal(p.calls.length,3);
+ assert.deepEqual(await db.q('SELECT * FROM news_budget'),[]);
 });
-test('the exhausted quest allowance is retained and never borrows the independent news budget',async()=>{
+test('scheduled checks respect the remaining daily quest allowance',async()=>{
  await reset();const user=await account();await awardTask(db,user,xTasks[0],'prior-follow-proof');await db.q("INSERT INTO x_task_api_budget(day,reserved_cents) VALUES((clock_timestamp() AT TIME ZONE 'UTC')::date,98)");
- assert.equal(await taskQueueHasWork(db),false);assert.equal((await runAutomaticTaskChecks(db,()=>{throw Error('Cap prevents X reads');})).status,'idle');
- assert.equal((await db.q('SELECT reserved_cents FROM x_task_api_budget'))[0].reserved_cents,98);await db.q('UPDATE news_settings SET enabled=true');await reserveNewsCost(db,'ai',1);
- assert.equal((await db.q('SELECT reserved_cents FROM x_task_api_budget'))[0].reserved_cents,98);assert.equal((await db.q('SELECT reserved_cents FROM news_budget'))[0].reserved_cents,1);
+ assert.equal(await taskQueueHasWork(db),false);assert.equal((await scheduled(()=>assert.fail('Cap prevents X reads'))).status,'idle');
+ assert.equal((await db.q('SELECT reserved_cents FROM x_task_api_budget'))[0].reserved_cents,98);
+ assert.deepEqual(await db.q('SELECT * FROM news_budget'),[]);
 });
 test('an in-flight verification holds priority without duplicate X calls or a worker dispatch loop',async()=>{
  await reset();const user=await account(),p=provider(user);await db.q('UPDATE news_settings SET enabled=true');let release,started;const began=new Promise(r=>started=r),gate=new Promise(r=>release=r);
  const first=runAutomaticTaskChecks(db,async(...args)=>{started();await gate;return p.fetcher(...args);});await began;
  assert.equal(await taskQueueHasWork(db),false);assert.equal(await taskQueueHasWork(db,{includeRunning:true}),true);
- assert.equal((await runAutomaticTaskChecks(db,p.fetcher)).status,'already-running');await assert.rejects(reserveNewsCost(db,'ai',1),/waiting for automatic quest/);
- await dispatchNewsQueue(db,()=>{throw Error('Do not spin while another worker owns the check');});release();assert.equal((await first).awarded,13500);assert.equal(p.calls.length,3);
+ assert.equal((await scheduled(()=>assert.fail('Do not contact X or dispatch more work'))).status,'already-running');
+ release();assert.equal((await first).awarded,13500);assert.equal(p.calls.length,3);
 });
 test('manual and automatic checks share the existing per-account daily cap',async()=>{
  await reset();const user=await account();await db.q("INSERT INTO rate_limits(bucket,window_start,count) VALUES($1,floor(extract(epoch FROM clock_timestamp())/86400)*86400,20)",['x-task-checks:'+user.id]);

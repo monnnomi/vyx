@@ -2,11 +2,11 @@ import {test,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import {calculateNewsPacing,newsSpendState,reserveNewsCost,newsPublicationState} from '../server/news-budget.js';
-import {reserveBatchRead,settleBatchRead,collectNewsBatches} from '../server/news-batch.js';
-import {runNewsPipeline} from '../server/news-pipeline.js';
-import {newsQueueHasWork,runNewsJobs} from '../server/news-jobs.js';
-import {validNewsSelection} from '../server/news-selection.js';
+import {calculateNewsPacing,newsSpendState,reserveNewsCost,newsPublicationState} from './legacy-news/news-budget.js';
+import {reserveBatchRead,settleBatchRead,collectNewsBatches} from './legacy-news/news-batch.js';
+import {runNewsPipeline} from './legacy-news/news-pipeline.js';
+import {newsQueueHasWork,runNewsJobs} from './legacy-news/news-jobs.js';
+import {validNewsSelection} from './legacy-news/news-selection.js';
 const pg=new PGlite();await pg.exec(await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'));
 let now=new Date();const today=now.toISOString().slice(0,10);
 // Deterministic database clock in the isolated fixture, never production time overrides.

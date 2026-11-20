@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {obviousNewsNoise} from './news-policy.js';
-import {extractNewsPhotos} from './news-media.js';
+import {extractNewsPhotos} from '../../server/news-media.js';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 export function normalizeNewsPost(post,source,now=new Date()){
  if(!/^[0-9]{1,20}$/.test(String(post.id))||String(post.author_id)!==source.x_user_id)return null;

@@ -1,8 +1,30 @@
+// Keep the existing scheduler URL for installations that use it for X quests.
+import {timingSafeEqual} from 'node:crypto';
 import {waitUntil} from '../server/background.js';
 import {withDB} from '../server/db.js';
-import {fail,handleError,json} from '../server/http.js';
-import {requireNewsCron} from '../server/news-pipeline.js';
-import {runNewsJobs,dispatchNewsQueue} from '../server/news-jobs.js';
-import {createNewsWorkerHandler} from '../server/news-worker.js';
-export function createNewsCronHandler(useDB=withDB,fetcher=fetch,background=waitUntil){const worker=createNewsWorkerHandler(useDB,fetcher,background);return async(req,res)=>{try{if(req.method==='POST')return worker(req,res);if(req.method!=='GET')fail(405,'Method not allowed.');requireNewsCron(req);await useDB(async db=>{const result=await runNewsJobs(db,fetcher);if((await db.q('SELECT collection_mode FROM news_settings WHERE id=1'))[0].collection_mode==='batch')background(useDB(d=>dispatchNewsQueue(d,fetcher)).catch(()=>console.error('VYX news worker dispatch failed')));json(res,200,result);});}catch(error){handleError(res,error);}};}
+import {appURL,fail,handleError,hash,json} from '../server/http.js';
+import {runAutomaticTaskChecks,taskQueueHasWork} from '../server/x-task-queue.js';
+
+export function createNewsCronHandler(useDB=withDB,fetcher=fetch,background=waitUntil){
+ async function run(db){
+  const tasks=await runAutomaticTaskChecks(db,fetcher);
+  if(tasks.status!=='already-running'&&await taskQueueHasWork(db)){
+   const result=await fetcher(new URL('/api/news-cron',appURL()).href,{method:'POST',redirect:'error',signal:AbortSignal.timeout(5000),headers:{Authorization:'Bearer '+process.env.CRON_SECRET}});
+   if(!result.ok)throw Error('Quest worker dispatch failed.');
+  }
+  return tasks;
+ }
+ return async(req,res)=>{
+  try{
+   if(!['GET','POST'].includes(req.method))fail(405,'Method not allowed.');
+   const expected=process.env.CRON_SECRET,actual=req.headers.authorization||'';
+   if(!expected||!timingSafeEqual(Buffer.from(hash(actual)),Buffer.from(hash('Bearer '+expected))))fail(401,'Unauthorized.');
+   if(req.method==='POST'){
+    background(useDB(run).catch(()=>console.error('VYX automatic quest check failed')));
+    return json(res,202,{accepted:true});
+   }
+   json(res,200,await useDB(run));
+  }catch(error){handleError(res,error);}
+ };
+}
 export default createNewsCronHandler();

@@ -10,7 +10,7 @@ NODE_ENV=production VYX_RUNTIME=node node scripts/build-analytics.mjs
 node scripts/build-media.mjs
 node scripts/build-drop-audio.mjs
 node scripts/build-interface-ru.mjs
-COPYFILE_DISABLE=1 tar -czf "$archive" public api server scripts locales package.json package-lock.json analytics-settings.json vercel.json
+COPYFILE_DISABLE=1 tar -czf "$archive" public api server scripts locales db/manual-news.sql package.json package-lock.json analytics-settings.json vercel.json
 scp -F "$config" "$archive" "$target:/root/vyx-release-$release.tar.gz"
 ssh -F "$config" "$target" sh -s -- "$release" <<'REMOTE'
 set -eu
@@ -31,11 +31,13 @@ node --env-file=/etc/vyx/vyx.env scripts/check-x-config.mjs
 node --env-file=/etc/vyx/vyx.env scripts/migrate-notifications.mjs
 node --env-file=/etc/vyx/vyx.env scripts/migrate-x-task-refresh.mjs
 node --env-file=/etc/vyx/vyx.env scripts/migrate-owner-locale.mjs
+node --env-file=/etc/vyx/vyx.env scripts/migrate-manual-news.mjs
 ln -s "$new" /opt/vyx/current.next
 mv -Tf /opt/vyx/current.next /opt/vyx/current
 systemctl restart vyx
 for attempt in 1 2 3 4 5 6 7 8 9 10; do
  if curl -fsS http://127.0.0.1:4173/healthz >/dev/null &&
+    curl -fsS -o /dev/null http://127.0.0.1:4173/api/news &&
     curl -fsS -o /dev/null http://127.0.0.1:4173/softpop.css &&
     curl -fsS -o /dev/null http://127.0.0.1:4173/softpop.js &&
     curl -fsS -o /dev/null 'http://127.0.0.1:4173/api/vyx?action=tasks' &&

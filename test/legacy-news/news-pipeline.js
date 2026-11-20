@@ -1,10 +1,10 @@
 import {createHash,randomUUID,timingSafeEqual} from 'node:crypto';
-import {fail} from './http.js';
-import {newsCategories,reserveNewsCost} from './news.js';
+import {fail} from '../../server/http.js';
+import {newsCategories,reserveNewsCost} from './admin.js';
 import {newsAIConfig,newsAIStatus} from './news-ai.js';
 import {newsSourceContext,draftInstructions,verifyInstructions} from './news-policy.js';
 import {enqueueNewsPost} from './news-queue.js';
-import {newsMediaFields} from './news-media.js';
+import {newsMediaFields} from '../../server/news-media.js';
 import {newsAIRequest as ai} from './news-ai-client.js';
 import {newsSpendState,newsPublicationState} from './news-budget.js';
 import {selectNewsCandidates} from './news-selection.js';

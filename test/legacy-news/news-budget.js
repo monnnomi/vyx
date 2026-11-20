@@ -1,5 +1,5 @@
-import {fail} from './http.js';
-import {taskQueueHasWork} from './x-task-queue.js';
+import {fail} from '../../server/http.js';
+import {taskQueueHasWork} from '../../server/x-task-queue.js';
 
 export const newsClock=async db=>new Date((await db.q('SELECT clock_timestamp() AS news_now'))[0].news_now);
 const stamp=(day,hour)=>new Date(Date.parse(day+'T00:00:00Z')+hour*3600000).toISOString();

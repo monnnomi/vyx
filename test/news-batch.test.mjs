@@ -2,9 +2,9 @@ import {test,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import {buildNewsBatches,collectNewsBatches,reserveBatchRead,settleBatchRead} from '../server/news-batch.js';
-import {newsAdminWrite,newsAdminState,reserveNewsCost} from '../server/news.js';
-import {runNewsJobs,newsQueueHasWork,dispatchNewsQueue} from '../server/news-jobs.js';
+import {buildNewsBatches,collectNewsBatches,reserveBatchRead,settleBatchRead} from './legacy-news/news-batch.js';
+import {newsAdminWrite,newsAdminState,reserveNewsCost} from './legacy-news/admin.js';
+import {runNewsJobs,newsQueueHasWork,dispatchNewsQueue} from './legacy-news/news-jobs.js';
 import {createNewsCronHandler} from '../api/news-cron.js';
 import {login} from '../server/oauth.js';
 const pg=new PGlite();await pg.exec(await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'));
@@ -14,7 +14,7 @@ const owner=await db.tx(tx=>login(tx,{id:'9001',username:'owner',name:'Owner',av
 after(()=>pg.close());
 async function reset(n=0){
  await db.q('DELETE FROM news_audit');await db.q('DELETE FROM news_read_reservations');await db.q('DELETE FROM news_scan_batches');await db.q('DELETE FROM news_items');await db.q('DELETE FROM news_sources');await db.q('DELETE FROM news_budget');
- await db.q("UPDATE news_settings SET pacing_enabled=false,enabled=true,collection_mode='batch',daily_budget_cents=100,scan_dirty=true,lease_until=NULL,scan_lease_until=NULL");
+ await db.q("UPDATE news_settings SET pacing_enabled=false,enabled=true,auto_publish=true,collection_mode='batch',daily_budget_cents=100,scan_dirty=true,lease_until=NULL,scan_lease_until=NULL");
  for(let i=0;i<n;i++)await db.q('INSERT INTO news_sources(username,x_user_id) VALUES($1,$2)',['account_'+String(i).padStart(3,'0'),String(1000+i)]);
  return db.q('SELECT * FROM news_sources ORDER BY username');
 }

@@ -1,45 +1,41 @@
 'use strict';
 (()=>{
- const box=document.getElementById('admin-news'),ru=window.VYXAdminRU,esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),date=ru.date,money=ru.money;
+ const box=document.getElementById('admin-news');
+ const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let busy=false;
- async function request(body){const r=await fetch('/api/news'+(body?'':'?admin=1'),{method:body?'POST':'GET',credentials:'same-origin',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});const d=await r.json();if(!r.ok)throw Error(d.error||'Newsroom unavailable');return d;}
- function reasonHTML(item){
-  if(!item.reason)return '';
-  const translated=ru.reason(item.reason);
-  return translated?`<p>${esc(translated)}</p>`:`<details><summary>Комментарий ИИ — оригинал</summary><p lang="en">${esc(item.reason)}</p></details>`;
+ async function request(body){
+  const r=await fetch('/api/news'+(body?'':'?admin=1'),{method:body?'POST':'GET',credentials:'same-origin',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
+  const d=await r.json();
+  if(!r.ok){
+   const known={'VYX member not found.':'Участник с таким ником VYX не найден.','Administrators already have publishing access.':'У администратора уже есть право публикации.'};
+   throw Error(known[d.error]||window.VYXAdminRU.error(d.error));
+  }
+  return d;
  }
- async function load(){
-  try{
-   const d=await request(),ready=d.readiness.x&&d.readiness.ai&&d.readiness.sources;
-   const provider=d.readiness.provider==='ORBITA AI service'?'Сервис ИИ ORBITA':d.readiness.provider==='Invalid AI configuration'?'Ошибка настройки ИИ':d.readiness.provider;
-   const pacing=d.pacing?.enabled?`<div class="admin-care-card"><h3>Распределение бюджета на сутки</h3><p>Текущее окно: <b>${date(d.pacing.startsAt)} — ${date(d.pacing.endsAt)}</b></p><p>Доступно сейчас: <b>${money(d.pacing.remainingCents)}</b> · Лимит окна с учётом переноса: ${money(d.pacing.allowanceCents)} · Зарезервировано в этом окне: ${money(d.pacing.reservedCents)}</p><p>Восемь окон по 3 часа · Неиспользованный остаток переносится, но не более ${money(d.pacing.carryCapCents)} на окно · ${money(d.pacing.safetyCents)} в сутки остаётся нераспределённым запасом. На следующие сутки UTC остаток не переносится.</p><p>${d.pacing.dailyRemainingCents===0?'Дневной лимит исчерпан. Платная обработка возобновится после <b>'+date(d.pacing.resetAt)+'</b>':'Следующее окно бюджета: <b>'+date(d.pacing.endsAt)+'</b>'} · ${d.publication.allowed?'Окно публикации доступно':'Следующее окно публикации: '+date(d.publication.nextAt)}. Не более одной автоновости за четырёхчасовой слот UTC и шести в сутки.</p></div>`:'';
-   box.innerHTML=`<header><div><h2>Редакция новостей</h2><p>Посты из X → черновик на английском → проверка по источнику → публикация.</p></div><div><button class="secondary" data-news-admin-refresh>Обновить редакцию</button> <button class="primary" data-news-run ${!ready||!d.settings.enabled?'disabled':''}>Выполнить один цикл</button></div></header>
-   <p class="admin-news-status"><b>${d.settings.enabled?'Автоматизация включена':'Автоматизация приостановлена'}</b> · <span title="${esc(d.settings.last_status)}">${ru.status(d.settings.last_status)}</span> · Последнее завершение: ${date(d.settings.last_completed_at)}</p>
-   <div class="admin-news-readiness"><span>Сбор из X: <b>${d.readiness.x?'Подключён':'Не подключён'}</b></span><span>Подготовка новостей ИИ: <b>${d.readiness.ai?'Подключена':'Не подключена'}</b>${d.readiness.ai?' · '+esc(provider):''}</span><span>Активных источников: <b>${d.sources.filter(s=>s.enabled).length}</b></span></div>
-   <form id="news-settings-form" class="admin-news-settings"><label><input name="enabled" type="checkbox" ${d.settings.enabled?'checked':''} ${!ready&&!d.settings.enabled?'disabled':''}> Сбор постов по расписанию</label><label><input name="autoPublish" type="checkbox" ${d.settings.auto_publish?'checked':''}> Автопубликация прошедших проверку новостей без высокого риска</label><label>Дневной лимит новостей (USD)<input name="budget" type="number" min="0" max="1" step="0.01" value="${(d.settings.daily_budget_cents/100).toFixed(2)}" required></label><button class="primary">Сохранить настройки редакции</button></form>
-   <p>Зарезервировано сегодня: <b>${money(d.usage.reserved_cents)}</b> / ${money(d.settings.daily_budget_cents)} · X: ${money(d.usage.x_cents)} · ИИ: ${money(d.usage.ai_cents)}. Это консервативный резерв расходов, а не счёт провайдера. При неудачных запросах и неопределённом результате резерв сохраняется. Суточный лимит сбрасывается в 00:00 UTC. Средства открываются каждые три часа; остаток переносится в пределах лимита окна.</p>
-   ${pacing}<p>Планировщик запускается каждые 15 минут. Платные запросы к X и ИИ выполняются только при наличии средств в текущем окне. Перед написанием свежие посты из очереди проходят пакетный отбор — до восьми за один запрос. Накопившаяся очередь разбирается постепенно. Новости с высоким риском или неопределённостью требуют вашей проверки.</p>
-   <p>Последняя проверка источников: <b>${date(d.settings.last_scan_at)}</b> · <span title="${esc(d.settings.scan_status)}">${ru.status(d.settings.scan_status)}</span> · Аккаунтов: ${d.sources.length}/100. Идентификаторы новых аккаунтов проверяются один раз и сохраняются.</p>
-   <h3>Отслеживаемые аккаунты</h3><form id="news-source-form" class="admin-news-add"><label>Аккаунты X<textarea name="usernames" rows="3" maxlength="8000" placeholder="@аккаунт или https://x.com/account — по одному в строке" required></textarea></label><button class="secondary">Добавить аккаунты</button></form>
-   ${d.sources.length?d.sources.map(s=>`<div class="admin-news-source"><a href="https://x.com/${esc(s.username)}" target="_blank" rel="noopener noreferrer">@${esc(s.username)}</a><small>${s.enabled?'Активен':'Приостановлен'} · <span title="${esc(s.last_status)}">${ru.status(s.last_status)}</span> · ${date(s.last_fetched_at)}</small><button class="secondary" data-news-source-toggle="${s.id}" data-enabled="${!s.enabled}">${s.enabled?'Приостановить':'Возобновить'}</button><button class="text-link" data-news-source-remove="${s.id}">Удалить источник</button></div>`).join(''):'<p>Аккаунты пока не добавлены. Запросы к X и ИИ начнутся только после подключения источников и включения автоматизации.</p>'}
-   <h3>Новости и очередь проверки</h3><p>${d.counts.map(c=>`${ru.status(c.status)}: ${ru.number(c.total)}`).join(' · ')||'Постов пока нет.'} · Показаны последние 40 материалов.</p>
-   ${d.items.map(i=>`<details class="admin-care-card"><summary><b>${esc(i.title_en||'Ожидает черновика')}</b> · ${ru.status(i.status)} · @${esc(i.username)}</summary>${reasonHTML(i)}<a href="${esc(i.source_url)}" target="_blank" rel="noopener noreferrer">Исходный пост ↗</a><p><small>Дата исходного поста: ${date(i.source_published_at)} · Добавлен в очередь: ${date(i.created_at)} · Попыток подготовки: ${ru.number(i.attempts)}${d.pacing?.enabled?' · Отбор: '+ru.status(i.selection_status)+' · Пакетных проверок: '+ru.number(i.selection_attempts):''}</small></p><details><summary>Текст источника — оригинал</summary><p>${esc(i.source_text)}</p></details><div class="admin-news-copy"><section lang="en"><b>${esc(i.title_en)}</b><p>${esc(i.summary_en)}</p>${(Array.isArray(i.body_en)?i.body_en:[]).map(p=>`<p>${esc(p)}</p>`).join('')}</section></div><div class="admin-news-controls">${i.status==='review'&&i.verification.supported&&i.verification.english?`<button class="primary" data-news-review="publish" data-id="${i.id}">Опубликовать проверенную новость</button>`:''}${['review','pending','rejected'].includes(i.status)?`<button class="secondary" data-news-review="reject" data-id="${i.id}">Отклонить</button>`:''}${['review','rejected'].includes(i.status)?`<button class="secondary" data-news-review="retry" data-id="${i.id}">Повторить проверку</button>`:''}${i.status==='published'?`<a href="/?story=${i.id}#news" target="_blank">Открыть новость ↗</a><button class="secondary" data-news-review="withdraw" data-id="${i.id}">Снять с публикации</button>`:''}</div></details>`).join('')}
-   <p class="admin-note">ИИ проверяет соответствие текста исходному посту, а не независимо подтверждает факты. Новости не создают посты сообщества, начисления VP или уведомления. Сами новости, исходные посты и комментарии ИИ показаны на языке оригинала.</p>`;
-  }catch(err){box.innerHTML=`<h2>Редакция новостей</h2><p role="status">${esc(ru.error(err.message))}</p><button class="secondary" data-news-admin-refresh>Повторить</button>`;}
+ async function load(message=''){
+  const {authors}=await request();
+  box.innerHTML=`<header><div><h2>Редакция новостей</h2><p>Вы публикуете от имени VYX. Приглашённые авторы публикуют под своим именем.</p></div><a class="primary" href="/#news">Перейти в новости ↗</a></header>
+   <h3>Авторы</h3><form class="admin-news-add"><label>Ник участника в VYX<input name="handle" maxlength="100" placeholder="@ник" autocomplete="off" required></label><button class="secondary">Дать право публикации</button></form>
+   <p role="status">${escape(message)}</p>
+   ${authors.length?authors.map(a=>`<div class="admin-news-source"><b>${escape(a.name)}</b><span>@${escape(a.handle)}</span><button class="secondary" data-revoke="${escape(a.id)}" aria-label="Отозвать право публикации у ${escape(a.handle)}">Отозвать доступ</button></div>`).join(''):'<p>Приглашённых авторов пока нет.</p>'}`;
  }
- box.addEventListener('submit',async ev=>{
-  ev.preventDefault();if(busy)return;const f=ev.target,data=new FormData(f);busy=true;const b=f.querySelector('button');b.disabled=true;
-  try{if(f.id==='news-source-form')await request({action:'source-add-many',usernames:data.get('usernames')});if(f.id==='news-settings-form')await request({action:'settings',enabled:data.get('enabled')==='on',autoPublish:data.get('autoPublish')==='on',budgetCents:Math.round(Number(data.get('budget'))*100)});await load();}catch(err){alert(ru.error(err.message));b.disabled=false;}finally{busy=false;}
+ function error(message){
+  const status=box.querySelector('[role=status]');
+  if(status)status.textContent=message;
+  else box.innerHTML=`<h2>Редакция новостей</h2><p role="status">${escape(message)}</p><button class="secondary" data-refresh-team>Повторить</button>`;
+ }
+ async function update(input,button){
+  if(busy)return;
+  busy=true;button.disabled=true;
+  try{await request(input);await load(input.action==='author-grant'?'Право публикации выдано.':'Доступ отозван.');}
+  catch(err){error(err.message);}
+  finally{busy=false;button.disabled=false;}
+ }
+ box.addEventListener('submit',ev=>{ev.preventDefault();update({action:'author-grant',handle:new FormData(ev.target).get('handle')},ev.target.querySelector('button'));});
+ box.addEventListener('click',ev=>{
+  const button=ev.target.closest('button');if(!button)return;
+  if(button.hasAttribute('data-refresh-team'))load().catch(err=>error(err.message));
+  if(button.dataset.revoke)update({action:'author-revoke',id:button.dataset.revoke},button);
  });
- box.addEventListener('click',async ev=>{
-  const b=ev.target.closest('button');if(!b||busy)return;
-  if(b.hasAttribute('data-news-admin-refresh'))return load();
-  let payload;
-  if(b.hasAttribute('data-news-run'))payload={action:'run'};
-  if(b.dataset.newsSourceToggle)payload={action:'source-toggle',id:b.dataset.newsSourceToggle,enabled:b.dataset.enabled==='true'};
-  if(b.dataset.newsSourceRemove)payload={action:'source-remove',id:b.dataset.newsSourceRemove};
-  if(b.dataset.newsReview)payload={action:b.dataset.newsReview,id:b.dataset.id};
-  if(!payload)return;busy=true;b.disabled=true;try{await request(payload);await load();}catch(err){alert(ru.error(err.message));b.disabled=false;}finally{busy=false;}
- });
- load();
+ load().catch(err=>error(err.message));
 })();

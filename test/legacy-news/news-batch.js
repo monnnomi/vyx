@@ -2,7 +2,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {reserveNewsCostTx,newsSpendState} from './news-budget.js';
 import {enqueueNewsPost} from './news-queue.js';
 import {newsAIConfig} from './news-ai.js';
-import {newsMediaFields} from './news-media.js';
+import {newsMediaFields} from '../../server/news-media.js';
 export function buildNewsBatches(sources){
  const active=sources.filter(s=>s.enabled&&!s.archived).sort((a,b)=>a.username.localeCompare(b.username));
  const batches=[];

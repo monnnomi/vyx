@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {newsMediaFields,extractNewsPhotos} from './news-media.js';
+import {newsMediaFields,extractNewsPhotos} from '../../server/news-media.js';
 import {reserveBatchRead,settleBatchRead,newsWriterReserve} from './news-batch.js';
 // Backfill existing published articles through the same bounded news allowance.
 export async function syncNewsPhotos(db,fetcher=fetch,startedAt=Date.now()){

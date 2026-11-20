@@ -869,7 +869,7 @@ VP earned	VP заработано
 Connect X to let VYX check your tasks in the background. You can disconnect at any time.	Подключи X, чтобы VYX проверял задания в фоне. Доступ можно отозвать в любой момент.
 Reconnect X to check your tasks	Подключи X для проверки заданий
 Allow VYX to stay connected and read your follows, likes and posts for task checks, even when you are away. You can disconnect at any time.	Разреши VYX читать подписки, лайки и посты для проверки заданий, в том числе когда тебя нет на сайте. Подключение можно отключить в любой момент.
-Automatic verification is connected. Checks run in the background about every 15 minutes, ahead of news. Confirmed VP is added automatically. The shared daily limit may delay checks.	Автопроверка подключена. Задания проверяются в фоне примерно каждые 15 минут, раньше новостей. VP зачисляются автоматически. Общий дневной лимит может задержать проверку.
+Automatic verification is connected. Checks run in the background about every 15 minutes. Confirmed VP is added automatically. The shared daily limit may delay checks.	Автопроверка подключена. Задания проверяются в фоне примерно каждые 15 минут. VP зачисляются автоматически. Общий дневной лимит может задержать проверку.
 Your connection renews automatically.	Подключение продлевается автоматически.
 Your current connection is temporary.	Текущее подключение временное.
 Disconnect verification	Отключить проверку
@@ -1231,3 +1231,19 @@ When you open an invitation link, this browser remembers the latest inviter for 
 ">Continue with X ↗	">Продолжить через X ↗
 Sound on	Звук включён
 Sound off	Звук выключен
+Project reviews	Обзоры проектов
+News and project reviews from VYX and community authors.	Новости и обзоры проектов от VYX и авторов сообщества.
+Write a story	Написать статью
+Edit story	Редактировать статью
+Unpublish	Снять с публикации
+Unpublish this story?	Снять статью с публикации?
+Readers will lose access to the story and its discussion.	Читатели больше не увидят статью и её обсуждение.
+Write in English. Separate paragraphs with a blank line.	Пишите на английском. Разделяйте абзацы пустой строкой.
+Headline	Заголовок
+Category	Рубрика
+Short summary	Краткое описание
+Article	Текст статьи
+Source link (optional)	Ссылка на источник (необязательно)
+Publish story	Опубликовать статью
+View source ⟦0⟧	Источник ⟦0⟧
+Story could not be saved.	Не удалось сохранить статью.

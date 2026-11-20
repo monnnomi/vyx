@@ -1,10 +1,10 @@
-import {appURL} from './http.js';
+import {appURL} from '../../server/http.js';
 import {newsAIStatus,newsAIConfig} from './news-ai.js';
 import {runNewsPipeline} from './news-pipeline.js';
 import {collectNewsBatches,newsWriterReserve,newsWriterWindowReserve} from './news-batch.js';
 import {syncNewsPhotos} from './news-media-sync.js';
 import {newsSpendState,newsPublicationState} from './news-budget.js';
-import {runAutomaticTaskChecks,taskQueueHasWork} from './x-task-queue.js';
+import {runAutomaticTaskChecks,taskQueueHasWork} from '../../server/x-task-queue.js';
 export async function runNewsJobs(db,fetcher=fetch){
  const tasks=await runAutomaticTaskChecks(db,fetcher);
  if(tasks.status!=='idle'){

@@ -2,10 +2,11 @@ import {test,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import {newsAIConfig,newsAIStatus} from '../server/news-ai.js';
-import {listNews,newsAdminState,newsAdminWrite,reserveNewsCost,newsHandle} from '../server/news.js';
-import {initialNewsSources,newsSourceContext} from '../server/news-policy.js';
-import {normalizeNewsPost,validNewsDraft,canAutoPublish,runNewsPipeline,newsAITimeout} from '../server/news-pipeline.js';
+import {newsAIConfig,newsAIStatus} from './legacy-news/news-ai.js';
+import {listNews} from '../server/news.js';
+import {newsAdminState,newsAdminWrite,reserveNewsCost,newsHandle} from './legacy-news/admin.js';
+import {initialNewsSources,newsSourceContext} from './legacy-news/news-policy.js';
+import {normalizeNewsPost,validNewsDraft,canAutoPublish,runNewsPipeline,newsAITimeout} from './legacy-news/news-pipeline.js';
 import {createNewsHandler} from '../api/news.js';
 import {createNewsCronHandler} from '../api/news-cron.js';
 import {login} from '../server/oauth.js';
@@ -146,13 +147,13 @@ test('rejected noise is terminal without verification and allows the next substa
  assert.equal((await db.q('SELECT ai_cents FROM news_budget'))[0].ai_cents,18);
  assert.equal(normalizeNewsPost({...post(),text:'gm '.repeat(25)},{x_user_id:'123',username:'example'}),null);
 });
-test('manual cycle is admin-only, respects pause, and uses the same spending and publication rules',async()=>{
- await reset();await source();const p=provider(),api=createNewsHandler(fn=>fn(db),p.fetcher);
- for(const [user,status] of [[null,401],[member,403]])assert.equal((await call(api,{method:'POST',user,input:{action:'run'}})).status,status);
- assert.equal((await call(api,{method:'POST',user:owner,origin:'https://evil.invalid',input:{action:'run'}})).status,403);
- assert.equal((await call(api,{method:'POST',user:owner,input:{action:'run'}})).data.status,'paused');assert.equal(p.calls.length,0);
- await enable();assert.equal((await call(api,{method:'POST',user:owner,input:{action:'run'}})).data.processed,1);assert.equal((await listNews(db)).articles.length,1);
- await db.q("UPDATE news_settings SET lease_until=clock_timestamp()+interval '1 minute'");assert.equal((await runNewsPipeline(db,p.fetcher)).status,'already-running');
+test('retired news collector cannot be started through the website',async()=>{
+ await reset();await source();await enable();const api=createNewsHandler(fn=>fn(db));
+ for(const action of ['run','settings','source-add','publish','retry']){
+  const result=await call(api,{method:'POST',user:owner,input:{action}});
+  assert.equal(result.status,400);
+ }
+ assert.deepEqual((await listNews(db)).articles,[]);
 });
 test('source errors expose actionable status without leaking credentials or upstream content',async()=>{
  await reset();await source();await enable();await runNewsPipeline(db,async()=>new Response('private upstream content',{status:401}));

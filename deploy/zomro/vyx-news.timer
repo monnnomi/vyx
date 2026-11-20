@@ -1,5 +1,5 @@
 [Unit]
-Description=VYX quests and news every fifteen minutes
+Description=VYX quest checks every fifteen minutes
 [Timer]
 OnCalendar=*-*-* *:00,15,30,45:00 UTC
 Persistent=true

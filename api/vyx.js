@@ -10,6 +10,7 @@ import {body,sameOrigin,session,fail,handleError,json,limit,ipKey,setCookie,cook
 import {state,feed,comments,conversations,messages,mutate} from '../server/service.js';
 import {listRooms,roomSummary,roomThread,roomMembers,roomMessage,roomMentionCandidates} from '../server/rooms.js';
 import {dropResults,dropResult,revealDrop,notifications,readNotifications} from '../server/drops.js';
+import {createWalletChallenge,linkWallet,unlinkWallet} from '../server/wallets.js';
 export function createHandler(useDB=withDB,taskFetcher=fetch){return async function handler(req,res){
  try{
   const url=new URL(req.url,'https://vyx.local'),action=url.searchParams.get('action')||'state';
@@ -71,6 +72,9 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
    if(action==='disconnect-task-x'){await db.q('DELETE FROM x_task_access WHERE user_id=$1',[user.id]);return json(res,200,{ok:true});}
    if(action==='drop-reveal')return json(res,200,await revealDrop(db,user,data.id));
    if(action==='notifications-read')return json(res,200,await readNotifications(db,user,data));
+   if(action==='wallet-challenge')return json(res,200,await createWalletChallenge(db,user,data));
+   if(action==='wallet-link')return json(res,200,{wallet:await linkWallet(db,user,data)});
+   if(action==='wallet-unlink')return json(res,200,{wallet:await unlinkWallet(db,user)});
    systemResult(await mutate(db,user,action,data));
   });
  }catch(e){handleError(res,e);}

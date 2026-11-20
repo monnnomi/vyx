@@ -560,3 +560,33 @@ ALTER TABLE news_items ALTER COLUMN source_id DROP NOT NULL, ALTER COLUMN x_post
 ALTER TABLE news_items DROP CONSTRAINT IF EXISTS news_items_category_check;
 ALTER TABLE news_items ADD CONSTRAINT news_items_category_check CHECK (category IN ('updates','ecosystem','events','security','markets','reviews'));
 UPDATE news_settings SET enabled=false, auto_publish=false WHERE id=1 AND (enabled OR auto_publish);
+
+-- Robinhood Chain wallet links (server/wallets.js, scripts/migrate-wallets.mjs).
+CREATE TABLE IF NOT EXISTS wallet_challenges (
+ nonce text PRIMARY KEY,
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ address text NOT NULL CHECK (address ~ '^0x[0-9a-f]{40}$'),
+ chain_id integer NOT NULL,
+ message text NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ expires_at timestamptz NOT NULL,
+ used_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS wallet_challenges_user_idx ON wallet_challenges(user_id,created_at DESC);
+CREATE TABLE IF NOT EXISTS user_wallets (
+ user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ address text NOT NULL UNIQUE CHECK (address ~ '^0x[0-9a-f]{40}$'),
+ chain_id integer NOT NULL,
+ message text NOT NULL,
+ signature text NOT NULL,
+ linked_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS wallet_link_events (
+ id bigserial PRIMARY KEY,
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ address text NOT NULL CHECK (address ~ '^0x[0-9a-f]{40}$'),
+ action text NOT NULL CHECK (action IN ('link','unlink')),
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS wallet_link_events_user_idx ON wallet_link_events(user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS wallet_link_events_address_idx ON wallet_link_events(address);

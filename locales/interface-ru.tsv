@@ -1265,3 +1265,27 @@ VYX brings people together in group chats about ideas, culture and everyday life
 Sign in with X ⟦0⟧	Войти через X ⟦0⟧
 Add a room description	Добавить описание комнаты
 e.g. Share your onchain research and compare notes on new projects.	Например: делимся ончейн-исследованиями и обсуждаем новые проекты.
+Your wallet	Твой кошелёк
+⟦0⟧ Linked	⟦0⟧ Привязан
+Copy address	Скопировать адрес
+VYX Points will be sent to this address on ⟦0⟧. Linked ⟦1⟧.	VYX Points будут приходить на этот адрес в сети ⟦0⟧. Привязан ⟦1⟧.
+Unlink wallet	Отвязать кошелёк
+View on explorer ⟦0⟧	Открыть в обозревателе ⟦0⟧
+Add network to wallet	Добавить сеть в кошелёк
+You can link a different wallet after ⟦0⟧. Your previous wallet can be linked again now.	Другой кошелёк можно будет привязать после ⟦0⟧. Прежний кошелёк можно привязать снова уже сейчас.
+Connect wallet	Подключить кошелёк
+No wallet was found in this browser. Install a wallet extension such as MetaMask, or open VYX in your wallet app’s browser.	В этом браузере нет кошелька. Установи расширение, например MetaMask, или открой VYX во встроенном браузере приложения кошелька.
+Open in MetaMask	Открыть в MetaMask
+Link your wallet	Привяжи кошелёк
+Connect an EVM wallet to receive VYX Points on ⟦0⟧. Signing is free and does not move any funds.	Подключи EVM-кошелёк, чтобы получать VYX Points в сети ⟦0⟧. Подпись бесплатная и не переводит средства.
+The request was cancelled in your wallet.	Запрос отменён в кошельке.
+Your wallet already has a request open. Check your wallet.	В кошельке уже открыт запрос. Проверь кошелёк.
+Your wallet did not respond. Try again.	Кошелёк не ответил. Попробуй ещё раз.
+Address copied	Адрес скопирован
+Copy did not work. Select the address instead.	Не удалось скопировать. Выдели адрес вручную.
+Unlink this wallet?	Отвязать этот кошелёк?
+You can link the same wallet again at any time. A different wallet can be linked 7 days after unlinking.	Этот же кошелёк можно привязать снова в любой момент. Другой кошелёк — через 7 дней после отвязки.
+Wallet unlinked	Кошелёк отвязан
+Robinhood Chain is in your wallet	Сеть Robinhood Chain добавлена в кошелёк
+Your wallet did not share an address.	Кошелёк не передал адрес.
+Wallet linked	Кошелёк привязан

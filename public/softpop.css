@@ -569,3 +569,22 @@ html body[data-interface=social] .post-text .hashtag{color:var(--accent)}
  html body[data-interface=social] :is(.room-member-count,.news-source){position:relative}
  html body[data-interface=social] :is(.room-member-count,.news-source)::after{content:"";position:absolute;inset:-12px -4px}
 }
+
+/* Robinhood Chain wallet card on the profile. */
+html body[data-interface=social] .wallet-card{margin-top:16px;padding:22px 24px;background:var(--panel);border:1px solid var(--line);border-radius:16px;display:grid;gap:12px}
+html body[data-interface=social] .wallet-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+html body[data-interface=social] .wallet-card-head h2{margin:0;font-size:20px;font-weight:700;letter-spacing:-.02em}
+html body[data-interface=social] .wallet-card-head p{margin:2px 0 0;font-size:13px;color:var(--muted)}
+html body[data-interface=social] .wallet-status{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border-radius:999px;background:var(--chair-green);color:var(--chair-green-ink);font-size:13px;font-weight:600;white-space:nowrap}
+html body[data-interface=social] .wallet-status .icon{width:16px;height:16px}
+html body[data-interface=social] .wallet-lead{margin:0;font-size:15px;line-height:1.5;color:var(--text);max-width:52ch}
+html body[data-interface=social] .wallet-note{margin:0;font-size:13px;line-height:1.5;color:var(--muted)}
+html body[data-interface=social] .wallet-address{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px}
+html body[data-interface=social] .wallet-address code{font:600 17px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em;padding:10px 14px;border-radius:12px;background:var(--soft);color:var(--text)}
+html body[data-interface=social] .wallet-address .text-link{display:inline-flex;align-items:center;gap:4px;min-height:44px;font-size:14px}
+html body[data-interface=social] .wallet-address .icon{width:15px;height:15px}
+html body[data-interface=social] .wallet-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px 18px}
+html body[data-interface=social] .wallet-actions .primary,html body[data-interface=social] .wallet-actions .secondary{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+html body[data-interface=social] .wallet-actions .secondary{border:1px solid var(--line)}
+html body[data-interface=social] .wallet-unlink{color:var(--muted);min-height:44px}
+html body[data-interface=social] .wallet-unlink:hover{color:var(--accent)}

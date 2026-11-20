@@ -32,6 +32,7 @@ node --env-file=/etc/vyx/vyx.env scripts/migrate-notifications.mjs
 node --env-file=/etc/vyx/vyx.env scripts/migrate-x-task-refresh.mjs
 node --env-file=/etc/vyx/vyx.env scripts/migrate-owner-locale.mjs
 node --env-file=/etc/vyx/vyx.env scripts/migrate-manual-news.mjs
+node --env-file=/etc/vyx/vyx.env scripts/migrate-wallets.mjs
 ln -s "$new" /opt/vyx/current.next
 mv -Tf /opt/vyx/current.next /opt/vyx/current
 systemctl restart vyx

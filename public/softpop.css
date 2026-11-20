@@ -361,11 +361,11 @@ html body[data-interface=social] .context-members{border-radius:16px;background:
 .club-issue {display:flex; align-items:center; gap:13px; padding-bottom:18px; border-bottom:1px solid var(--line); font-size:13px; color:var(--muted)}
 .club-wordmark {color:var(--text); font-size:23px; font-weight:800; letter-spacing:-.09em; line-height:1; padding-right:14px; border-right:1px solid var(--line)}
 .club-feature {display:grid; grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr); gap:clamp(24px,4cqw,64px); align-items:center; margin:30px 0}
-html body[data-interface=social] .club-feature h1 {
+html body[data-interface=social] .club-feature h2 {
   font:400 clamp(54px,8.8cqw,96px)/.99 'Instrument Serif',Georgia,serif;
   letter-spacing:-.035em; margin:0; color:var(--text);
 }
-.club-feature h1 em {display:block; color:var(--accent); font-weight:400}
+.club-feature h2 em {display:block; color:var(--accent); font-weight:400}
 .club-feature-copy>p {max-width:36ch; margin:22px 0 26px; color:var(--muted); font-size:clamp(15px,2.1cqw,18px); line-height:1.55}
 .club-photo {display:block; overflow:hidden; border-radius:clamp(12px,2cqw,24px); background:var(--gold-soft)}
 .club-photo img {display:block; width:100%; height:clamp(310px,44cqw,490px); object-fit:cover; object-position:50% 58%}
@@ -470,3 +470,101 @@ html body[data-interface=social] .vyx-room-progress .vyx-send-feedback[role=stat
 }
 
 html body[data-interface=social] .chat-room-list .room-row.selected :is(.room-unread-badge,.room-mention-badge) {color:var(--sp-on-ink)}
+
+/* =====================================================================
+   Review fixes, 20 Nov 2026. Presentation only.
+   ===================================================================== */
+/* 1. Analytics choice: compact, and never over the message composer. */
+html body[data-interface=social] .analytics-consent{right:20px;bottom:20px;width:min(360px,calc(100vw - 32px));padding:16px 18px;border-radius:16px;box-shadow:0 10px 32px #1112}
+@media(min-width:761px){html body[data-interface=social]:is([data-page=rooms],[data-page=messages]) .analytics-consent{left:104px;right:auto;bottom:16px}}
+html body[data-interface=social] .analytics-consent strong{font-size:15px;line-height:1.3}
+html body[data-interface=social] .analytics-consent p{font-size:13px;line-height:1.45;margin:6px 0 12px}
+html body[data-interface=social] .analytics-consent>div{justify-content:stretch}
+html body[data-interface=social] .analytics-consent button{flex:1}
+@media(max-width:760px){
+ html body[data-interface=social] .analytics-consent{left:12px;right:12px;width:auto;bottom:calc(76px + env(safe-area-inset-bottom));padding:14px 16px}
+ html body[data-interface=social].in-room .analytics-consent,html body[data-interface=social].in-direct .analytics-consent{bottom:calc(84px + env(safe-area-inset-bottom))}
+}
+
+/* 4. Nothing below 12px. */
+html body[data-interface=social] :is(small,.eyebrow,.vyx-section-label,.nav-more span,.nav-settings span,.post-handle,.post-name .verified,
+ .composer-bottom .post-count,.news-card-top .news-category,.news-card-top time,.news-image-count,.news-card-source,.news-source,.news-fineprint,
+ .account-keepsake-label,.round-timing span,.farm-policy-notice span,.pill-label,.drop-collection-link span,.drop-collection-link .text-link,
+ .section-title .text-link,.ranking-you,.ranking-season,.ranking-position span,.ranking-list-heading span,.whitelist-you,.whitelist-badge,
+ .room-row-byline span,.room-row-joined,.room-row-host,.room-row-entry span,.direct-row time,.room-history-tools span,.room-unread-divider,
+ .quiet-section-title .text-link,.quiet-rewards .text-link,.quiet-rail footer :is(a,button,span),.vyx-official-top span,.vyx-guide-links button,
+ .farm-panel-heading .text-link,.contribution-status span,.farm-countdown span,.farm-speed span,.farm-window,.farm-estimate-note,.farm-contributors span,
+ .farm-event-row span,.farm-event,.farm-recent h3,.farm-panel-note,.member-preferences p,.settings-panel p,.inbox-item p,.drop-metrics>div>span){font-size:12px!important;letter-spacing:.01em}
+html body[data-interface=social] .activity-badge{font-size:12px;min-width:22px;height:22px;line-height:1}
+html body[data-interface=social] .quiet-person .avatar{font-size:13px}
+
+/* 5. Quest total: the small label keeps normal spacing. */
+html body[data-interface=social] .x-task-summary>strong small{letter-spacing:0;word-spacing:normal;font-size:14px!important;font-weight:500;margin-left:6px;color:var(--muted)}
+
+/* 6. Drop card on phones: text first, scene below. */
+@media(max-width:760px){
+ html body[data-interface=social] .drop-feature{display:grid;grid-template-columns:1fr;min-height:0}
+ html body[data-interface=social] .drop-feature-copy{padding:24px 22px 8px}
+ html body[data-interface=social] .drop-feature-copy p{max-width:none}
+ html body[data-interface=social] .drop-feature .sky-scene{min-height:220px;height:220px}
+}
+
+/* 7. One accent: figures use text colour; the accent marks the first. */
+html body[data-interface=social] .drop-metrics>div:nth-child(n+2) strong{color:var(--text)}
+
+/* 10. The round strip never cuts a sentence: feedback gets its own line. */
+html body[data-interface=social] .vyx-room-progress{flex-wrap:wrap}
+html body[data-interface=social] #vyx-room-progress-content{flex-wrap:wrap;row-gap:4px}
+html body[data-interface=social] .vyx-room-progress .vyx-send-feedback{flex:1 1 100%;white-space:normal;overflow:visible;padding-left:34px}
+html body[data-interface=social] .vyx-room-progress-line>.text-link{min-height:40px;display:inline-flex;align-items:center;padding:0 6px}
+
+/* 11. Reactions: a drawn icon, readable contrast, a full-size target. */
+html body[data-interface=social] .reaction-add{position:relative;font-size:0!important;width:36px;height:32px;min-height:32px;padding:0;border-radius:16px;opacity:1!important;color:var(--muted);display:inline-grid;place-items:center}
+html body[data-interface=social] .reaction-add::before{content:"";width:19px;height:19px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M20.8 11.2A8.8 8.8 0 1 1 12.8 3.2'/%3E%3Cpath d='M8.5 14.5c1.9 2 5.1 2 7 0'/%3E%3Cpath d='M9 9.5h.01M15 9.5h.01' stroke-width='2.6'/%3E%3Cpath d='M19 2.5v5M16.5 5h5'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M20.8 11.2A8.8 8.8 0 1 1 12.8 3.2'/%3E%3Cpath d='M8.5 14.5c1.9 2 5.1 2 7 0'/%3E%3Cpath d='M9 9.5h.01M15 9.5h.01' stroke-width='2.6'/%3E%3Cpath d='M19 2.5v5M16.5 5h5'/%3E%3C/svg%3E") center/contain no-repeat}
+html body[data-interface=social] .reaction-add::after{content:"";position:absolute;inset:-6px -4px}
+html body[data-interface=social] .reaction-add:hover{color:var(--text);background:var(--panel-hover)}
+html body[data-interface=social] :is(.room-message-by time,.room-message time,.message-view-count){opacity:1!important;color:var(--muted)}
+
+/* 12. Touch targets. */
+html body[data-interface=social] .room-search>button{min-width:40px;min-height:40px;display:inline-grid;place-items:center}
+html body[data-interface=social] .setting-toggle input{width:22px;height:22px;accent-color:var(--accent)}
+html body[data-interface=social] details>summary{min-height:44px;padding-block:11px;box-sizing:border-box;cursor:pointer}
+html body[data-interface=social] :is(.room-options,.nav-account){min-width:44px;min-height:44px}
+html body[data-interface=social] .brand{min-width:44px;min-height:44px}
+
+/* 13. Settings sound control reads as a live button. */
+html body[data-interface=social] .settings-panel .wonder-sound{color:var(--text);background:var(--panel);border:1px solid var(--line);opacity:1;min-height:44px;font-size:13px!important}
+html body[data-interface=social] .settings-panel .wonder-sound[aria-pressed=true]{background:var(--blue-soft);border-color:transparent}
+html body[data-interface=social] .settings-panel .wonder-sound *{color:inherit;font-size:13px!important}
+
+/* 14. Profile edit button is a real button on the card. */
+html body[data-interface=social] .account-identity-top .secondary{border:1px solid var(--line);background:var(--panel)}
+
+/* 9. Home: live round and most active rooms in place of the photograph. */
+.club-live{display:grid;gap:14px;align-self:stretch;align-content:center}
+.club-live-round{display:grid;gap:4px;padding:24px 26px;border-radius:clamp(12px,2cqw,24px);background:var(--gold-soft);color:var(--text)}
+.club-live-round>span{font-size:14px;font-weight:600;color:var(--muted)}
+.club-live-round>strong{font:400 clamp(52px,8cqw,84px)/1 'Instrument Serif',Georgia,serif;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.club-live-round>small{font-size:13px;color:var(--muted);line-height:1.45}
+.club-live-rooms{display:grid;gap:2px;padding:14px;border:1px solid var(--line);border-radius:clamp(12px,2cqw,24px);background:var(--panel)}
+html body[data-interface=social] .club-live-rooms h3{margin:4px 10px 6px;font-size:13px;font-weight:600;letter-spacing:0;color:var(--muted)}
+.club-live-room{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:8px 10px;border:0;border-radius:12px;background:none;color:var(--text);text-align:left;font:inherit;cursor:pointer}
+.club-live-room:hover{background:var(--panel-hover)}
+.club-live-room .chat-room-avatar{width:40px;height:40px;flex:0 0 40px;display:grid;place-items:center}
+.club-live-name{flex:1;min-width:0;display:flex;flex-direction:column}
+.club-live-name b{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.club-live-name small{font-size:13px;color:var(--muted)}
+.club-live-room .icon{width:18px;height:18px;color:var(--muted)}
+@container (max-width:520px){.club-live-round>strong{font-size:52px}}
+
+/* Direct chat on phones: the thread fills the screen so the composer sits at the bottom. */
+@media(max-width:760px){html body[data-interface=social] .direct-thread{height:100%;display:flex;flex-direction:column}html body[data-interface=social] .direct-thread .chat-bubbles{flex:1 1 0;min-height:0;max-height:none}}
+html body[data-interface=social] .settings-panel .wonder-sound{white-space:nowrap}
+html body[data-interface=social] :is(.drop-history-row>div>b,.quiet-rewards>div>span,.current-round p){font-size:12px!important}
+html body[data-interface=social] :is(.composer-bottom .post-count,.room-member-count span){opacity:1;color:var(--muted)}
+html body[data-interface=social] .post-text .hashtag{color:var(--accent)}
+@media(max-width:760px){
+ html body[data-interface=social] :is(.chat-list-tabs button,.feed-tab,.subtabs button){min-height:44px}
+ html body[data-interface=social] :is(.room-member-count,.news-source){position:relative}
+ html body[data-interface=social] :is(.room-member-count,.news-source)::after{content:"";position:absolute;inset:-12px -4px}
+}

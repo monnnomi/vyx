@@ -7,5 +7,5 @@ body[data-interface=social] .brand{display:flex;align-items:center;justify-conte
 body[data-interface=social] .brand>span{display:none}
 @media(max-width:760px){
  .chat-directory-heading>h1,.feed-heading>h1{display:flex;align-items:center;gap:10px}
- .chat-directory-heading>h1::before,.feed-heading>h1::before{content:"";display:block;width:32px;height:32px;flex:0 0 32px;background:url('/assets/vyx-mark-v1.png') center/contain no-repeat;border-radius:8px}
+ .chat-directory-heading>h1::before,.feed-heading>h1::before{content:"";display:block;width:32px;height:32px;flex:0 0 32px;background:url('/assets/vyx-mark-96-v1.png') center/contain no-repeat;border-radius:8px}
 }

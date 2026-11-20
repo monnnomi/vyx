@@ -42,3 +42,23 @@ test('Node background work is tracked after the response and local media needs n
  const previous=process.env.MEDIA_STORAGE_DIR;process.env.MEDIA_STORAGE_DIR=folder;assert.equal(mediaAvailable(),true);if(previous===undefined)delete process.env.MEDIA_STORAGE_DIR;else process.env.MEDIA_STORAGE_DIR=previous;
  delete process.env.VYX_RUNTIME;
 });
+test('pages reference content-hashed styles and scripts that are cached for a year',async()=>{
+ const directory=join(folder,'versioned');const fs=await import('node:fs/promises');await fs.mkdir(directory);
+ await writeFile(join(directory,'app.js'),'console.log(1)');await writeFile(join(directory,'site.css'),'body{color:red}');
+ await writeFile(join(directory,'index.html'),'<link rel="stylesheet" href="/site.css"><script defer src="app.js"></script><script src="https://cdn.example/x.js"></script><a href="/missing.js">x</a>');
+ const server=createStandaloneServer({publicDirectory:directory,handlers:{}});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base='http://127.0.0.1:'+server.address().port;
+ try{
+  const page=await fetch(base);const html=await page.text();
+  assert.match(html,/href="\/site\.css\?v=[0-9a-f]{12}"/);assert.match(html,/src="app\.js\?v=[0-9a-f]{12}"/);
+  assert.match(html,/src="https:\/\/cdn\.example\/x\.js"/);assert.match(html,/href="\/missing\.js"/);
+  assert.equal(page.headers.get('cache-control'),'public,max-age=0,must-revalidate');
+  assert.equal((await fetch(base,{headers:{'if-none-match':page.headers.get('etag')}})).status,304);
+  const css=html.match(/\/site\.css\?v=([0-9a-f]+)/)[1];
+  const asset=await fetch(base+'/site.css?v='+css);assert.equal(await asset.text(),'body{color:red}');
+  assert.equal(asset.headers.get('cache-control'),'public,max-age=31536000,immutable');
+  assert.equal((await fetch(base+'/site.css')).headers.get('cache-control'),'public,max-age=0,must-revalidate');
+  await new Promise(r=>setTimeout(r,20));await writeFile(join(directory,'site.css'),'body{color:blue}');
+  assert.notEqual((await (await fetch(base)).text()).match(/\/site\.css\?v=([0-9a-f]+)/)[1],css);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+});

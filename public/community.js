@@ -14,7 +14,8 @@ const avatar=(u,extra='')=>`<span class="avatar ${u?.is_system?'sage':'me-avatar
 const findPerson=id=>data.members.find(u=>u.id===id)||profileCache.get(id)||data.posts.find(p=>p.author.id===id)?.author||(data.user?.id===id?data.user:null);
 async function api(action,body,params={}){
  const url=new URL('/api/vyx',location.origin);url.searchParams.set('action',action);for(const [k,v] of Object.entries(params))if(v!=null)url.searchParams.set(k,v);
- const res=await fetch(url,{method:body===undefined?'GET':'POST',credentials:'same-origin',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+ let res;try{res=await fetch(url,{method:body===undefined?'GET':'POST',credentials:'same-origin',headers:body===undefined?{}:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});}
+ catch(error){if(error instanceof TypeError)throw new Error(navigator.onLine===false?'You’re offline. Check your connection and try again.':'VYX can’t be reached right now. Check your connection and try again.');throw error;}
  const result=await res.json().catch(()=>({error:'The service could not be reached.'}));
  if(!res.ok){if(res.status===401)data.user=null;throw new Error(result.error||'Please try again.');}return result;
 }

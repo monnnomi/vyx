@@ -9,7 +9,7 @@ function newsSource(article){
  return `<a class="news-source" href="${e(article.source.url)}" target="_blank" rel="noopener noreferrer">@${e(article.source.username)} on X ${icon('arrowup')}</a>`;}
 function newsByline(article){
  if(article.manual&&article.publisher.handle)return `<span class="news-publisher"><span><b>${e(article.publisher.name)}</b><small>@${e(article.publisher.handle)}</small></span></span>`;
- return `<span class="news-publisher"><img src="/assets/vyx-mark-v1.png" width="28" height="28" alt=""><span><b>VYX</b><small>Newsroom</small></span></span>`;}
+ return `<span class="news-publisher"><img src="/assets/vyx-mark-96-v1.png" width="28" height="28" alt=""><span><b>VYX</b><small>Newsroom</small></span></span>`;}
 function newsKind(article){return article.kind==='market-view'?'Market view':newsLabels[article.category]||'Updates';}
 function newsPhotoURL(image,small=false){const url=new URL(image.url,location.origin);if(url.hostname==='pbs.twimg.com')url.searchParams.set('name',small?'small':'large');return url.href;}
 function newsPhotoImage(image,index,small=false){return `<img data-news-image src="${e(newsPhotoURL(image,small))}" alt="${e(image.alt||'Image '+(index+1)+' from the original X post')}" ${image.width&&image.height?`width="${image.width}" height="${image.height}"`:''} loading="lazy" decoding="async" referrerpolicy="no-referrer">`;}

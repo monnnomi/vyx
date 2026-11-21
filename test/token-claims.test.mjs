@@ -98,6 +98,11 @@ test('seasons() results decode and the browser builds claim calldata the contrac
  assert.equal(ctx.jvyxUnlocked(item,Date.parse('2026-12-04T12:00:00Z')),100n);
  assert.equal(ctx.jvyxUnlocked(item,Date.parse('2027-03-01T00:00:00Z')),900n);
  assert.equal(ctx.jvyxFormat(1234567n*10n**16n),'12,345.67');
+ // Wallets get the token with the VYX mark as its image (EIP-747 wallet_watchAsset).
+ assert.deepEqual(JSON.parse(JSON.stringify(ctx.jvyxWatchParams({token:'0x3e5ec018ffe0f04adb7416581c1bf53af32b2e95',symbol:'jVYX',decimals:18},'https://joinvyx.com'))),
+  {type:'ERC20',options:{address:'0x3e5ec018ffe0f04adb7416581c1bf53af32b2e95',symbol:'jVYX',decimals:18,image:'https://joinvyx.com/assets/jvyx-token-256.png'}});
+ const icon=await readFile(new URL('../public/assets/jvyx-token-256.png',import.meta.url));
+ assert.equal(icon.toString('ascii',1,4),'PNG');assert.deepEqual([icon.readUInt32BE(16),icon.readUInt32BE(20)],[256,256]);
 });
 
 test('the season timer freezes closed seasons once and activates batches it finds on-chain',async()=>{

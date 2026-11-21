@@ -36,9 +36,11 @@ function tokenCardHTML(){
    :i.status==='needs-wallet'?'Link your wallet below to receive these tokens.':'Being prepared for your wallet. Check back soon.';
   return `<li><div><strong>${e(i.label)}</strong><small>${note}</small></div><span>${e(jvyxFormat(i.amount))} ${e(t.symbol)}</span></li>`;
  };
- const action=live.length&&typeof walletProvider==='function'&&walletProvider()
-  ?`<div class="wallet-actions"><button class="primary" data-jvyx-claim>Claim ${e(t.symbol)}</button></div><p class="wallet-note">Each claim is one transaction: network gas plus a ${e(jvyxEth(t.claimFee))} ETH service fee.</p>`
-  :live.length?'<p class="wallet-note">Open VYX in a browser with your wallet to claim.</p>':'';
+ const hasWallet=typeof walletProvider==='function'&&Boolean(walletProvider());
+ const add=hasWallet&&t.token?`<button class="secondary" data-jvyx-watch>Add ${e(t.symbol)} to wallet</button>`:'';
+ const action=live.length&&hasWallet
+  ?`<div class="wallet-actions"><button class="primary" data-jvyx-claim>Claim ${e(t.symbol)}</button>${add}</div><p class="wallet-note">Each claim is one transaction: network gas plus a ${e(jvyxEth(t.claimFee))} ETH service fee.</p>`
+  :live.length?'<p class="wallet-note">Open VYX in a browser with your wallet to claim.</p>':add?`<div class="wallet-actions">${add}</div>`:'';
  return `<section class="wallet-card token-card" aria-labelledby="token-heading">
   <div class="wallet-card-head"><div><h2 id="token-heading">${e(t.name)}</h2><p>${e(t.symbol)} on Robinhood Chain</p></div>${t.token?`<a class="text-link" href="${e(t.explorer)}/token/${e(t.token)}" target="_blank" rel="noopener noreferrer">Token ${icon('arrowup')}</a>`:''}</div>
   <div class="token-totals"><div><small>Total</small><strong>${e(jvyxFormat(total))}</strong></div><div><small>Unlocked</small><strong>${e(jvyxFormat(unlocked))}</strong></div>${live.length&&known?`<div><small>Claimed</small><strong>${e(jvyxFormat(claimed))}</strong></div>`:''}</div>
@@ -72,6 +74,20 @@ async function jvyxClaim(){
  toast('Claim sent. Your tokens arrive when the transaction confirms.');
  return hash;
 }
+// The ERC-20 contract has no image; wallets show this one when the token is added from VYX.
+const JVYX_IMAGE='/assets/jvyx-token-256.png';
+function jvyxWatchParams(t,origin){return {type:'ERC20',options:{address:t.token,symbol:t.symbol,decimals:t.decimals,image:origin+JVYX_IMAGE}};}
+async function jvyxWatch(){
+ const t=data.user.tokens,eth=walletProvider();if(!eth||!t?.token)return;
+ await jvyxEnsureChain(eth,t);
+ if(await eth.request({method:'wallet_watchAsset',params:jvyxWatchParams(t,location.origin)}))toast(`${t.symbol} is in your wallet.`);
+}
+document.addEventListener('click',async ev=>{
+ const w=ev.target.closest('[data-jvyx-watch]');if(!w||!data.user)return;
+ w.disabled=true;
+ try{await jvyxWatch();}catch(err){toast(walletError(err));}
+ finally{w.disabled=false;}
+});
 document.addEventListener('click',async ev=>{
  const b=ev.target.closest('[data-jvyx-claim]');if(!b||!data.user||jvyxBusy)return;
  jvyxBusy=true;b.disabled=true;

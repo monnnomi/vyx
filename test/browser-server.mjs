@@ -97,11 +97,15 @@ if(process.env.VYX_QA_TOKENS==='1'){
  await db.q("UPDATE users SET created_at='2026-11-01T00:00:00Z' WHERE id=$1",[a.user.id]);
  await db.q("INSERT INTO x_task_awards(user_id,x_id,task_id,season,amount,proof_id,created_at) VALUES($1,$2,'qa-token','season-1',1000,'qa','2026-11-10T00:00:00Z')",[a.user.id,a.user.x_id]);
  if(process.env.VYX_QA_TOKEN_WALLET)await db.q("INSERT INTO user_wallets(user_id,address,chain_id,message,signature) VALUES($1,$2,4663,'qa','0x00')",[a.user.id,process.env.VYX_QA_TOKEN_WALLET.toLowerCase()]);
+ // Bob has a share; his wallet is linked after the first batch, so /admin can create a second one.
+ await db.q("UPDATE users SET created_at='2026-11-02T00:00:00Z' WHERE id=$1",[b.user.id]);
+ await db.q("INSERT INTO x_task_awards(user_id,x_id,task_id,season,amount,proof_id,created_at) VALUES($1,$2,'qa-token-b','season-1',400,'qa','2026-11-10T00:00:00Z')",[b.user.id,b.user.x_id]);
  await computeAllocations(db,'early-members',new Date('2026-11-22T00:00:00Z'));
  if(process.env.VYX_QA_TOKEN_WALLET){
   const batch=await createBatch(db,'early-members',{startsAt:new Date(Date.now()-5*86400000).toISOString()});
   await activateBatch(db,batch.id,0,async()=>({root:batch.root,total:batch.total,start:batch.start,interval:batch.intervalSeconds,tranches:batch.tranches}));
  }
+ await db.q("INSERT INTO user_wallets(user_id,address,chain_id,message,signature) VALUES($1,'0x00000000000000000000000000000000000000b0',4663,'qa','0x00')",[b.user.id]);
 }
 if(process.env.VYX_QA_X_TASKS==='1'){
  await saveTaskAccess(db,a.user,{access_token:'isolated-qa-token',scope:taskScopes.join(' '),expires_in:7200});
@@ -114,7 +118,7 @@ if(process.env.VYX_QA_X_TASKS==='1'){
   return {ok:true,status:200,json:async()=>data};
  };
 }
-const api=createHandler(fn=>fn(db),qaTaskFetcher),admin=createAdminHandler(fn=>fn(db)),presence=createPresenceHandler(fn=>fn(db)),farm=createFarmHandler(fn=>fn(db)),root=resolve('public');
+const api=createHandler(fn=>fn(db),qaTaskFetcher),admin=createAdminHandler(fn=>fn(db),{tokenChain:()=>({readSeasonCount:async()=>0,readSeason:async()=>{throw new Error('QA has no chain');}})}),presence=createPresenceHandler(fn=>fn(db)),farm=createFarmHandler(fn=>fn(db)),root=resolve('public');
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.webp':'image/webp','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json'};
 http.createServer(async(req,res)=>{
  const path=new URL(req.url,process.env.PUBLIC_APP_URL).pathname;

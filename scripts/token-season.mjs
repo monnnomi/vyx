@@ -8,18 +8,13 @@
 // Seasons: early-members, season-1, season-2.
 import {withDB} from '../server/db.js';
 import {walletChain} from '../server/wallets.js';
-import {computeAllocations,createBatch,activateBatch,discardBatch,tokenContracts,tokenUnit,tokenSeasons,decodeSeason,seasonsCallData,autoTokenSeasons} from '../server/token-claims.js';
+import {computeAllocations,createBatch,activateBatch,discardBatch,tokenContracts,tokenUnit,tokenSeasons,autoTokenSeasons,distributorReader,ownerSteps} from '../server/token-claims.js';
 
 const [cmd,a,b]=process.argv.slice(2),opt=Object.fromEntries(process.argv.slice(2).filter(x=>x.startsWith('--')).map(x=>x.slice(2).split('=')));
 const tokens=wei=>{const v=BigInt(wei);return (v/tokenUnit).toLocaleString('en-US')+(v%tokenUnit?'.'+(v%tokenUnit).toString().padStart(18,'0').replace(/0+$/,'').slice(0,4):'');};
 const chain=walletChain(),contracts=tokenContracts[chain.id];
 
-async function ethCall(data){
- const res=await fetch(chain.rpc,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:contracts.distributor,data},'latest']})});
- const body=await res.json();if(body.error)throw new Error(body.error.message);return body.result;
-}
-const readSeason=async id=>decodeSeason(await ethCall(seasonsCallData(id)));
-const readSeasonCount=async()=>Number(BigInt(await ethCall('0x715f8fe8')));
+const {readSeason,readSeasonCount}=distributorReader(chain);
 
 await withDB(async db=>{
  if(cmd==='allocate'){
@@ -29,8 +24,7 @@ await withDB(async db=>{
   const r=await createBatch(db,a,{startsAt:opt.start});
   console.log(`Batch ${r.id} · ${r.season} · ${r.members} wallets · ${tokens(r.total)} jVYX · ${r.tranches} unlocks every ${r.intervalSeconds}s from ${r.startsAt}`);
   console.log('\nOwner steps (from the Mac, contracts/ folder):');
-  console.log(`1) Treasury sends tokens to the distributor:\n   cast send ${contracts.token} "transfer(address,uint256)" ${contracts.distributor} ${r.total} --rpc-url robinhood --account <treasury>`);
-  console.log(`2) Owner adds the season:\n   cast send ${contracts.distributor} "addSeason(bytes32,uint128,uint64,uint16,uint32)" ${r.root} ${r.total} ${r.start} ${r.tranches} ${r.intervalSeconds} --rpc-url robinhood --account <owner>`);
+  ownerSteps(r,contracts).forEach((step,i)=>console.log(`${i+1}) ${step.title}:\n   ${step.command}`));
   console.log(`3) Read the new season id: cast call ${contracts.distributor} "seasonCount()(uint256)" --rpc-url robinhood   (id = count - 1)`);
   console.log(`4) node --env-file=/etc/vyx/vyx.env scripts/token-season.mjs activate ${r.id} <id>`);
  }else if(cmd==='activate'){

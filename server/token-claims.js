@@ -148,6 +148,95 @@ export function decodeSeason(hex){
 }
 export const seasonsCallData=id=>'0xf5d709a1'+BigInt(id).toString(16).padStart(64,'0');
 
+// Read-only access to VYXDistributor over the chain's JSON-RPC. Shared by the
+// season timer script and the /admin section.
+export function distributorReader(chain=walletChain(),fetchImpl=globalThis.fetch){
+ const contracts=tokenContracts[chain.id];
+ async function call(data){
+  if(!contracts)throw new Error('No jVYX distributor is configured for this network.');
+  const res=await fetchImpl(chain.rpc,{method:'POST',headers:{'content-type':'application/json'},signal:AbortSignal.timeout(15000),
+   body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:contracts.distributor,data},'latest']})});
+  const body=await res.json();if(body.error)throw new Error(body.error.message);return body.result;
+ }
+ return {readSeason:async id=>decodeSeason(await call(seasonsCallData(id))),readSeasonCount:async()=>Number(BigInt(await call('0x715f8fe8')))};
+}
+
+// What the owner runs after a batch is created (Foundry cast, from the Mac).
+export function ownerSteps(batch,contracts){
+ if(!contracts)return [];
+ return [
+  {title:'Treasury sends tokens to the distributor',command:`cast send ${contracts.token} "transfer(address,uint256)" ${contracts.distributor} ${batch.total} --rpc-url robinhood --account <treasury>`},
+  {title:'Owner adds the season',command:`cast send ${contracts.distributor} "addSeason(bytes32,uint128,uint64,uint16,uint32)" ${batch.root} ${batch.total} ${batch.start} ${batch.tranches} ${batch.intervalSeconds} --rpc-url robinhood --account <owner>`}
+ ];
+}
+
+const batchView=(b,contracts)=>{
+ const start=Math.floor(new Date(b.starts_at).getTime()/1000);
+ const view={id:b.id,season:b.season,label:tokenSeasons[b.season]?.label||b.season,root:b.root,total:String(b.total),members:b.members,startsAt:iso(b.starts_at),start,
+  tranches:b.tranches,intervalSeconds:b.interval_seconds,chainId:b.chain_id,onchainId:b.onchain_id,createdAt:iso(b.created_at),activatedAt:b.activated_at?iso(b.activated_at):null};
+ return {...view,steps:view.activatedAt?[]:ownerSteps(view,contracts)};
+};
+
+// Administrator overview of every jVYX season, batch and the largest shares.
+export async function tokenAdmin(db,now=null){
+ const at=await clock(db,now),chain=walletChain(),contracts=tokenContracts[chain.id]||null;
+ const stats=new Map((await db.q(`SELECT a.season,count(*)::int AS members,sum(a.amount)::text AS allocated,COALESCE(sum(a.basis_vp),0)::text AS basis_vp,min(a.computed_at) AS frozen_at,
+   count(w.user_id)::int AS with_wallet,count(c.user_id)::int AS batched,
+   count(c.user_id) FILTER (WHERE b.activated_at IS NOT NULL)::int AS live,
+   count(*) FILTER (WHERE w.user_id IS NOT NULL AND c.user_id IS NULL)::int AS waiting,
+   COALESCE(sum(c.allocation) FILTER (WHERE b.activated_at IS NOT NULL),0)::text AS live_amount
+  FROM token_allocations a LEFT JOIN user_wallets w ON w.user_id=a.user_id
+  LEFT JOIN token_batch_claims c ON c.season=a.season AND c.user_id=a.user_id LEFT JOIN token_batches b ON b.id=c.batch_id
+  GROUP BY a.season`)).map(r=>[r.season,r]));
+ const batches=await db.q('SELECT id,season,root,total::text AS total,members,starts_at,tranches,interval_seconds,chain_id,onchain_id,created_at,activated_at FROM token_batches ORDER BY id');
+ const top=await db.q(`SELECT season,amount,basis_vp,name,handle,x_username,status FROM (
+   SELECT a.season,a.amount::text AS amount,a.basis_vp::text AS basis_vp,u.name,u.handle,u.x_username,
+    CASE WHEN b.activated_at IS NOT NULL THEN 'live' WHEN c.user_id IS NOT NULL THEN 'batched' WHEN w.user_id IS NOT NULL THEN 'waiting' ELSE 'needs-wallet' END AS status,
+    row_number() OVER (PARTITION BY a.season ORDER BY a.amount DESC,a.user_id) AS place
+   FROM token_allocations a JOIN users u ON u.id=a.user_id LEFT JOIN user_wallets w ON w.user_id=a.user_id
+   LEFT JOIN token_batch_claims c ON c.season=a.season AND c.user_id=a.user_id LEFT JOIN token_batches b ON b.id=c.batch_id) r
+  WHERE place<=20 ORDER BY season,place`);
+ return {...jvyx,serverNow:iso(at),chain:{id:chain.id,name:chain.name,explorer:chain.explorer},contracts,claimFee:claimFeeWei.toString(),unlock:defaultUnlock,
+  seasons:Object.entries(tokenSeasons).map(([key,s])=>{
+   const r=stats.get(key),first=batches.find(b=>b.season===key);
+   return {key,label:s.label,kind:s.kind,pool:(s.pool*tokenUnit).toString(),closesAt:s.closesAt,closed:at>=new Date(s.closesAt),frozen:Boolean(r),frozenAt:r?iso(r.frozen_at):null,
+    members:r?.members||0,allocated:r?.allocated||'0',basisVP:r?.basis_vp||'0',withWallet:r?.with_wallet||0,needsWallet:r?r.members-r.with_wallet:0,
+    batched:r?.batched||0,live:r?.live||0,liveAmount:r?.live_amount||'0',waiting:r?.waiting||0,
+    schedule:first?{startsAt:iso(first.starts_at),tranches:first.tranches,intervalSeconds:first.interval_seconds}:null,
+    top:top.filter(t=>t.season===key).map(({season,...t})=>t)};
+  }),
+  batches:[...batches].reverse().map(b=>batchView(b,contracts))};
+}
+
+// POST actions from /admin. chain = distributorReader() (injected in tests).
+export async function tokenAdminAction(db,input,chain){
+ const action=String(input?.action||'');
+ if(action==='token-batch'){
+  const key=String(input.season||'');season(key);
+  const [{n}]=await db.q('SELECT count(*)::int AS n FROM token_allocations WHERE season=$1',[key]);
+  if(!n)fail(409,'Freeze this season before creating a batch.');
+  const startsAt=input.startsAt?String(input.startsAt).slice(0,40):undefined;
+  return createBatch(db,key,{startsAt});
+ }
+ if(action==='token-discard'){
+  const id=Number(input.id);if(!Number.isInteger(id)||id<1)fail(400,'Batch not found.');
+  const [b]=await db.q('SELECT root,activated_at FROM token_batches WHERE id=$1',[id]);
+  if(!b)fail(404,'Batch not found.');
+  if(b.activated_at)fail(409,'Only an inactive batch can be discarded.');
+  // Never drop a root the owner already funded on-chain: its members could not claim it.
+  let onchain=false;
+  try{const count=await chain.readSeasonCount();for(let i=0;i<count&&!onchain;i++)onchain=String((await chain.readSeason(i)).root).toLowerCase()===b.root;}
+  catch{fail(503,'Could not reach Robinhood Chain. Try again.');}
+  if(onchain)fail(409,'This batch is already in the distributor. Check the chain to activate it instead.');
+  return discardBatch(db,id);
+ }
+ if(action==='token-sync'){
+  try{return {log:await autoTokenSeasons(db,chain)};}
+  catch(err){if(err?.status)throw err;fail(503,'Could not reach Robinhood Chain. Try again.');}
+ }
+ fail(400,'Unknown token action.');
+}
+
 // What the member sees. null when the member has no jVYX allocation.
 export async function memberTokens(db,userId){
  const rows=await db.q(`SELECT a.season,a.amount::text AS amount,c.address,c.proof,b.onchain_id,b.starts_at,b.tranches,b.interval_seconds,b.activated_at,

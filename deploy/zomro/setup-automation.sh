@@ -32,7 +32,7 @@ repo=$2
 command -v git >/dev/null || apt-get install -y -q git
 # GitHub's published ed25519 host key fingerprint.
 keys=$(mktemp)
-ssh-keyscan -q -t ed25519 github.com > "$keys"
+ssh-keyscan -t ed25519 github.com > "$keys"
 ssh-keygen -lf "$keys" | grep -q 'SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU' || { echo 'GitHub host key mismatch'; exit 1; }
 install -m 600 "$keys" /root/.ssh/vyx_github_known_hosts
 rm -f "$keys"

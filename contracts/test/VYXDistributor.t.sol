@@ -108,6 +108,19 @@ contract VYXDistributorTest is Test {
         assertEq(token.balanceOf(ALICE), A);
     }
 
+    function test_DailyUnlocksOverNinetyDays() public {
+        uint256 id = addSeason(90, 1 days);
+        assertEq(claimAs(ALICE, id, A, proofA()), A / 90);
+        vm.warp(block.timestamp + 9 days);
+        assertEq(claimAs(ALICE, id, A, proofA()), A * 10 / 90 - A / 90);
+        vm.warp(block.timestamp + 80 days);
+        assertEq(claimAs(ALICE, id, A, proofA()), A - A * 10 / 90);
+        assertEq(token.balanceOf(ALICE), A);
+        vm.prank(owner);
+        vm.expectRevert(VYXDistributor.InvalidSeason.selector);
+        dist.addSeason(ROOT, 1, uint64(block.timestamp), 366, 1 days);
+    }
+
     function test_RejectsWrongProofAmountSenderAndFee() public {
         uint256 id = addSeason(1, 0);
         (uint256[] memory i, uint256[] memory a, bytes32[][] memory p) = one(id, A + 1, proofA());

@@ -27,7 +27,8 @@ contract VYXDistributor is Ownable2Step, ReentrancyGuard {
 
     /// Hard ceiling on the per-transaction service fee, denominated in ETH.
     uint256 public constant MAX_CLAIM_FEE = 0.0001 ether;
-    uint16 public constant MAX_TRANCHES = 52;
+    /// Up to one tranche per day for a year (e.g. 90 tranches, 1 day apart = daily unlocks).
+    uint16 public constant MAX_TRANCHES = 365;
 
     IERC20 public immutable token;
     uint256 public claimFee;
@@ -71,7 +72,8 @@ contract VYXDistributor is Ownable2Step, ReentrancyGuard {
     // ---- owner ----
 
     /// @notice Publish a season. The contract must already hold enough unallocated tokens.
-    /// @param tranches 1 = everything unlocks at `start`; 4 with a 30-day interval = 25% monthly.
+    /// @param tranches 1 = everything unlocks at `start`; 4 with a 30-day interval = 25% monthly;
+    ///        90 with a 1-day interval = daily unlocks over 90 days.
     function addSeason(bytes32 root, uint128 total, uint64 start, uint16 tranches, uint32 interval)
         external
         onlyOwner

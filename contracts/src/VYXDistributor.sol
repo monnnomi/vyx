@@ -25,7 +25,7 @@ contract VYXDistributor is Ownable2Step, ReentrancyGuard {
         uint16 tranches;
     }
 
-    /// Hard ceiling on the per-transaction service fee (about $0.30 at $3,000 per ETH).
+    /// Hard ceiling on the per-transaction service fee, denominated in ETH.
     uint256 public constant MAX_CLAIM_FEE = 0.0001 ether;
     uint16 public constant MAX_TRANCHES = 52;
 

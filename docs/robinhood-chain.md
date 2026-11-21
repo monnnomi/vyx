@@ -58,7 +58,7 @@
 - `test/VYXDistributor.t.sol` — тесты. Merkle-дерево в них построено `server/merkle.js`, поэтому тесты заодно проверяют, что сервер и контракт хешируют одинаково.
 - `script/Deploy.s.sol` — деплой обоих контрактов.
 
-Сбор в wei: `0.03 / цена ETH в долларах × 10^18`. При $3 000 за ETH это `10000000000000` (0,00001 ETH). Цена ETH меняется, поэтому владелец периодически поправляет сбор через `setClaimFee`.
+При расчётном курсе $1 500 за ETH комиссия $0,03 за одну транзакцию клейма составляет **0,00002 ETH** (`20000000000000` wei). Это значение по умолчанию при развёртывании. Его можно переопределить через `CLAIM_FEE_WEI`. Для уже развёрнутого контракта владелец меняет ставку вызовом `setClaimFee`. При изменении курса новая ставка в wei рассчитывается как `0.03 / цена ETH в долларах × 10^18`.
 
 Сборка и тесты на Mac (в Терминале):
 
@@ -74,7 +74,7 @@ forge test -vv
 
 ```
 cast wallet import vyx-deployer --interactive
-TOKEN_NAME="..." TOKEN_SYMBOL="..." TREASURY=0x... OWNER=0x... FEE_RECIPIENT=0x... CLAIM_FEE_WEI=10000000000000 \
+TOKEN_NAME="..." TOKEN_SYMBOL="..." TREASURY=0x... OWNER=0x... FEE_RECIPIENT=0x... CLAIM_FEE_WEI=20000000000000 \
   forge script script/Deploy.s.sol --rpc-url robinhood_testnet --account vyx-deployer --broadcast
 forge verify-contract <адрес> src/VYXToken.sol:VYXToken --verifier blockscout --verifier-url https://explorer.testnet.chain.robinhood.com/api
 ```

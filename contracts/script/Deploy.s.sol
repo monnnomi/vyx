@@ -11,7 +11,7 @@ import {VYXDistributor} from "../src/VYXDistributor.sol";
 ///   TREASURY                  receives all 100,000,000 tokens (use a multisig on mainnet)
 ///   OWNER                     controls seasons and the fee (use a multisig on mainnet)
 ///   FEE_RECIPIENT             receives the claim service fees
-///   CLAIM_FEE_WEI             per-transaction fee; $0.03 / ETH price in USD * 1e18
+///   CLAIM_FEE_WEI             optional fee override in wei; default is $0.03 at $1,500/ETH
 contract Deploy is Script {
     function run() external {
         string memory name = vm.envString("TOKEN_NAME");
@@ -19,7 +19,7 @@ contract Deploy is Script {
         address treasury = vm.envAddress("TREASURY");
         address owner = vm.envAddress("OWNER");
         address feeRecipient = vm.envAddress("FEE_RECIPIENT");
-        uint256 fee = vm.envUint("CLAIM_FEE_WEI");
+        uint256 fee = vm.envOr("CLAIM_FEE_WEI", uint256(0.00002 ether));
 
         vm.startBroadcast();
         VYXToken token = new VYXToken(name, symbol, treasury);

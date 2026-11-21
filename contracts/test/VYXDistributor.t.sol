@@ -17,7 +17,7 @@ contract VYXDistributorTest is Test {
     uint256 constant A = 1000 ether;
     uint256 constant B = 2000 ether;
     uint256 constant C = 3000 ether;
-    uint256 constant FEE = 0.00001 ether;
+    uint256 constant FEE = 0.00002 ether;
 
     address treasury = makeAddr("treasury");
     address owner = makeAddr("owner");

@@ -32,7 +32,12 @@
 - Неудачный коммит записывается в `/opt/vyx/failed-commit` и не повторяется; следующий коммит пробуется заново.
 - Выкладка с Mac (`deploy.sh`) записывает свой коммит; автодеплой не откатывает её на более старый `main`.
 - Журнал: `journalctl -u vyx-autodeploy`. Остановить: `systemctl disable --now vyx-autodeploy.timer`.
-- Установка и обновление — `deploy/zomro/setup-automation.sh`, вызывается из `deploy.sh`; ключ регистрируется через `gh` на Mac.
+- Установка и обновление — `deploy/zomro/setup-automation.sh`, вызывается из `deploy.sh`; ключ регистрируется через `gh` на Mac. С 21 ноября 2026 после успешного выпуска скрипт сам ставит свою новую версию из выпущенного коммита в `/usr/local/sbin/vyx-autodeploy`.
+- 21 ноября 2026: первая версия скрипта искала итоги тестов в формате TAP (`# pass`). Node 24 пишет `ℹ pass N`, поэтому после зелёных тестов `grep` под `set -e` завершал службу с кодом 1 без сообщения и без `failed-commit`, и тот же коммит пересобирался снова. Исправленный скрипт на сервер нужно один раз поставить вручную (или выкладкой `deploy.sh` с Mac):
+
+  ```sh
+  git --git-dir=/opt/vyx/source.git show refs/remotes/origin/main:deploy/zomro/autodeploy.sh > /root/autodeploy.sh && install -m 755 /root/autodeploy.sh /usr/local/sbin/vyx-autodeploy && rm /root/autodeploy.sh
+  ```
 
 `vyx-token-seasons.timer` каждые 5 минут: замораживает доли jVYX закрывшихся сезонов и включает партии, которые владелец уже добавил в контракт (`scripts/token-season.mjs auto`, журнал `journalctl -u vyx-token-seasons`).
 

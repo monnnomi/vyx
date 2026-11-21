@@ -590,3 +590,39 @@ CREATE TABLE IF NOT EXISTS wallet_link_events (
 );
 CREATE INDEX IF NOT EXISTS wallet_link_events_user_idx ON wallet_link_events(user_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS wallet_link_events_address_idx ON wallet_link_events(address);
+
+-- jVYX allocations and claim batches (server/token-claims.js, scripts/migrate-tokens.mjs).
+CREATE TABLE IF NOT EXISTS token_allocations (
+ season text NOT NULL,
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ amount numeric(78,0) NOT NULL CHECK (amount > 0),
+ basis_vp bigint NOT NULL DEFAULT 0,
+ computed_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY (season,user_id)
+);
+CREATE TABLE IF NOT EXISTS token_batches (
+ id serial PRIMARY KEY,
+ season text NOT NULL,
+ root text NOT NULL UNIQUE CHECK (root ~ '^0x[0-9a-f]{64}$'),
+ total numeric(78,0) NOT NULL CHECK (total > 0),
+ members integer NOT NULL,
+ starts_at timestamptz NOT NULL,
+ tranches integer NOT NULL CHECK (tranches BETWEEN 1 AND 365),
+ interval_seconds integer NOT NULL CHECK (interval_seconds >= 0),
+ chain_id integer NOT NULL,
+ onchain_id integer,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ activated_at timestamptz,
+ UNIQUE (chain_id,onchain_id)
+);
+CREATE TABLE IF NOT EXISTS token_batch_claims (
+ batch_id integer NOT NULL REFERENCES token_batches(id) ON DELETE CASCADE,
+ season text NOT NULL,
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ address text NOT NULL CHECK (address ~ '^0x[0-9a-f]{40}$'),
+ allocation numeric(78,0) NOT NULL CHECK (allocation > 0),
+ proof jsonb NOT NULL,
+ PRIMARY KEY (batch_id,user_id),
+ UNIQUE (season,user_id)
+);
+CREATE INDEX IF NOT EXISTS token_batch_claims_user_idx ON token_batch_claims(user_id);

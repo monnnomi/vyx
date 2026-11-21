@@ -588,3 +588,13 @@ html body[data-interface=social] .wallet-actions .primary,html body[data-interfa
 html body[data-interface=social] .wallet-actions .secondary{border:1px solid var(--line)}
 html body[data-interface=social] .wallet-unlink{color:var(--muted);min-height:44px}
 html body[data-interface=social] .wallet-unlink:hover{color:var(--accent)}
+
+/* jVYX allocations (public/token-claim.js) */
+.token-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:14px 0}
+.token-totals>div{border:1px solid var(--line,#e4e4dc);border-radius:12px;padding:10px 12px}
+.token-totals small{display:block;font-size:12px;opacity:.7}
+.token-totals strong{display:block;font-size:20px;font-variant-numeric:tabular-nums;margin-top:2px}
+.token-items{list-style:none;margin:0 0 12px;padding:0}
+.token-items li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line,#e4e4dc)}
+.token-items li small{display:block;font-size:12px;opacity:.7;margin-top:2px}
+.token-items li>span{font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}

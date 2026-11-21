@@ -1289,3 +1289,19 @@ Wallet unlinked	Кошелёк отвязан
 Robinhood Chain is in your wallet	Сеть Robinhood Chain добавлена в кошелёк
 Your wallet did not share an address.	Кошелёк не передал адрес.
 Wallet linked	Кошелёк привязан
+⟦0⟧ unlocked · ⟦1⟧	⟦0⟧ разблокировано · ⟦1⟧
+unlocks daily over ⟦0⟧ days	ежедневная разблокировка в течение ⟦0⟧ дн.
+fully unlocked	полностью разблокировано
+Link your wallet below to receive these tokens.	Привяжи кошелёк ниже, чтобы получить эти токены.
+Being prepared for your wallet. Check back soon.	Готовим к выдаче на твой кошелёк. Загляни чуть позже.
+Claim ⟦0⟧	Забрать ⟦0⟧
+Each claim is one transaction: network gas plus a ⟦0⟧ ETH service fee.	Каждый клейм — одна транзакция: газ сети плюс сервисный сбор ⟦0⟧ ETH.
+Open VYX in a browser with your wallet to claim.	Чтобы забрать токены, открой VYX в браузере с кошельком.
+⟦0⟧ on Robinhood Chain	⟦0⟧ в Robinhood Chain
+Total	Всего
+Unlocked	Разблокировано
+Token ⟦0⟧	Токен ⟦0⟧
+Claimed	Получено
+Switch your wallet to ⟦0⟧…⟦1⟧ to claim.	Чтобы забрать токены, переключи кошелёк на ⟦0⟧…⟦1⟧.
+Nothing to claim yet. More tokens unlock tomorrow.	Пока забирать нечего. Новая часть разблокируется завтра.
+Claim sent. Your tokens arrive when the transaction confirms.	Клейм отправлен. Токены придут, когда транзакция подтвердится.

@@ -91,6 +91,18 @@ const qaMediaStorage={
 const qaMedia=createMediaHandler(fn=>fn(db),qaMediaStorage);
 const qaPort=Number(process.env.VYX_QA_PORT||4174);process.env.PUBLIC_APP_URL='http://127.0.0.1:'+qaPort;process.env.VYX_ADMIN_X_IDS=aliceX;process.env.VYX_APP_SECRET=randomBytes(32).toString('base64url');
 let qaTaskFetcher=fetch;
+if(process.env.VYX_QA_TOKENS==='1'){
+ // A live early-member allocation for Alice, unlocking daily since five days ago.
+ const {computeAllocations,createBatch,activateBatch}=await import('../server/token-claims.js');
+ await db.q("UPDATE users SET created_at='2026-11-01T00:00:00Z' WHERE id=$1",[a.user.id]);
+ await db.q("INSERT INTO x_task_awards(user_id,x_id,task_id,season,amount,proof_id,created_at) VALUES($1,$2,'qa-token','season-1',1000,'qa','2026-11-10T00:00:00Z')",[a.user.id,a.user.x_id]);
+ if(process.env.VYX_QA_TOKEN_WALLET)await db.q("INSERT INTO user_wallets(user_id,address,chain_id,message,signature) VALUES($1,$2,4663,'qa','0x00')",[a.user.id,process.env.VYX_QA_TOKEN_WALLET.toLowerCase()]);
+ await computeAllocations(db,'early-members',new Date('2026-11-22T00:00:00Z'));
+ if(process.env.VYX_QA_TOKEN_WALLET){
+  const batch=await createBatch(db,'early-members',{startsAt:new Date(Date.now()-5*86400000).toISOString()});
+  await activateBatch(db,batch.id,0,async()=>({root:batch.root,total:batch.total,start:batch.start,interval:batch.intervalSeconds,tranches:batch.tranches}));
+ }
+}
 if(process.env.VYX_QA_X_TASKS==='1'){
  await saveTaskAccess(db,a.user,{access_token:'isolated-qa-token',scope:taskScopes.join(' '),expires_in:7200});
  qaTaskFetcher=async url=>{

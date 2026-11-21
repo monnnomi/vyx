@@ -1,0 +1,10 @@
+[Unit]
+Description=VYX jVYX seasons: freeze closed seasons and activate funded batches
+After=vyx.service
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/vyx/current
+EnvironmentFile=/etc/vyx/vyx.env
+ExecStart=/usr/local/bin/node scripts/token-season.mjs auto
+NoNewPrivileges=true
+PrivateTmp=true

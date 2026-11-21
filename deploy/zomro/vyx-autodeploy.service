@@ -1,0 +1,9 @@
+[Unit]
+Description=VYX deploy from GitHub main (tests must pass)
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=oneshot
+User=root
+ExecStart=/bin/sh /usr/local/sbin/vyx-autodeploy
+TimeoutStartSec=30min

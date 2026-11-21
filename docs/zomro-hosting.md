@@ -25,6 +25,17 @@
 
 Проверка: `systemctl status vyx`, `curl -fsS http://127.0.0.1:4173/healthz`, `nginx -t`. Журналы приложения: `journalctl -u vyx`. В nginx используется формат без query string, чтобы не записывать OAuth-коды. Не включайте логирование тел/заголовков авторизации.
 
+## Автодеплой из GitHub
+
+`vyx-autodeploy.timer` раз в минуту проверяет `main` на GitHub (read-only deploy key `vyx-zomro-autodeploy`, ключ `/root/.ssh/vyx_github`, отпечаток хоста GitHub закреплён). Если `main` ушёл вперёд от выкладки (`/opt/vyx/deployed-commit`), сервер собирает этот коммит в `/var/tmp`, запускает `npm ci` и **все тесты**. Только при зелёных тестах выпуск идёт через `deploy/zomro/release.sh`: миграции, переключение, проверки здоровья, откат при сбое.
+
+- Неудачный коммит записывается в `/opt/vyx/failed-commit` и не повторяется; следующий коммит пробуется заново.
+- Выкладка с Mac (`deploy.sh`) записывает свой коммит; автодеплой не откатывает её на более старый `main`.
+- Журнал: `journalctl -u vyx-autodeploy`. Остановить: `systemctl disable --now vyx-autodeploy.timer`.
+- Установка и обновление — `deploy/zomro/setup-automation.sh`, вызывается из `deploy.sh`; ключ регистрируется через `gh` на Mac.
+
+`vyx-token-seasons.timer` каждые 5 минут: замораживает доли jVYX закрывшихся сезонов и включает партии, которые владелец уже добавил в контракт (`scripts/token-season.mjs auto`, журнал `journalctl -u vyx-token-seasons`).
+
 ## Фоновые задачи и данные
 
 - `vyx-news.timer`: каждые 15 минут UTC; автоматическая проверка заданий с прежним лимитом $1/сутки. Не увеличивать лимиты и не сбрасывать расход для QA.

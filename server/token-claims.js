@@ -164,3 +164,29 @@ export async function memberTokens(db,userId){
     ...(live?{onchainId:r.onchain_id,address:checksumAddress(r.address),proof:r.proof,startsAt:iso(r.starts_at),tranches:r.tranches,intervalSeconds:r.interval_seconds}:{})};
   })};
 }
+
+// Timer task (vyx-token-seasons.timer): freeze every season that has closed and
+// activate inactive batches whose root the owner has already added on-chain.
+// chain = {readSeason(id), readSeasonCount()}. Returns log lines.
+export async function autoTokenSeasons(db,chain,now=null){
+ const at=await clock(db,now),log=[],chainId=walletChain().id;
+ for(const [key,s] of Object.entries(tokenSeasons)){
+  if(at<new Date(s.closesAt))continue;
+  const [{n}]=await db.q('SELECT count(*)::int AS n FROM token_allocations WHERE season=$1',[key]);
+  if(n)continue;
+  const r=await computeAllocations(db,key,at);
+  if(r.members)log.push(`Froze ${key}: ${r.members} members, ${(BigInt(r.allocated)/tokenUnit).toString()} of ${(BigInt(r.pool)/tokenUnit).toString()} jVYX.`);
+ }
+ const pending=await db.q('SELECT id,root FROM token_batches WHERE activated_at IS NULL AND chain_id=$1 ORDER BY id',[chainId]);
+ if(!pending.length||!tokenContracts[chainId])return log;
+ const used=new Set((await db.q('SELECT onchain_id FROM token_batches WHERE onchain_id IS NOT NULL AND chain_id=$1',[chainId])).map(r=>r.onchain_id));
+ const count=await chain.readSeasonCount();
+ for(let i=0;i<count&&pending.length;i++){
+  if(used.has(i))continue;
+  const s=await chain.readSeason(i),k=pending.findIndex(p=>p.root===String(s.root).toLowerCase());
+  if(k<0)continue;
+  try{await activateBatch(db,pending[k].id,i,async()=>s,at);log.push(`Batch ${pending[k].id} is live as on-chain season ${i}.`);pending.splice(k,1);}
+  catch(err){log.push(`Batch ${pending[k].id} matches season ${i} by root but not by schedule or total: ${err.message}`);}
+ }
+ return log;
+}

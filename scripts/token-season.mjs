@@ -4,19 +4,22 @@
 //   ... batch <season> [--start=ISO]      Merkle batch for members with a wallet (90 daily unlocks)
 //   ... activate <batchId> <onchainId>    after addSeason; checked against the chain
 //   ... discard <batchId>                 drop a batch that was never added on-chain
+//   ... auto                              timer: freeze closed seasons, activate batches found on-chain
 // Seasons: early-members, season-1, season-2.
 import {withDB} from '../server/db.js';
 import {walletChain} from '../server/wallets.js';
-import {computeAllocations,createBatch,activateBatch,discardBatch,tokenContracts,tokenUnit,tokenSeasons,decodeSeason,seasonsCallData} from '../server/token-claims.js';
+import {computeAllocations,createBatch,activateBatch,discardBatch,tokenContracts,tokenUnit,tokenSeasons,decodeSeason,seasonsCallData,autoTokenSeasons} from '../server/token-claims.js';
 
 const [cmd,a,b]=process.argv.slice(2),opt=Object.fromEntries(process.argv.slice(2).filter(x=>x.startsWith('--')).map(x=>x.slice(2).split('=')));
 const tokens=wei=>{const v=BigInt(wei);return (v/tokenUnit).toLocaleString('en-US')+(v%tokenUnit?'.'+(v%tokenUnit).toString().padStart(18,'0').replace(/0+$/,'').slice(0,4):'');};
 const chain=walletChain(),contracts=tokenContracts[chain.id];
 
-async function readSeason(id){
- const res=await fetch(chain.rpc,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:contracts.distributor,data:seasonsCallData(id)},'latest']})});
- const body=await res.json();if(body.error)throw new Error(body.error.message);return decodeSeason(body.result);
+async function ethCall(data){
+ const res=await fetch(chain.rpc,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:contracts.distributor,data},'latest']})});
+ const body=await res.json();if(body.error)throw new Error(body.error.message);return body.result;
 }
+const readSeason=async id=>decodeSeason(await ethCall(seasonsCallData(id)));
+const readSeasonCount=async()=>Number(BigInt(await ethCall('0x715f8fe8')));
 
 await withDB(async db=>{
  if(cmd==='allocate'){
@@ -32,6 +35,8 @@ await withDB(async db=>{
   console.log(`4) node --env-file=/etc/vyx/vyx.env scripts/token-season.mjs activate ${r.id} <id>`);
  }else if(cmd==='activate'){
   const r=await activateBatch(db,Number(a),Number(b),readSeason);console.log(`Batch ${r.id} is live as on-chain season ${r.onchainId}.`);
+ }else if(cmd==='auto'){
+  for(const line of await autoTokenSeasons(db,{readSeason,readSeasonCount}))console.log(line);
  }else if(cmd==='discard'){
   await discardBatch(db,Number(a));console.log(`Batch ${a} discarded.`);
  }else if(cmd==='status'){
@@ -43,5 +48,5 @@ await withDB(async db=>{
      FROM token_allocations WHERE season=$1`,[key]);
    console.log(`${key}: ${s.members} members, ${tokens(s.allocated)} jVYX allocated, ${s.batched} in batches (${s.live} live), ${s.waiting} with a wallet waiting for a batch`);
   }
- }else{console.log('Usage: status | allocate <season> | batch <season> [--start=ISO] | activate <batchId> <onchainId> | discard <batchId>');process.exitCode=1;}
+ }else{console.log('Usage: status | auto | allocate <season> | batch <season> [--start=ISO] | activate <batchId> <onchainId> | discard <batchId>');process.exitCode=1;}
 });

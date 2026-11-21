@@ -1,0 +1,7 @@
+[Unit]
+Description=Run VYX jVYX season tasks every five minutes
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=5min
+[Install]
+WantedBy=timers.target

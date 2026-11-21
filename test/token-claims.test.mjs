@@ -6,7 +6,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {login} from '../server/oauth.js';
 import {state} from '../server/service.js';
 import {verifyClaim} from '../server/merkle.js';
-import {splitPool,computeAllocations,createBatch,activateBatch,discardBatch,memberTokens,migrateTokens,decodeSeason,seasonsCallData,tokenUnit} from '../server/token-claims.js';
+import {splitPool,computeAllocations,createBatch,activateBatch,discardBatch,memberTokens,migrateTokens,decodeSeason,seasonsCallData,tokenUnit,autoTokenSeasons} from '../server/token-claims.js';
 
 process.env.VYX_APP_SECRET||='token-test-secret';process.env.PUBLIC_APP_URL='https://joinvyx.com';delete process.env.VYX_CHAIN_ID;
 const pg=new PGlite();await pg.exec(await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'));
@@ -98,4 +98,25 @@ test('seasons() results decode and the browser builds claim calldata the contrac
  assert.equal(ctx.jvyxUnlocked(item,Date.parse('2026-12-04T12:00:00Z')),100n);
  assert.equal(ctx.jvyxUnlocked(item,Date.parse('2027-03-01T00:00:00Z')),900n);
  assert.equal(ctx.jvyxFormat(1234567n*10n**16n),'12,345.67');
+});
+
+test('the season timer freezes closed seasons once and activates batches it finds on-chain',async()=>{
+ const p2=new PGlite();await p2.exec(await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'));const d2=wrap(p2);
+ const {user}=await d2.tx(tx=>login(tx,{id:'99001',username:'auto_1',name:'Auto',avatar:''}));
+ await d2.q("UPDATE users SET created_at='2026-11-01T00:00:00Z' WHERE id=$1",[user.id]);
+ await d2.q("INSERT INTO x_task_awards(user_id,x_id,task_id,season,amount,proof_id,created_at) VALUES($1,$2,'a','season-1',50,'p','2026-11-05T00:00:00Z')",[user.id,user.x_id]);
+ await d2.q("INSERT INTO user_wallets(user_id,address,chain_id,message,signature) VALUES($1,$2,4663,'m','0x00')",[user.id,addr(0xcc)]);
+ const none={readSeasonCount:async()=>{throw new Error('no chain calls expected');},readSeason:async()=>{throw new Error('no');}};
+ assert.deepEqual(await autoTokenSeasons(d2,none,'2026-11-21T23:59:00Z'),[]);
+ const log=await autoTokenSeasons(d2,none,'2026-11-22T00:05:00Z');
+ assert.equal(log.length,1);assert.match(log[0],/Froze early-members: 1 members, 10000000 of 10000000 jVYX/);
+ assert.deepEqual(await autoTokenSeasons(d2,none,'2026-11-22T00:10:00Z'),[]);
+ const b=await createBatch(d2,'early-members',{startsAt:'2026-11-23T00:00:00Z'});
+ const other={root:'0x'+'11'.repeat(32),total:1n,claimed:0n,start:0n,interval:0n,tranches:1n};
+ const mine={root:b.root,total:BigInt(b.total),claimed:0n,start:BigInt(b.start),interval:86400n,tranches:90n};
+ const chain={readSeasonCount:async()=>2,readSeason:async i=>i===0?other:mine};
+ assert.deepEqual(await autoTokenSeasons(d2,chain,'2026-11-22T00:15:00Z'),[`Batch ${b.id} is live as on-chain season 1.`]);
+ assert.equal((await memberTokens(d2,user.id)).items[0].onchainId,1);
+ assert.deepEqual(await autoTokenSeasons(d2,none,'2026-11-22T00:20:00Z'),[]);
+ await p2.close();
 });

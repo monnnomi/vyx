@@ -68,3 +68,16 @@ test('admin OAuth return is allowed, arbitrary external redirects are rejected',
   const binding=token(),url=new URL(await startOAuth(db,binding,new Date(),path));const attempt=await consumeAttempt(db,url.searchParams.get('state'),binding);assert.equal(attempt.return_to,expected);
  }
 });
+test('administrators see who linked a Robinhood Chain wallet and can filter and search by it',async()=>{
+ const address='0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed';
+ await db.q("INSERT INTO user_wallets(user_id,address,chain_id,message,signature,linked_at) VALUES($1,$2,4663,'m','0x00',clock_timestamp())",[member.user.id,address]);
+ const all=await adminOverview(db,owner.user);assert.equal(all.counts.wallets,1);assert.equal(all.counts.wallets_today,1);
+ const linked=all.users.find(u=>u.id===member.user.id).wallet;
+ assert.equal(linked.address,'0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed');assert.equal(linked.chainId,4663);assert.equal(linked.explorer,'https://robinhoodchain.blockscout.com');
+ assert.equal(all.users.find(u=>u.id===owner.user.id).wallet,null);
+ const withWallet=await adminOverview(db,owner.user,{filter:'wallet'});assert.deepEqual(withWallet.users.map(u=>u.x_id),['1002']);
+ const without=await adminOverview(db,owner.user,{filter:'no-wallet'});assert.deepEqual(without.users.map(u=>u.x_id),['1001']);
+ assert.deepEqual((await adminOverview(db,owner.user,{query:'0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'})).users.map(u=>u.x_id),['1002']);
+ await assert.rejects(adminOverview(db,owner.user,{filter:'wallets; DROP'}),/Invalid filter/);
+ await db.q('DELETE FROM user_wallets WHERE user_id=$1',[member.user.id]);
+});

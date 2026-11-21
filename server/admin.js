@@ -1,6 +1,8 @@
 import {fail} from './http.js';
 import {halloween} from './events.js';
 import {nftSelectionTotalsSQL,nftSelectionRules,nftSelectionStatus} from './nft-selection.js';
+import {checksumAddress} from './evm.js';
+import {robinhoodChains} from './wallets.js';
 
 export function isAdmin(user){
  const ids=(process.env.VYX_ADMIN_X_IDS||'').split(',').map(x=>x.trim()).filter(Boolean);
@@ -10,7 +12,7 @@ export function requireAdmin(user){if(!user)fail(401,'Sign in with your administ
 export async function adminOverview(db,user,params={}){
  requireAdmin(user);
  const query=String(params.query||'').trim().slice(0,100),filter=params.filter||'all';
- if(!['all','minted','not-minted','online','nft-free','nft-half-price','nft-full-price'].includes(filter))fail(400,'Invalid filter.');
+ if(!['all','minted','not-minted','online','nft-free','nft-half-price','nft-full-price','wallet','no-wallet'].includes(filter))fail(400,'Invalid filter.');
  const page=Number(params.page||1);if(!Number.isInteger(page)||page<1||page>100000)fail(400,'Invalid page.');
  const [counts]=await db.q(`SELECT
  (SELECT count(*)::int FROM users WHERE x_id IS NOT NULL AND NOT is_system) AS connected,
@@ -19,22 +21,27 @@ export async function adminOverview(db,user,params={}){
  (SELECT count(*)::int FROM presence_sessions WHERE user_id IS NULL AND last_seen_at>clock_timestamp()-interval '90 seconds') AS online_guests,
  (SELECT count(*)::int FROM users WHERE x_id IS NOT NULL AND NOT is_system AND created_at>=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS connected_today,
  (SELECT count(*)::int FROM event_mints WHERE campaign_id=$1 AND minted_at>=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS minted_today,
+ (SELECT count(*)::int FROM user_wallets w JOIN users wu ON wu.id=w.user_id WHERE NOT wu.is_system) AS wallets,
+ (SELECT count(*)::int FROM user_wallets w JOIN users wu ON wu.id=w.user_id WHERE NOT wu.is_system AND w.linked_at>=date_trunc('day',clock_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS wallets_today,
  clock_timestamp() AS server_now`,[halloween.id]);
  const rows=await db.q(`SELECT u.id,u.x_id,u.x_username,u.name,u.handle,u.avatar_url,u.created_at,
- u.last_login_at,u.login_count,u.last_seen_at,m.id AS mint_id,m.minted_at,nft.confirmed_vp,nft.invited_referrals,
+ u.last_login_at,u.login_count,u.last_seen_at,w.address AS wallet_address,w.chain_id AS wallet_chain_id,w.linked_at AS wallet_linked_at,m.id AS mint_id,m.minted_at,nft.confirmed_vp,nft.invited_referrals,
  EXISTS(SELECT 1 FROM presence_sessions p WHERE p.user_id=u.id AND p.last_seen_at>clock_timestamp()-interval '90 seconds') AS online,
  count(*) OVER()::int AS filtered_total
  FROM users u LEFT JOIN event_mints m ON m.user_id=u.id AND m.campaign_id=$1
+ LEFT JOIN user_wallets w ON w.user_id=u.id
  CROSS JOIN LATERAL (${nftSelectionTotalsSQL}) nft
  WHERE u.x_id IS NOT NULL AND NOT u.is_system
- AND ($2='' OR u.name ILIKE $3 OR u.x_username ILIKE $3 OR u.handle ILIKE $3 OR u.x_id=$2)
+ AND ($2='' OR u.name ILIKE $3 OR u.x_username ILIKE $3 OR u.handle ILIKE $3 OR u.x_id=$2 OR w.address=lower($2))
  AND ($4='all' OR ($4='minted' AND m.id IS NOT NULL) OR ($4='not-minted' AND m.id IS NULL)
  OR ($4='online' AND EXISTS(SELECT 1 FROM presence_sessions p WHERE p.user_id=u.id AND p.last_seen_at>clock_timestamp()-interval '90 seconds'))
  OR ($4='nft-free' AND nft.confirmed_vp>=${nftSelectionRules.vp} AND nft.invited_referrals>=${nftSelectionRules.referrals})
  OR ($4='nft-half-price' AND nft.confirmed_vp>=${nftSelectionRules.vp} AND nft.invited_referrals<${nftSelectionRules.referrals})
- OR ($4='nft-full-price' AND nft.confirmed_vp<${nftSelectionRules.vp}))
+ OR ($4='nft-full-price' AND nft.confirmed_vp<${nftSelectionRules.vp})
+ OR ($4='wallet' AND w.address IS NOT NULL) OR ($4='no-wallet' AND w.address IS NULL))
  ORDER BY u.created_at DESC,u.id LIMIT 50 OFFSET $5`,[halloween.id,query,'%'+query+'%',filter,(page-1)*50]);
  const total=rows[0]?.filtered_total||0;
  return {admin:{name:user.name,x_username:user.x_username},counts:{...counts,online:counts.online_members+counts.online_guests,not_minted:Math.max(0,counts.connected-counts.minted)},
-  event:halloween,users:rows.map(({filtered_total,confirmed_vp,invited_referrals,...row})=>({...row,nftSelection:nftSelectionStatus(confirmed_vp,invited_referrals)})),pagination:{page,pageSize:50,total,pages:Math.max(1,Math.ceil(total/50))},onlineWindowSeconds:90};
+  event:halloween,users:rows.map(({filtered_total,confirmed_vp,invited_referrals,wallet_address,wallet_chain_id,wallet_linked_at,...row})=>({...row,nftSelection:nftSelectionStatus(confirmed_vp,invited_referrals),
+  wallet:wallet_address?{address:checksumAddress(wallet_address),chainId:wallet_chain_id,linkedAt:wallet_linked_at,explorer:robinhoodChains[wallet_chain_id]?.explorer||null}:null})),pagination:{page,pageSize:50,total,pages:Math.max(1,Math.ceil(total/50))},onlineWindowSeconds:90};
 }

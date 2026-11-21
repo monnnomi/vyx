@@ -14,3 +14,5 @@
 
 /* Russian labels need room to wrap on narrow admin screens. */
 @media(max-width:650px){.admin-intro{flex-direction:column;align-items:flex-start}.admin-intro h1{font-size:38px;line-height:1.15}.admin-intro>div{min-width:0}.admin-event{flex-wrap:wrap}.admin-event>div{flex:1;min-width:0}.admin-event .admin-badge{margin-left:0}.admin-news-settings button,.admin-news-add button{max-width:100%;white-space:normal}}
+.admin-wallet{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;background:#f1f4ec;border:1px solid #dfe5d6;border-radius:5px;padding:3px 6px;color:#3e5236}
+#admin-metrics{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}

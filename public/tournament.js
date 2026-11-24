@@ -11,24 +11,47 @@ function renderTournament(){
  if(!t)return '<section class="panel"><h2>Tournament</h2><p>Loading tournament…</p></section>';
  const transferKey=data.user?'vyx-tournament-payment:'+data.user.id:'';
  const pending=transferKey ? localStorage.getItem(transferKey)||'' : '';
- const entry=t.entered ? '<p>You’ve joined the tournament.</p>' : !t.open ? '' : !data.user ?
-  '<p>Sign in with X to join.</p>' : !t.wallet ? '<p><a href="#profile">Link your wallet in your profile</a> to join.</p>' :
-  `<p>Connect X verification under <a href="#tasks">Quests</a> before paying.</p>
-   <button class="primary" data-tournament-pay ${pending?'disabled':''}>Pay 10,000 jVYX</button>
-   <form data-tournament-receipt><label>Payment transaction hash <input name="hash" required value="${e(pending)}" pattern="0x[0-9A-Fa-f]{64}"></label> <button class="secondary">Verify payment</button></form>`;
- const submission=t.entered&&t.open ? `<form data-tournament-post><label>X post URL <input type="url" name="url" required placeholder="https://x.com/…/status/…"></label> <button class="secondary">Verify post</button></form>` : '';
- return `<section class="news-page">
-  <header class="news-page-head"><h1>VYX Tournament</h1><p>Publish about VYX on X. Compete for 1,000,000 jVYX across 15 places.</p>
-  <p><strong>${t.closed?'Closed':t.open?'Open for entries':'Entry opens after verification is enabled'}</strong> · Ends November 29, 23:59 Yekaterinburg time</p></header>
-  <section class="panel"><h2>Entry</h2><p>10,000 jVYX to the VYX treasury and a 0.00002 ETH service fee on Robinhood Chain, plus network gas. Your wallet may first ask for token approval.</p>${entry}${submission}
-  <p>One original post or quote per day mentioning @vyxsocial. One account per participant. Duplicate posts and manipulated engagement are ineligible.</p>
-  <p>1 point per 100 views · 3 per like · 5 per reply · 8 per repost or quote.</p></section>
-  <section class="panel"><h2>Leaderboard</h2><p>Provisional scores. Submit the same link again to refresh its metrics once an hour.</p>
-  ${t.board.length?`<ol>${t.board.map(r=>`<li><strong>${e(r.name)}</strong> · ${fmt(r.score)} points · ${fmt(r.posts)} posts</li>`).join('')}</ol>`:'<p>No scored posts yet.</p>'}</section>
-  <section class="panel"><h2>Prizes</h2><ol>${t.prizes.map(n=>`<li>${fmt(n)} jVYX</li>`).join('')}</ol>
-  <p>Prizes for unfilled places roll over to the next tournament.</p></section>
-  <a href="#news">News archive</a>
- </section>`;
+ const entry=t.entered ? '<p class="tournament-joined">✓ Entry confirmed</p>' : !t.open ? '' : !data.user ?
+  '<button class="primary" data-action="signin">Sign in with X</button>' : !t.wallet ?
+  '<a class="tournament-link" href="#profile">Link your wallet →</a>' :
+  `<p>Enable X verification under <a href="#tasks">Quests</a> before paying.</p>
+   <button class="primary" data-tournament-pay ${pending?'disabled':''}>Join for 10,000 jVYX</button>
+   <details ${pending?'open':''}><summary>Verify an existing payment</summary>
+   <form data-tournament-receipt><label>Transaction hash <input name="hash" required value="${e(pending)}" pattern="0x[0-9A-Fa-f]{64}"></label><button class="secondary">Verify payment</button></form></details>`;
+ const submission=t.entered&&t.open ? `<form data-tournament-post><label>X post URL <input type="url" name="url" required placeholder="https://x.com/…/status/…"></label><button class="primary">Verify post</button></form>` : '';
+ return `<div class="tournament-page">
+  <header class="tournament-hero">
+   <div><p class="tournament-status">${t.closed?'Tournament closed':t.open?'Open for entries':'Entry unavailable'}</p>
+   <h1>VYX Tournament</h1><p>Publish about VYX on X and earn points from engagement.</p>
+   <div class="tournament-pool"><strong>${fmt(t.prizes.reduce((sum,n)=>sum+n,0))}</strong> jVYX</div>
+   <p>Prize pool for the top ${t.prizes.length} · Ends Nov 29, 23:59 (UTC+5)</p></div>
+   <img src="/assets/jvyx-token-256.png" alt="" width="256" height="256">
+  </header>
+  <div class="tournament-grid">
+   <section class="tournament-card tournament-entry"><h2>Join the tournament</h2>
+    <p class="tournament-cost"><strong>10,000 jVYX</strong><span>+ 0.00002 ETH service fee and network gas</span></p>
+    <p>Pay on Robinhood Chain. Your wallet may ask for token approval first.</p>${entry}${submission}
+   </section>
+   <section class="tournament-card"><h2>How to earn points</h2>
+    <p>Submit one original post or quote per day mentioning <a href="https://x.com/vyxsocial" target="_blank" rel="noopener noreferrer">@vyxsocial</a>.</p>
+    <dl class="tournament-metrics"><div><dt>100 views</dt><dd>+1</dd></div><div><dt>Like</dt><dd>+3</dd></div><div><dt>Reply</dt><dd>+5</dd></div><div><dt>Repost or quote</dt><dd>+8</dd></div></dl>
+    <p>One account per person. Duplicate posts and manipulated engagement are ineligible.</p>
+   </section>
+  </div>
+  <div class="tournament-grid">
+   <section class="tournament-card"><h2>Leaderboard</h2><p>Provisional scores. Resubmit your link to refresh after one hour.</p>
+    ${t.board.length?`<table><thead><tr><th>Rank</th><th>Participant</th><th>Posts</th><th>Points</th></tr></thead><tbody>${t.board.map((r,i)=>`<tr><td>${i+1}</td><td><strong>${e(r.name)}</strong></td><td>${fmt(r.posts)}</td><td>${fmt(r.score)}</td></tr>`).join('')}</tbody></table>`:'<div class="tournament-empty"><strong>No scored posts yet</strong><p>Verified posts will appear here.</p></div>'}
+   </section>
+   <section class="tournament-card"><h2>Prizes</h2>
+    <div class="tournament-podium">${t.prizes.slice(0,3).map((n,i)=>`<div><span>Rank ${i+1}</span><strong>${fmt(n)}</strong><small>jVYX</small></div>`).join('')}</div>
+    <details><summary>See prizes for ranks 4–15</summary>
+     <table><thead><tr><th>Rank</th><th>Prize, jVYX</th></tr></thead><tbody>${t.prizes.slice(3).map((n,i)=>`<tr><td>${i+4}</td><td>${fmt(n)}</td></tr>`).join('')}</tbody></table>
+    </details><p>Prizes for unfilled places roll over to the next tournament.</p>
+   </section>
+  </div>
+  <a class="tournament-archive" href="#news">News archive →</a>
+ </div>`;
+
 }
 
 async function tournamentAction(button,action){

@@ -20,7 +20,7 @@ function renderTournament(){
  return `<section class="news-page">
   <header class="news-page-head"><h1>VYX Tournament</h1><p>Publish about VYX on X. Compete for 1,000,000 jVYX across 15 places.</p>
   <p><strong>${t.closed?'Closed':t.open?'Open for entries':'Entry opens after verification is enabled'}</strong> · Ends November 29, 23:59 Yekaterinburg time</p></header>
-  <section class="panel"><h2>Entry</h2><p>10,000 jVYX to the VYX treasury on Robinhood Chain, plus network gas.</p>${entry}${submission}
+  <section class="panel"><h2>Entry</h2><p>10,000 jVYX to the VYX treasury and a 0.00002 ETH service fee on Robinhood Chain, plus network gas. Your wallet may first ask for token approval.</p>${entry}${submission}
   <p>One original post or quote per day mentioning @vyxsocial. One account per participant. Duplicate posts and manipulated engagement are ineligible.</p>
   <p>1 point per 100 views · 3 per like · 5 per reply · 8 per repost or quote.</p></section>
   <section class="panel"><h2>Leaderboard</h2><p>Provisional scores. Submit the same link again to refresh its metrics once an hour.</p>
@@ -51,8 +51,20 @@ document.addEventListener('click',event=>{
   const [from]=await wallet.request({method:'eth_requestAccounts'});
   if(from?.toLowerCase()!==tournament.wallet.toLowerCase())throw Error('Select your linked wallet.');
   await jvyxEnsureChain(wallet,tournament.payment);
-  const {to,data:calldata}=tournament.payment;
-  const hash=await wallet.request({method:'eth_sendTransaction',params:[{from,to,data:calldata,value:'0x0'}]});
+  const {to,token,approval,allowancePrefix,data:calldata,value,amount}=tournament.payment;
+  const addressWord=address=>address.toLowerCase().slice(2).padStart(64,'0');
+  const allowance=await wallet.request({method:'eth_call',params:[{to:token,data:allowancePrefix+addressWord(from)+addressWord(to)},'latest']});
+  if(BigInt(allowance)<BigInt(amount)){
+   const approvalHash=await wallet.request({method:'eth_sendTransaction',params:[{from,to:token,data:approval,value:'0x0'}]});
+   let receipt;
+   for(let i=0;i<20&&!receipt;i++){
+    await new Promise(resolve=>setTimeout(resolve,2000));
+    receipt=await wallet.request({method:'eth_getTransactionReceipt',params:[approvalHash]});
+   }
+   if(receipt?.status!=='0x1')throw Error('Token approval has not succeeded. Check it in your wallet before trying again.');
+  }
+  await api('tournament-preflight',{});
+  const hash=await wallet.request({method:'eth_sendTransaction',params:[{from,to,data:calldata,value}]});
   localStorage.setItem(key,hash);
   const input=document.querySelector('[data-tournament-receipt] input');
   if(input)input.value=hash;

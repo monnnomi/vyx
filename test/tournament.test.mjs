@@ -20,6 +20,9 @@ test('a confirmed exact jVYX transfer grants one entry and can be retried safely
  await db.q('INSERT INTO user_wallets VALUES($1,$2,4663)',[user.id,from]);
  const before=process.env.VYX_TOURNAMENT_OPEN;
  process.env.VYX_TOURNAMENT_OPEN='1';
+ const entryAddress='0x'+'2'.repeat(40);
+ process.env.VYX_TOURNAMENT_CONTRACT=entryAddress;
+ t.after(()=>delete process.env.VYX_TOURNAMENT_CONTRACT);
  t.after(()=>{if(before===undefined)delete process.env.VYX_TOURNAMENT_OPEN;else process.env.VYX_TOURNAMENT_OPEN=before;});
  const receipt={status:'0x1',blockHash:'0x1234',blockNumber:'0x10',logs:[{
   address:tokenContracts[4663].token,
@@ -30,8 +33,14 @@ test('a confirmed exact jVYX transfer grants one entry and can be retried safely
   eth_getBlockByHash:{timestamp:'0x'+(Date.parse('2026-11-25T00:00:00Z')/1000).toString(16)},
   eth_blockNumber:'0x12'};
  t.mock.method(globalThis,'fetch',async(_url,options)=>Response.json({result:results[JSON.parse(options.body).method]}));
- await assert.rejects(registerTournamentPayment(db,user,hash),/required 10,000 jVYX transfer/);
+ await assert.rejects(registerTournamentPayment(db,user,hash),/required 10,000 jVYX entry/);
  receipt.logs[0].data='0x'+(10_000n*10n**18n).toString(16);
+ await assert.rejects(registerTournamentPayment(db,user,hash),/service fee/);
+ const word=n=>n.toString(16).padStart(64,'0');
+ receipt.logs.push({address:entryAddress,
+  topics:['0x089d0daa5e8466fdfdab1113e8fdd98c06ef26711cafc429dabce354d007364e',topic(from)],
+  data:'0x'+word(10_000n*10n**18n)+word(20_000_000_000_000n)});
+
  assert.deepEqual(await registerTournamentPayment(db,user,hash),{ok:true});
  assert.deepEqual(await registerTournamentPayment(db,user,hash),{ok:true});
  assert.equal((await tournamentState(db,user)).entered,true);

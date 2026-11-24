@@ -114,7 +114,7 @@ export async function createBatch(db,key,{startsAt,tranches=defaultUnlock.tranch
   const tree=buildClaimTree(rows.map(r=>({address:r.address,allocation:BigInt(r.amount)})));
   const [batch]=await tx.q(`INSERT INTO token_batches(season,root,total,members,starts_at,tranches,interval_seconds,chain_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
    [key,tree.root,tree.total,rows.length,start,plan.tranches,plan.intervalSeconds,chain.id]);
-  for(const r of rows)await tx.q('INSERT INTO token_batch_claims(batch_id,season,user_id,address,allocation,proof) VALUES($1,$2,$3,$4,$5,$6)',
+  for(const r of rows)await tx.q('INSERT INTO token_batch_claims(batch_id,season,user_id,address,allocation,proof) VALUES($1,$2,$3,$4,$5,$6::text::jsonb)',
    [batch.id,key,r.user_id,r.address,r.amount,JSON.stringify(tree.claims[r.address].proof)]);
   return {id:batch.id,season:key,root:tree.root,total:tree.total,members:rows.length,startsAt:iso(start),start:Math.floor(start.getTime()/1000),...plan,chainId:chain.id};
  });

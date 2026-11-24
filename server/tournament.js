@@ -1,4 +1,5 @@
 import {fail} from './http.js';
+import {reserveXCheckRead} from './x-tasks.js';
 import {getTaskAccess} from './x-task-access.js';
 import {walletChain} from './wallets.js';
 import {tokenContracts} from './token-claims.js';
@@ -22,6 +23,7 @@ export async function migrateTournament(db) {
   user_id uuid PRIMARY KEY REFERENCES users(id), wallet text NOT NULL UNIQUE,
   tx_hash text NOT NULL UNIQUE, entered_at timestamptz NOT NULL
  )`);
+ await db.q("ALTER TABLE tournament_entries ADD COLUMN IF NOT EXISTS scanned_at timestamptz");
  await db.q(`CREATE TABLE IF NOT EXISTS tournament_posts (
   id text PRIMARY KEY, user_id uuid NOT NULL REFERENCES tournament_entries(user_id),
   post_day date NOT NULL, score bigint NOT NULL, measured_at timestamptz NOT NULL,
@@ -101,37 +103,81 @@ export async function registerTournamentPayment(db,user,hash) {
  return {ok:true};
 }
 
+const postFields='author_id,created_at,public_metrics,entities,referenced_tweets';
+
+export function tournamentPostScore(post,entry,user) {
+ const published=Date.parse(post?.created_at);
+ if(post?.author_id!==String(user.x_id)||!Number.isFinite(published)||published<Math.max(opens,Date.parse(entry.entered_at))
+  ||published>=closes||post.referenced_tweets?.some(ref=>ref.type!=='quoted')
+  ||!post.entities?.hashtags?.some(tag=>tag.tag.toLowerCase()==='vyx')||!post.public_metrics)return null;
+ const m=post.public_metrics;
+ const score=Math.floor((m.impression_count??0)/100)+3*(m.like_count??0)+5*(m.reply_count??0)+8*(m.retweet_count??0);
+ return {score,day:new Date(published+5*3600000).toISOString().slice(0,10)};
+}
+
+async function saveTournamentPost(db,user,id,{score,day}) {
+ const [saved]=await db.q(`INSERT INTO tournament_posts(id,user_id,post_day,score,measured_at)
+  SELECT $1,$2,$3,$4,now() WHERE now()<$5 ON CONFLICT(user_id,post_day) DO UPDATE SET score=EXCLUDED.score,measured_at=EXCLUDED.measured_at
+  WHERE tournament_posts.id=EXCLUDED.id RETURNING id`,[id,user.id,day,score,new Date(closes)]);
+ return Boolean(saved);
+}
+
+async function fetchTournamentPosts(db,token,path,params) {
+ const url=new URL('https://api.x.com/2/'+path);
+ url.search=new URLSearchParams({'tweet.fields':postFields,...params});
+ await reserveXCheckRead(db,url.href);
+ let response;
+ try { response=await fetch(url,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(8000),redirect:'error'}); }
+ catch { fail(503,'X is temporarily unavailable. Try again later.'); }
+ if (!response.ok) fail(response.status===429?503:409,'X could not verify this post. Check its visibility and your X connection.');
+ return response.json();
+}
+
 export async function scoreTournamentPost(db,user,url) {
  if (!ready()||!isOpen()) fail(409,'Tournament submissions are closed.');
  const id=typeof url==='string'&&url.match(postPattern)?.[1];
  if (!id) fail(400,'Enter a link to a post on X.');
- const [entry]=await db.q('SELECT user_id FROM tournament_entries WHERE user_id=$1',[user.id]);
+ const [entry]=await db.q('SELECT entered_at FROM tournament_entries WHERE user_id=$1',[user.id]);
  if (!entry) fail(403,'Join the tournament before submitting a post.');
  const [previous]=await db.q('SELECT measured_at FROM tournament_posts WHERE id=$1 AND user_id=$2',[id,user.id]);
  if (previous&&Date.now()-new Date(previous.measured_at).getTime()<3600000) fail(429,'You can refresh this post once an hour.');
  const {token}=await getTaskAccess(db,user);
- const endpoint=new URL('https://api.x.com/2/tweets/'+id);
- endpoint.searchParams.set('tweet.fields','author_id,created_at,public_metrics,entities,referenced_tweets');
- let response;
- try { response=await fetch(endpoint,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(8000)}); }
- catch { fail(503,'X is temporarily unavailable. Try again later.'); }
- if (!response.ok) fail(409,'X could not verify this post. Check its visibility and your X connection.');
- const post=(await response.json()).data;
- const published=Date.parse(post?.created_at);
- if (post?.author_id!==String(user.x_id)||!Number.isFinite(published)||published<opens||published>=closes
-  ||post.referenced_tweets?.some(ref=>ref.type!=='quoted')||!post.entities?.mentions?.some(m=>m.username.toLowerCase()==='vyxsocial')) {
-  fail(400,'Use your own original post or quote published during the tournament, mentioning @vyxsocial.');
+ const {data:post}=await fetchTournamentPosts(db,token,'tweets/'+id,{});
+ const scored=tournamentPostScore(post,entry,user);
+ if(!scored) fail(400,'Publish your own original post or quote with #VYX after your tournament entry is confirmed.');
+ if(!await saveTournamentPost(db,user,id,scored))fail(409,'Only one post per day counts, and submissions must arrive before closing.');
+ return {ok:true,score:scored.score};
+}
+
+export async function syncTournament(db) {
+ if(!ready()||!isOpen())return {scanned:0,scored:0};
+ const entries=await db.q(`SELECT t.user_id AS id,t.entered_at,u.x_id FROM tournament_entries t
+  JOIN users u ON u.id=t.user_id WHERE t.scanned_at IS NULL OR t.scanned_at<now()-interval '2 hours'
+  ORDER BY t.scanned_at NULLS FIRST,t.entered_at LIMIT 3`);
+ let scanned=0,scored=0;
+ for(const user of entries){
+  try{
+   const {token}=await getTaskAccess(db,user);
+   const params={max_results:'10',exclude:'retweets,replies',start_time:new Date(Math.max(opens,Date.parse(user.entered_at))).toISOString()};
+   const {data:recent=[]}=await fetchTournamentPosts(db,token,'users/'+encodeURIComponent(user.x_id)+'/tweets',params);
+   for(const post of recent.reverse()){
+    const result=tournamentPostScore(post,user,user);
+    if(result&&await saveTournamentPost(db,user,post.id,result))scored++;
+   }
+   const known=await db.q(`SELECT id FROM tournament_posts WHERE user_id=$1 AND measured_at<now()-interval '2 hours' ORDER BY measured_at LIMIT 7`,[user.id]);
+   if(known.length){
+    const {data:posts=[]}=await fetchTournamentPosts(db,token,'tweets',{ids:known.map(post=>post.id).join(',')});
+    for(const post of posts){
+     const result=tournamentPostScore(post,user,user);
+     if(result&&await saveTournamentPost(db,user,post.id,result))scored++;
+    }
+   }
+   scanned++;
+  }catch(error){
+   if(error.status===503)break;
+   if(error.status!==409)throw error;
+  }
+  await db.q('UPDATE tournament_entries SET scanned_at=now() WHERE user_id=$1',[user.id]);
  }
- const m=post.public_metrics;
- if (!m) fail(503,'X did not return metrics for this post.');
- const score=Math.floor((m.impression_count??0)/100)+3*(m.like_count??0)+5*(m.reply_count??0)+8*((m.retweet_count??0)+(m.quote_count??0));
- const [saved]=await db.q(`INSERT INTO tournament_posts(id,user_id,post_day,score,measured_at)
-  SELECT $1,$2,$3,$4,now() WHERE now()<$5 ON CONFLICT(id) DO UPDATE SET score=EXCLUDED.score,measured_at=EXCLUDED.measured_at
-  WHERE tournament_posts.user_id=EXCLUDED.user_id AND tournament_posts.measured_at <= now()-interval '1 hour' RETURNING id`,
-  [id,user.id,new Date(published+5*3600000).toISOString().slice(0,10),score,new Date(closes)]).catch(error=>{
-   if(error.code==='23505')fail(409,'Only one post per day counts toward the tournament.');
-   throw error;
-  });
- if (!saved) fail(409,'This post is already registered, was just refreshed, or submissions have closed.');
- return {ok:true,score};
+ return {scanned,scored};
 }

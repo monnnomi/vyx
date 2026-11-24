@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';
-import {migrateTournament,registerTournamentPayment,tournamentState} from '../server/tournament.js';
+import {migrateTournament,registerTournamentPayment,tournamentState,tournamentPostScore} from '../server/tournament.js';
 import {tokenContracts} from '../server/token-claims.js';
 
 test('a confirmed exact jVYX transfer grants one entry and can be retried safely', async t=>{
@@ -46,4 +46,16 @@ test('a confirmed exact jVYX transfer grants one entry and can be retried safely
  assert.equal((await tournamentState(db,user)).entered,true);
  assert.equal((await tournamentState(db,user)).prizes.reduce((sum,amount)=>sum+amount,0),1_000_000);
  assert.equal((await db.q('SELECT count(*)::int AS count FROM tournament_entries'))[0].count,1);
+});
+
+test('only eligible #VYX posts score using the supplied X weights',()=>{
+ const entry={entered_at:'2026-11-24T03:00:00Z'},user={x_id:'24'};
+ const post={author_id:'24',created_at:'2026-11-24T04:00:00Z',
+  entities:{hashtags:[{tag:'vYx'}]},
+  public_metrics:{impression_count:299,like_count:3,reply_count:2,retweet_count:1,quote_count:4}};
+ assert.deepEqual(tournamentPostScore(post,entry,user),{score:29,day:'2026-11-24'});
+ assert.equal(tournamentPostScore({...post,author_id:'25'},entry,user),null);
+ assert.equal(tournamentPostScore({...post,entities:{hashtags:[{tag:'VYX2'}]}},entry,user),null);
+ assert.equal(tournamentPostScore({...post,created_at:'2026-11-24T02:00:00Z'},entry,user),null);
+ assert.equal(tournamentPostScore({...post,referenced_tweets:[{type:'replied_to'}]},entry,user),null);
 });

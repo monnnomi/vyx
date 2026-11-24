@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh paid VYX tournament entries from X
+After=vyx.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/vyx/current
+EnvironmentFile=/etc/vyx/vyx.env
+ExecStart=/usr/local/bin/node scripts/tournament-sync.mjs
+NoNewPrivileges=true
+PrivateTmp=true

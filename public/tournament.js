@@ -18,11 +18,11 @@ function renderTournament(){
    <button class="primary" data-tournament-pay ${pending?'disabled':''}>Join for 10,000 jVYX</button>
    <details ${pending?'open':''}><summary>Verify an existing payment</summary>
    <form data-tournament-receipt><label>Transaction hash <input name="hash" required value="${e(pending)}" pattern="0x[0-9A-Fa-f]{64}"></label><button class="secondary">Verify payment</button></form></details>`;
- const submission=t.entered&&t.open ? `<form data-tournament-post><label>X post URL <input type="url" name="url" required placeholder="https://x.com/…/status/…"></label><button class="primary">Verify post</button></form>` : '';
+ const submission=t.entered&&t.open ? `<form data-tournament-post><label>Verify a post manually <input type="url" name="url" required placeholder="https://x.com/…/status/…"></label><button class="primary">Verify post</button></form>` : '';
  return `<div class="tournament-page">
   <header class="tournament-hero">
    <div><p class="tournament-status">${t.closed?'Tournament closed':t.open?'Open for entries':'Entry unavailable'}</p>
-   <h1>VYX Tournament</h1><p>Publish about VYX on X and earn points from engagement.</p>
+   <h1>VYX Tournament</h1><p>Publish about VYX on X with #VYX and earn points from engagement.</p>
    <div class="tournament-pool"><strong>${fmt(t.prizes.reduce((sum,n)=>sum+n,0))}</strong> jVYX</div>
    <p>Prize pool for the top ${t.prizes.length} · Ends Nov 29, 23:59 (UTC+5)</p></div>
    <img src="/assets/jvyx-token-256.png" alt="" width="256" height="256">
@@ -33,13 +33,13 @@ function renderTournament(){
     <p>Pay on Robinhood Chain. Your wallet may ask for token approval first.</p>${entry}${submission}
    </section>
    <section class="tournament-card"><h2>How to earn points</h2>
-    <p>Submit one original post or quote per day mentioning <a href="https://x.com/vyxsocial" target="_blank" rel="noopener noreferrer">@vyxsocial</a>.</p>
-    <dl class="tournament-metrics"><div><dt>100 views</dt><dd>+1</dd></div><div><dt>Like</dt><dd>+3</dd></div><div><dt>Reply</dt><dd>+5</dd></div><div><dt>Repost or quote</dt><dd>+8</dd></div></dl>
+    <p>After joining, publish one original post or quote per day with <strong>#VYX</strong>.</p>
+    <dl class="tournament-metrics"><div><dt>100 views</dt><dd>+1</dd></div><div><dt>Like</dt><dd>+3</dd></div><div><dt>Reply</dt><dd>+5</dd></div><div><dt>Repost</dt><dd>+8</dd></div></dl>
     <p>One account per person. Duplicate posts and manipulated engagement are ineligible.</p>
    </section>
   </div>
   <div class="tournament-grid">
-   <section class="tournament-card"><h2>Leaderboard</h2><p>Provisional scores. Resubmit your link to refresh after one hour.</p>
+   <section class="tournament-card"><h2>Leaderboard</h2><p>Scores update automatically as X posts and reactions are checked.</p>
     ${t.board.length?`<table><thead><tr><th>Rank</th><th>Participant</th><th>Posts</th><th>Points</th></tr></thead><tbody>${t.board.map((r,i)=>`<tr><td>${i+1}</td><td><strong>${e(r.name)}</strong></td><td>${fmt(r.posts)}</td><td>${fmt(r.score)}</td></tr>`).join('')}</tbody></table>`:'<div class="tournament-empty"><strong>No scored posts yet</strong><p>Verified posts will appear here.</p></div>'}
    </section>
    <section class="tournament-card"><h2>Prizes</h2>

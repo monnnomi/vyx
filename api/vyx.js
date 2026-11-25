@@ -78,7 +78,7 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
    }
    const data=await body(req);
    if(action==='topic-create')return json(res,200,await createForumTopic(db,user,data));
-   if(['topic-settings','topic-message','topic-message-edit','topic-message-delete'].includes(action))return json(res,200,await changeForumTopic(db,user,action,data));
+   if(['topic-settings','topic-message','topic-message-edit','topic-message-delete','topic-reaction'].includes(action))return json(res,200,await changeForumTopic(db,user,action,data));
    if(action==='giveaway-draw')return json(res,200,await drawGiveaway(db,user,data.id));
    if(action==='tournament-preflight')return json(res,200,await checkTournamentEntry(db,user));
    if(action==='tournament-payment')return json(res,200,await registerTournamentPayment(db,user,data.hash));

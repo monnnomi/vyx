@@ -1,3 +1,4 @@
+import {messageReactionEmojis} from './message-reactions.js';
 import {fail,text,uuid} from './http.js';
 import {assertInteraction,hiddenBy} from './social.js';
 
@@ -14,6 +15,13 @@ export async function migrateForumTopics(db) {
   author_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   kind text NOT NULL CHECK (kind IN ('update','reply')),
   body text NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), edited_at timestamptz
+ )`);
+ await db.q('ALTER TABLE forum_topic_messages ADD COLUMN IF NOT EXISTS reply_to uuid REFERENCES forum_topic_messages(id) ON DELETE SET NULL');
+ await db.q(`CREATE TABLE IF NOT EXISTS forum_topic_reactions (
+  message_id uuid NOT NULL REFERENCES forum_topic_messages(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  emoji text NOT NULL,
+  PRIMARY KEY(message_id,user_id)
  )`);
  await db.q('CREATE INDEX IF NOT EXISTS forum_topic_messages_chronology ON forum_topic_messages(topic_id,created_at DESC,id DESC)');
  await db.q('CREATE INDEX IF NOT EXISTS forum_topics_activity ON forum_topics(active_at DESC,id DESC)');
@@ -42,8 +50,14 @@ export async function forumTopic(db,user,id,offset) {
   WHERE t.id=$2 AND NOT ${hiddenBy('$1','t.owner_id')}`,[user?.id??null,uuid(id)]);
  if(!topic)fail(404,'Topic not found.');
  const owner=topic.owner_id===user?.id;
- const messages=await db.q(`SELECT m.id,m.body,m.kind,m.author_id,m.created_at,m.edited_at,u.name,u.handle
+ const messages=await db.q(`SELECT m.id,m.body,m.kind,m.author_id,m.created_at,m.edited_at,u.name,u.handle,u.avatar_url,
+  r.id AS reply_id,left(r.body,140) AS reply_body,ru.name AS reply_name,
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('emoji',a.emoji,'count',a.n,'mine',a.mine) ORDER BY a.emoji)
+   FROM (SELECT emoji,count(*)::int AS n,COALESCE(bool_or(user_id=$1),false) AS mine
+    FROM forum_topic_reactions WHERE message_id=m.id GROUP BY emoji) a),'[]'::jsonb) AS reactions
   FROM forum_topic_messages m JOIN users u ON u.id=m.author_id
+  LEFT JOIN forum_topic_messages r ON r.id=m.reply_to AND NOT ${hiddenBy('$1','r.author_id')}
+  LEFT JOIN users ru ON ru.id=r.author_id
   WHERE m.topic_id=$2 AND NOT ${hiddenBy('$1','m.author_id')}
   ORDER BY m.created_at DESC,m.id DESC LIMIT 31 OFFSET $3`,[user?.id??null,topic.id,pageOffset(offset)]);
  return {topic:{...topic,owner},messages:messages.slice(0,30),more:messages.length>30};
@@ -71,15 +85,31 @@ export async function changeForumTopic(db,user,action,input) {
   }else if(action==='topic-message'){
    await assertInteraction(tx,user.id,topic.owner_id);
    if(!owner&&!topic.replies_open)fail(409,'The owner has closed replies.');
-   await tx.q('INSERT INTO forum_topic_messages(topic_id,author_id,kind,body) VALUES($1,$2,$3,$4)',
-    [id,user.id,owner?'update':'reply',text(input.body,1,3500)]);
+   let replyTo=null;
+   if(input.replyTo!=null){
+    replyTo=uuid(input.replyTo);
+    const [parent]=await tx.q(`SELECT author_id FROM forum_topic_messages WHERE id=$1 AND topic_id=$2
+     AND NOT ${hiddenBy('$3','author_id')}`,[replyTo,id,user.id]);
+    if(!parent)fail(404,'The message you are replying to is unavailable.');
+    await assertInteraction(tx,user.id,parent.author_id);
+   }
+   await tx.q('INSERT INTO forum_topic_messages(topic_id,author_id,kind,body,reply_to) VALUES($1,$2,$3,$4,$5)',
+    [id,user.id,owner&&!replyTo?'update':'reply',text(input.body,1,3500),replyTo]);
    await tx.q('UPDATE forum_topics SET active_at=now() WHERE id=$1',[id]);
   }else{
    const messageId=uuid(input.messageId);
    const [message]=await tx.q('SELECT author_id FROM forum_topic_messages WHERE topic_id=$1 AND id=$2',[id,messageId]);
    if(!message)fail(404,'Message not found.');
    const author=message.author_id===user.id;
-   if(action==='topic-message-edit'){
+   if(action==='topic-reaction'){
+    const {emoji,enabled}=input;
+    if(!messageReactionEmojis.includes(emoji)||typeof enabled!=='boolean')fail(400,'Choose a reaction.');
+    await assertInteraction(tx,user.id,topic.owner_id);
+    await assertInteraction(tx,user.id,message.author_id);
+    if(enabled)await tx.q(`INSERT INTO forum_topic_reactions(message_id,user_id,emoji) VALUES($1,$2,$3)
+     ON CONFLICT(message_id,user_id) DO UPDATE SET emoji=EXCLUDED.emoji`,[messageId,user.id,emoji]);
+    else await tx.q('DELETE FROM forum_topic_reactions WHERE message_id=$1 AND user_id=$2 AND emoji=$3',[messageId,user.id,emoji]);
+   }else if(action==='topic-message-edit'){
     if(!author)fail(403,'Only the author can edit this message.');
     await tx.q('UPDATE forum_topic_messages SET body=$2,edited_at=now() WHERE id=$1',[messageId,text(input.body,1,3500)]);
    }else if(action==='topic-message-delete'){

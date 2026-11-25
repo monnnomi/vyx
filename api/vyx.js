@@ -6,6 +6,7 @@ import {ownNftSelection,nftWhitelist} from '../server/nft-selection.js';
 import {referralBoard} from '../server/referrals.js';
 import {searchCommunity,memberProfile,postDetail,handleAvailability,memberPreferences,recordProductEvent} from '../server/social.js';
 import {tournamentState,checkTournamentEntry,registerTournamentPayment,scoreTournamentPost} from '../server/tournament.js';
+import {giveawayResults,drawGiveaway} from '../server/forum-giveaways.js';
 import {withDB} from '../server/db.js';
 import {body,sameOrigin,session,fail,handleError,json,limit,ipKey,setCookie,cookie,hash,uuid} from '../server/http.js';
 import {state,feed,comments,conversations,messages,mutate} from '../server/service.js';
@@ -21,6 +22,10 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
    const user=await session(db,req);
    const systemResult=result=>json(res,200,localizeSystemResult(action,result,user));
    if(req.method==='GET'){
+    if(action==='giveaways'){
+     const posts=await feed(db,user,{filter:'giveaways',cursor:url.searchParams.get('cursor')||null});
+     return json(res,200,{posts,results:await giveawayResults(db,posts)});
+    }
     if(action==='tournament')return json(res,200,await tournamentState(db,user));
     if(action==='tasks')return systemResult(await taskState(db,user));
     if(action==='whitelist')return json(res,200,await nftWhitelist(db,{tier:url.searchParams.get('tier')||'all',page:url.searchParams.get('page')||1}));
@@ -69,6 +74,7 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
     await db.q('DELETE FROM sessions WHERE token_hash=$1',[hash(cookie(req,'vyx_session'))]);setCookie(res,'vyx_session','',0);return json(res,200,{ok:true});
    }
    const data=await body(req);
+   if(action==='giveaway-draw')return json(res,200,await drawGiveaway(db,user,data.id));
    if(action==='tournament-preflight')return json(res,200,await checkTournamentEntry(db,user));
    if(action==='tournament-payment')return json(res,200,await registerTournamentPayment(db,user,data.hash));
    if(action==='tournament-post'){await limit(db,'tournament-score:'+user.id,3);return json(res,200,await scoreTournamentPost(db,user,data.url));}

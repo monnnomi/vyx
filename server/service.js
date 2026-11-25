@@ -1,3 +1,4 @@
+import {giveawayAuthorIds,giveawayTag} from './forum-giveaways.js';
 import {ownerLocale} from './owner-interface.js';
 import {memberReputation} from './reputation.js';
 import {memberWallet} from './wallets.js';
@@ -25,7 +26,7 @@ export async function members(db,viewer,season) {
  return rows.map(u=>({...publicUser(u),points:u.points,following:u.following,follows_you:u.follows_you}));
 }
 export async function feed(db,viewer,{filter='all',author=null,cursor=null,query='',postId=null}={}) {
- if(!['all','following','saved'].includes(filter))fail(400,'Choose a feed filter.');
+ if(!['all','following','saved','giveaways'].includes(filter))fail(400,'Choose a feed filter.');
  if(cursor&&(typeof cursor!=='string'||cursor.length>40||Number.isNaN(Date.parse(cursor))))fail(400,'Invalid page cursor.');
  const rows=await db.q(`SELECT p.*,u.name,u.handle,u.avatar_url,u.is_system,${postViewProjection('$1')},${mediaProjection('p','post_id')},
  (SELECT count(*)::int FROM reactions WHERE post_id=p.id) AS likes,
@@ -36,11 +37,14 @@ export async function feed(db,viewer,{filter='all',author=null,cursor=null,query
  WHERE ($2::uuid IS NULL OR p.user_id=$2)
  AND ($3<>'following' OR EXISTS(SELECT 1 FROM follows WHERE follower_id=$1 AND following_id=p.user_id))
  AND ($3<>'saved' OR EXISTS(SELECT 1 FROM saved_posts WHERE user_id=$1 AND post_id=p.id))
+ AND ($3<>'giveaways' OR (u.x_id IN (SELECT jsonb_array_elements_text($7::text::jsonb))
+  AND NOT u.is_system AND (p.body LIKE '[giveaway:members] %' OR p.body LIKE '[giveaway:bloggers] %')))
  AND NOT ${hiddenBy('$1','p.user_id')}
  AND ($4::timestamptz IS NULL OR p.created_at<$4)
  AND ($5='' OR strpos(lower(p.body),lower($5))>0) AND ($6::uuid IS NULL OR p.id=$6)
- ORDER BY p.created_at DESC LIMIT 30`,[viewer?.id||null,author,filter,cursor,query,postId]);
- return rows.map(p=>({id:p.id,user_id:p.user_id,body:p.body,media:p.media,created_at:p.created_at,likes:p.likes,comments:p.comments,liked:p.liked,saved:p.saved,view_count:p.view_count,viewed_by_me:p.viewed_by_me,author:{id:p.user_id,name:p.name,handle:p.handle,avatar_url:p.avatar_url,is_system:p.is_system}}));
+ ORDER BY p.created_at DESC LIMIT 30`,[viewer?.id||null,author,filter,cursor,query,postId,JSON.stringify(giveawayAuthorIds())]);
+ return rows.map(p=>({id:p.id,user_id:p.user_id,body:filter==='giveaways'?p.body.replace(giveawayTag,''):p.body,
+  ...(filter==='giveaways'?{audience:p.body.match(giveawayTag)?.[1]}:{}),media:p.media,created_at:p.created_at,likes:p.likes,comments:p.comments,liked:p.liked,saved:p.saved,view_count:p.view_count,viewed_by_me:p.viewed_by_me,author:{id:p.user_id,name:p.name,handle:p.handle,avatar_url:p.avatar_url,is_system:p.is_system}}));
 }
 export async function state(db,user,now=null) {
  await settleDueWindows(db);

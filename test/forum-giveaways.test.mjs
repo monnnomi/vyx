@@ -1,0 +1,26 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {PGlite} from '@electric-sql/pglite';
+import {drawGiveaway,migrateForumGiveaways} from '../server/forum-giveaways.js';
+
+test('blogger giveaway draws once from distinct eligible forum members',async t=>{
+ const pg=new PGlite();
+ t.after(()=>pg.close());
+ const wrap=conn=>({q:async(sql,args=[]) => (await conn.query(sql,args)).rows,tx:fn=>conn.transaction(tx=>fn(wrap(tx)))});
+ const db=wrap(pg);
+ await pg.exec(`CREATE TABLE users(id uuid PRIMARY KEY,x_id text,name text,is_system boolean);
+ CREATE TABLE posts(id uuid PRIMARY KEY,user_id uuid,body text,created_at timestamptz);
+ CREATE TABLE comments(post_id uuid,user_id uuid,created_at timestamptz);`);
+ await migrateForumGiveaways(db);
+ const old=process.env.VYX_ADMIN_X_IDS;
+ process.env.VYX_ADMIN_X_IDS='11';
+ t.after(()=>{if(old===undefined)delete process.env.VYX_ADMIN_X_IDS;else process.env.VYX_ADMIN_X_IDS=old;});
+ const [organizer,blogger,reader,giveaway,blog]=Array.from({length:5},(_,i)=>'00000000-0000-4000-8000-00000000000'+(i+1));
+ await db.q("INSERT INTO users VALUES($1,'11','Organizer',false),($2,'12','Blogger',false),($3,'13','Reader',false)",[organizer,blogger,reader]);
+ await db.q("INSERT INTO posts VALUES($1,$2,'[giveaway:bloggers] Example giveaway','2026-11-25'),($3,$4,'Research on crypto','2026-11-24')",[giveaway,organizer,blog,blogger]);
+ await db.q("INSERT INTO comments VALUES($1,$2,'2026-11-26'),($1,$2,'2026-11-27'),($1,$3,'2026-11-26')",[giveaway,blogger,reader]);
+ await assert.rejects(drawGiveaway(db,{x_id:'12'},giveaway),/administrator/);
+ const result=await drawGiveaway(db,{x_id:'11'},giveaway);
+ assert.deepEqual(result,{winner_name:'Blogger',eligible_count:1});
+ assert.deepEqual(await drawGiveaway(db,{x_id:'11'},giveaway),result);
+});

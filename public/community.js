@@ -1,9 +1,9 @@
 'use strict';
 let data={user:null,members:[],posts:[],quests:[],calendar:{label:'Connecting…'},authReady:false};
-let page=location.hash.slice(1)||'rooms',feedTab='all',taskTab='all',feedPosts=[],profilePosts=[],chats=[],chatMessages=[],activeChat=null,busy=false,loaded=false,signInQueued=false;
+let page=location.hash.slice(1)||(new URL(location.href).searchParams.has('room')?'rooms':'feed'),feedTab='all',taskTab='all',feedPosts=[],profilePosts=[],chats=[],chatMessages=[],activeChat=null,busy=false,loaded=false,signInQueued=false;
 let theme='auto',modalFocus=null,homeRooms=[],collectionFilter='all';
 try{theme=localStorage.getItem('vyx-theme')||'auto';}catch{}
-if(!nav.some(n=>n[0]===page))page='rooms';
+if(!nav.some(n=>n[0]===page))page='feed';
 const e=escapeHTML;
 const currentSeason=()=>theme==='auto'?autoSeason():theme;
 const season=()=>seasons[currentSeason()]||seasons.halloween;
@@ -70,7 +70,7 @@ document.addEventListener('click',async event=>{
   };
  }catch(error){toast(error.message);}
 });
-function composerHTML(){if(!data.user)return `<div class="composer guest-composer"><div><strong>A new circle is taking shape.</strong><p>Be one of the first voices here.</p></div><button class="primary" data-action="signin">Continue with X ↗</button></div>`;return `<form class="composer" id="post-form" data-media-form="post"><div class="composer-top">${avatar(data.user)}<textarea id="post-input" placeholder="Share something with your circle…" aria-label="New post" minlength="20" maxlength="1500" required>${e(socialPostDraft)}</textarea></div>${typeof mediaDraftHTML==='function'?mediaDraftHTML('post'):''}<div class="composer-bottom">${typeof mediaComposerHTML==='function'?mediaComposerHTML('post','post'):''}<span class="post-count" id="post-counter">${socialPostDraft.length} / 1,500</span><button class="primary" type="submit">Post ${icon('arrowup')}</button></div></form>`;}
+function composerHTML(){if(!data.user)return `<div class="composer guest-composer"><div><strong>Join the crypto discussion.</strong><p>Sign in to write posts and reply to other members.</p></div><button class="primary" data-action="signin">Continue with X ↗</button></div>`;return `<form class="composer" id="post-form" data-media-form="post"><div class="composer-top">${avatar(data.user)}<textarea id="post-input" placeholder="What are you exploring in crypto?" aria-label="New post" minlength="20" maxlength="1500" required>${e(socialPostDraft)}</textarea></div>${typeof mediaDraftHTML==='function'?mediaDraftHTML('post'):''}<div class="composer-bottom">${typeof mediaComposerHTML==='function'?mediaComposerHTML('post','post'):''}<span class="post-count" id="post-counter">${socialPostDraft.length} / 1,500</span><button class="primary" type="submit">Post ${icon('arrowup')}</button></div></form>`;}
 function empty(message){return `<div class="empty-state">${icon('people')}<p>${e(message)}</p></div>`;}
 function renderFeed(){return `<div class="edition-header"><span>THE VYX JOURNAL</span><span>${e(data.calendar.label)} <i class="live-dot"></i></span></div><section class="editorial-hero"><div class="hero-text"><div class="eyebrow">A LITTLE MORE CONNECTED</div><h1>Good company.<br><em>Great finds.</em></h1><p>Meet in rooms. Share what you're working on.<br>Collect this season's rewards.</p><div class="hero-actions"><button class="primary" data-action="rooms">Find your room ${icon('arrowup')}</button><button class="text-link" data-action="rewards">Explore the collection</button></div><div class="hero-footnote"><span class="hero-footnote-symbol">↗</span><span>Conversations worth joining.<br>A collection worth keeping.</span></div></div><button class="hero-object" data-chest-details="3" aria-label="Explore Radiance legendary chest"><span class="object-caption">THE COLLECTION / 04 EDITIONS</span>${chestSVG(3,'hero')}<span class="object-bottom"><span><b>Radiance</b><small>Legendary edition</small></span>${rarityScale(3)}</span></button></section><section class="home-room-section"><div class="section-title"><div><span class="eyebrow">COME ON IN</span><h2>A room for your people.</h2></div><button class="text-link" data-action="rooms">All rooms ${icon('arrowup')}</button></div>${homeRooms.length?`<div class="home-room-grid">${homeRooms.slice(0,2).map(r=>roomCard(r,true)).join('')}</div>`:`<div class="home-room-empty"><span class="journal-flower" aria-hidden="true">✳</span><div><h3>Start a conversation.</h3><p>Open a room around something you care about.</p></div><button class="secondary" data-action="rooms">Explore rooms ${icon('arrowup')}</button></div>`}</section>${farmingHomeHTML()}<section class="home-collection"><div class="section-title"><div><span class="eyebrow">COLLECT THE UNEXPECTED</span><h2>Four editions. Your next find.</h2></div><button class="text-link" data-action="rewards">Full collection ${icon('arrowup')}</button></div>${chestCards('all')}</section><section aria-label="Community feed" class="journal-feed"><div class="section-title"><div><span class="eyebrow">FROM THE CLUB</span><h2>The conversation.</h2></div></div><div class="feed-tabs" role="tablist" aria-label="Feed filter">${[['all','Latest'],['following','Following'],['saved','Saved']].map(([id,label])=>`<button class="feed-tab ${id===feedTab?'active':''}" role="tab" aria-selected="${id===feedTab}" data-feedtab="${id}">${label}</button>`).join('')}<button class="text-link refresh-feed" data-action="refresh">Refresh ↻</button></div>${composerHTML()}<div id="posts-list">${feedPosts.length?feedPosts.map(postHTML).join(''):empty('Stories from your circle will appear here.')}</div>${feedPosts.length>=30?'<button class="secondary load-more" data-action="moreposts">Load more stories ↓</button>':''}</section>`;}
 
@@ -79,7 +79,7 @@ function renderRewards(){return `<header class="collection-heading"><div class="
 function renderLeaderboard(){return communityRankingsNav('leaderboard')+socialLeaderboard()+referralLeaderboardHTML();}
 
 function guestPage(title){return `<div class="page-intro"><div class="eyebrow">MAKE YOURSELF AT HOME</div><h1>${title}</h1></div><div class="info-panel"><h3>Your people are waiting.</h3><p>Sign in with X to join VYX and make this space yours.</p><button class="primary" data-action="signin">Continue with X ↗</button></div>`;}
-function renderProfile(){return socialProfile()+referralInviteHTML();}
+function renderProfile(){return socialProfile();}
 
 function bubbles(){return chatMessages.map(m=>`<div class="bubble ${m.sender_id===data.user?.id?'mine':''}" data-dm-message="${m.id}">${m.media?.length?mediaHTML(m.media):''}<p>${e(m.body)}</p><small>${date(m.created_at)}</small>${messageReactionsHTML(m,'dm')}${m.sender_id!==data.user?.id?`<button class="text-link" data-report-kind="message" data-report-id="${m.id}">Report</button>`:''}</div>`).join('')||'<div class="chat-date">The start of your story</div>';}
 function renderMessages(){return socialDirect();}
@@ -91,7 +91,7 @@ function render(){
  const draft=$('#post-input')?.value,searchDraft=$('#room-search')?.value,searchFocused=document.activeElement?.id==='room-search';document.body.dataset.page=page;document.body.classList.toggle('in-room',page==='rooms'&&Boolean(activeRoom));document.body.classList.toggle('in-direct',page==='messages'&&Boolean(activeChat));applyTheme();renderNav();$('#header-points').textContent=fmt(points());
  $('.header-actions .me-avatar').textContent=data.user?data.user.name.slice(0,1):'X';
  $('#top-title').innerHTML=`${nav.find(n=>n[0]===page)?.[2]||'Feed'} `;
- $('#main-content').innerHTML=({tournament:typeof renderTournament==='function'?renderTournament:undefined,news:renderNews,feed:renderHome,explore:renderExplore,drops:renderDrops,notifications:renderNotifications,settings:renderSettings,tasks:renderTasks,whitelist:renderWhitelist,rewards:renderRewards,leaderboard:renderLeaderboard,profile:renderProfile,messages:renderMessages,rooms:renderRooms}[page]||renderFeed)();
+ $('#main-content').innerHTML=({giveaways:typeof renderGiveaways==='function'?renderGiveaways:undefined,tournament:typeof renderTournament==='function'?renderTournament:undefined,news:renderNews,feed:renderHome,explore:renderExplore,drops:renderDrops,notifications:renderNotifications,settings:renderSettings,tasks:renderTasks,whitelist:renderWhitelist,rewards:renderRewards,leaderboard:renderLeaderboard,profile:renderProfile,messages:renderMessages,rooms:renderRooms}[page]||renderFeed)();
  renderProductBadge();if(draft&&$('#post-input'))$('#post-input').value=draft;if(searchDraft!==undefined&&$('#room-search')){$('#room-search').value=searchDraft;if(searchFocused)$('#room-search').focus();}renderRail();if(typeof restoreMediaComposers==='function')restoreMediaComposers();
  const box=$('.chat-bubbles');if(box)box.scrollTop=box.scrollHeight;
 }
@@ -116,6 +116,7 @@ async function loadPage(){
   if(page==='explore')await searchExplore();
   if(page==='tasks')await loadXTasks();
   if(page==='news')await loadNews();
+  if(page==='giveaways')await loadGiveaways();
   if(page==='tournament')await loadTournament();
   if(page==='whitelist')await Promise.all([loadWhitelist(),data.user?loadNftSelection():Promise.resolve()]);
   if(page==='rooms'){await loadRooms();return;}
@@ -123,7 +124,7 @@ async function loadPage(){
  }catch(err){if(page==='profile')profileStatus='error';render();toast(err.message);}
 }
 function go(id){if(!nav.some(n=>n[0]===id))return;closeModal();if(page===id){loadPage();return;}location.hash=id;}
-window.addEventListener('hashchange',()=>{page=location.hash.slice(1);if(page==='profile')profileStatus='loading';if(!nav.some(n=>n[0]===page))page='rooms';render();loadPage();window.scrollTo({top:0,behavior:'instant'});});
+window.addEventListener('hashchange',()=>{page=location.hash.slice(1);if(page==='profile')profileStatus='loading';if(!nav.some(n=>n[0]===page))page='feed';render();loadPage();window.scrollTo({top:0,behavior:'instant'});});
 async function personModal(id){
  if(id===data.user?.id){go('profile');return;}
  const owner=data.user?.id,token=++socialModalEpoch;showModal('<h2 id="modal-title">Profile</h2>'+loadingPanel('Loading this profile…'));

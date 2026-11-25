@@ -1,0 +1,37 @@
+.forum-intro {
+ padding: clamp(18px, 4vw, 34px);
+ margin: 0 0 16px;
+ border: 1px solid var(--line);
+ border-radius: 20px;
+ background: var(--panel);
+}
+.forum-intro h1 { margin: 0; font-size: clamp(27px, 4vw, 44px); }
+.forum-intro p { margin: 7px 0 0; color: var(--muted); max-width: 52ch; }
+.forum-intro.feed-heading { align-items: flex-start; }
+.forum-rail p { color: var(--muted); }
+.forum-giveaways { display: grid; gap: 14px; }
+.forum-giveaways .forum-intro { margin: 0; }
+.forum-giveaway { min-width: 0; border: 1px solid var(--line); border-radius: 18px; padding: 16px; background: var(--panel); }
+.forum-giveaway .post { margin: 0; }
+.forum-giveaway-meta, .forum-draw-result { display: flex; gap: 8px 14px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.forum-giveaway-meta { margin-bottom: 10px; }
+.forum-giveaway-meta span, .forum-draw-result span { color: var(--muted); }
+.forum-draw-result { padding-top: 12px; }
+.forum-giveaway summary { cursor: pointer; font-weight: 700; }
+.forum-giveaway form { display: grid; justify-items: start; gap: 10px; padding-top: 12px; }
+.forum-giveaway label { width: 100%; display: grid; gap: 6px; }
+.forum-giveaway textarea, .forum-giveaway select {
+ width: 100%;
+ padding: 8px 12px;
+ border: 1px solid var(--line);
+ border-radius: 9px;
+ background: var(--bg);
+ color: var(--text);
+}
+.forum-giveaway textarea { min-height: 105px; resize: vertical; }
+body[data-page="giveaways"] #main-content { background: transparent; border: 0; box-shadow: none; }
+body[data-interface="social"] .header-actions .points-pill { display: none; }
+@media (max-width: 560px) {
+ .forum-intro.feed-heading { flex-wrap: wrap; }
+ .forum-giveaway { padding: 12px; }
+}

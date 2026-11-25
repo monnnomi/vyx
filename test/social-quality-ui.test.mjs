@@ -34,9 +34,9 @@ test('loaded profiles and room threads do not flash false empty states while pen
  vm.runInContext('roomLoading=true',c);assert.match(c.roomBubbles(),/Loading the conversation/);assert.doesNotMatch(c.roomBubbles(),/Be the first/);
  vm.runInContext("roomLoading=false;roomLoadError='Offline'",c);assert.match(c.roomBubbles(),/Try again/);
 });
-test('recognition appears only in owner/public profiles with separate people and season-independent explanation',()=>{
+test('recognition counts appear on owner and public profiles',()=>{
  const c=setup();vm.runInContext('data.user.reputation={recognized:12,people:3}',c);
- const own=c.socialProfile();assert.match(own,/Recognized/);assert.match(own,/by 3 people/);assert.match(own,/Separate from VP; it does not reset with seasons/);assert.match(own,/account-reputation-count/);
+ const own=c.socialProfile();assert.match(own,/Recognized/);assert.match(own,/by 3 people/);assert.doesNotMatch(own,/Contributions & VP/);assert.match(own,/account-reputation-count/);
  const other=c.memberProfileHTML({person:{id:'bob',name:'Bob',handle:'bob',bio:'',followers:0,following_count:2,post_count:1,reputation:{recognized:4,people:1}},posts:[],rooms:[],controls:{}});assert.match(other,/by 1 person/);assert.match(other,/Recognized/);assert.match(other,/Following<\/dt><dd>2/);assert.doesNotMatch(other,/Your NFT eligibility/);
  assert.doesNotMatch(c.socialFeed(),/Recognized|by 3 people/);assert.doesNotMatch(c.socialLeaderboard(),/Recognized|by 3 people/);
  assert.match(c.reputationStatHTML({recognized:0,people:0}),/by 0 people/);assert.match(c.reputationStatHTML(null),/Loading recognition/);
@@ -55,10 +55,10 @@ test('discovery shows explicit empty search and profile preserves messaging requ
  assert.match(c.renderExplore(),/No matches for/);assert.match(c.renderExplore(),/Browse rooms and people/);
  const html=c.memberProfileHTML({person:{id:'bob',name:'Bob',handle:'bob',bio:'',followers:0,post_count:0},posts:[],rooms:[],controls:{}});assert.match(html,/Direct messages open when you follow each other/);assert.match(html,/<button class="secondary" disabled>Message/);
 });
-test('confirmed balance and current round precede the decorative chest; own posts precede collection',()=>{
+test('legacy drops preserve confirmed balances and the forum profile focuses on the blog',()=>{
  const c=setup();vm.runInContext(`dropData={summary:{total:100,today:20,unopened:0,pending:0},current:{startsAt:'2026-11-06T08:00:00Z',endsAt:'2026-11-06T12:00:00Z',ruleVersion:2},activity:{used:1,eligible:1,weight:1,rooms:1,releasedBudget:100,participants:1},results:[],estimate:20};profileStatus='ready';data.event={minted:true};`,c);
  const drops=c.renderDrops();assert.ok(drops.indexOf('Confirmed room VP')<drops.indexOf('drop-feature'));assert.ok(drops.indexOf('current-round')<drops.indexOf('drop-feature'));assert.match(drops,/Estimated VP: 20 VP · may change/);
- const profile=c.socialProfile();assert.ok(profile.indexOf('account-posts')<profile.indexOf('account-collection'));
+ const profile=c.socialProfile();assert.match(profile,/Your blog/);assert.doesNotMatch(profile,/account-collection/);
 });
 
 test('apostrophes are not interpreted as hashtags and links remain safe',()=>{
@@ -66,11 +66,11 @@ test('apostrophes are not interpreted as hashtags and links remain safe',()=>{
  assert.match(html,/It&#39;s/);assert.doesNotMatch(html,/>#39</);assert.match(html,/<span class="hashtag">#VYX<\/span>/);assert.doesNotMatch(html,/<img/);assert.match(html,/rel="noopener noreferrer"/);
 });
 
-test('NFT status explains missing requirements and appears only on the owner profile',()=>{
+test('NFT eligibility remains private and is absent from the forum profiles',()=>{
  const c=setup();
  assert.match(c.nftEligibilityHTML(),/Checking your confirmed VP/);
  vm.runInContext(`nftSelectionOwner='alice';nftSelectionState='ready';nftSelectionData={tier:'full-price',confirmedVP:49000,invitedReferrals:1,vpRemaining:1000,referralsRemaining:2,rules:{vp:50000,referrals:3}}`,c);
- assert.match(c.socialProfile(),/Your NFT eligibility/);assert.match(c.nftEligibilityHTML(),/Earn 1,000 more confirmed VP/);assert.match(c.nftEligibilityHTML(),/2 more invitations/);
+ assert.doesNotMatch(c.socialProfile(),/Your NFT eligibility/);assert.match(c.nftEligibilityHTML(),/Earn 1,000 more confirmed VP/);assert.match(c.nftEligibilityHTML(),/2 more invitations/);
  const other=c.memberProfileHTML({person:{id:'bob',name:'Bob',handle:'bob',bio:'',followers:0,post_count:0},posts:[],rooms:[],controls:{}});assert.doesNotMatch(other,/Your NFT eligibility|Full price|50% off|Free NFT/);
  vm.runInContext(`nftSelectionData.tier='half-price';nftSelectionData.vpRemaining=0`,c);assert.match(c.nftEligibilityHTML(),/You qualify for 50% off/);
  vm.runInContext(`nftSelectionData.tier='free';nftSelectionData.referralsRemaining=0`,c);assert.match(c.nftEligibilityHTML(),/meet both requirements/);

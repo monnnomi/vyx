@@ -7,7 +7,14 @@
 }
 .forum-intro h1 { margin: 0; font-size: clamp(27px, 4vw, 44px); }
 .forum-intro p { margin: 7px 0 0; color: var(--muted); max-width: 52ch; }
-.forum-intro.feed-heading { align-items: flex-start; }
+.forum-feed-heading {
+ display: grid;
+ grid-template-columns: minmax(0, 1fr) auto;
+ align-items: start;
+ gap: 12px;
+}
+.forum-feed-heading > div:first-child { overflow-wrap: anywhere; }
+.forum-feed-actions { display: flex; align-items: center; gap: 4px; }
 .forum-rail p { color: var(--muted); }
 .forum-giveaways { display: grid; gap: 14px; }
 .forum-giveaways .forum-intro { margin: 0; }
@@ -32,7 +39,6 @@
 body[data-page="giveaways"] #main-content { background: transparent; border: 0; box-shadow: none; }
 body[data-interface="social"] .header-actions .points-pill { display: none; }
 @media (max-width: 560px) {
- .forum-intro.feed-heading { flex-wrap: wrap; }
  .forum-giveaway { padding: 12px; }
 }
 .topic-page .topic-text { white-space: pre-wrap; overflow-wrap: anywhere; }

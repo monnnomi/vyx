@@ -35,3 +35,16 @@ body[data-interface="social"] .header-actions .points-pill { display: none; }
  .forum-intro.feed-heading { flex-wrap: wrap; }
  .forum-giveaway { padding: 12px; }
 }
+.topic-page .topic-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.topic-directory-item h2 { margin: 0 0 6px; font-size: 1.25rem; }
+.topic-directory-item h2 a { text-decoration: underline; text-underline-offset: .18em; }
+.topic-directory-item p { margin: 4px 0; }
+.topic-directory-item p:not(.topic-text), .topic-message time, .topic-message small { color: var(--muted); }
+.topic-message p { margin: 8px 0; }
+.topic-page :is(input:not([type="checkbox"]),textarea) {
+ width: 100%; color: var(--text); background: var(--bg);
+ border: 1px solid var(--line); border-radius: 9px; padding: 9px 12px;
+}
+.topic-search { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.topic-search label { display: grid; gap: 4px; flex: 1 1 220px; }
+.forum-giveaway .topic-checkbox { display: flex; align-items: center; }

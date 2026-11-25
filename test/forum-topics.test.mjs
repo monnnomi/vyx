@@ -1,0 +1,35 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {PGlite} from '@electric-sql/pglite';
+import {migrateForumTopics,forumTopics,forumTopic,createForumTopic,changeForumTopic} from '../server/forum-topics.js';
+
+test('one topic per member with owner-controlled replies and author-controlled edits',async t=>{
+ const pg=new PGlite();
+ t.after(()=>pg.close());
+ const wrap=conn=>({q:async(sql,args=[]) => (await conn.query(sql,args)).rows,tx:fn=>conn.transaction(tx=>fn(wrap(tx)))});
+ const db=wrap(pg);
+ await pg.exec(`CREATE TABLE users(id uuid PRIMARY KEY,name text,handle text);
+ CREATE TABLE member_controls(user_id uuid,target_id uuid,blocked boolean,muted boolean);`);
+ await migrateForumTopics(db);
+ await migrateForumTopics(db);
+ const users=Array.from({length:3},(_,i)=>({id:'00000000-0000-4000-8000-00000000000'+(i+1)}));
+ const [owner,reader,other]=users;
+ for(const [i,user] of users.entries())await db.q('INSERT INTO users VALUES($1,$2,$3)',[user.id,'Member '+i,'member'+i]);
+ const {id}=await createForumTopic(db,owner,{title:'My crypto journal',description:'Notes from the week'});
+ await assert.rejects(createForumTopic(db,owner,{title:'A second topic'}),/already have/);
+ const directory=await forumTopics(db,owner,{q:'journal'});
+ assert.equal(directory.ownId,id);
+ assert.equal(directory.topics.length,1);
+ await changeForumTopic(db,owner,'topic-message',{topicId:id,body:'An update'});
+ await changeForumTopic(db,reader,'topic-message',{topicId:id,body:'A reply'});
+ const detail=await forumTopic(db,reader,id);
+ assert.equal(detail.topic.owner,false);
+ const reply=detail.messages.find(message=>message.kind==='reply');
+ await assert.rejects(changeForumTopic(db,other,'topic-message-delete',{topicId:id,messageId:reply.id}),/Only the topic owner or author/);
+ await assert.rejects(changeForumTopic(db,owner,'topic-message-edit',{topicId:id,messageId:reply.id,body:'Edited by the owner'}),/Only the author/);
+ await changeForumTopic(db,reader,'topic-message-edit',{topicId:id,messageId:reply.id,body:'Edited reply'});
+ await changeForumTopic(db,owner,'topic-settings',{topicId:id,title:'Weekly crypto journal',description:'',repliesOpen:false});
+ await assert.rejects(changeForumTopic(db,reader,'topic-message',{topicId:id,body:'Late reply'}),/closed replies/);
+ await changeForumTopic(db,owner,'topic-message-delete',{topicId:id,messageId:reply.id});
+ assert.deepEqual((await forumTopic(db,null,id)).messages.map(message=>message.body),['An update']);
+});

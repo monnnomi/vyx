@@ -1,0 +1,12 @@
+# VYX Crypto Forum
+
+> An independent crypto forum for project research, personal blogs, member discussions, and community giveaways.
+
+## Public sources
+
+- [About VYX](https://joinvyx.com/about): What the forum is and how members use it.
+- [Public crypto topics](https://joinvyx.com/topics): Server-rendered directory of member topics. Individual pages contain descriptions and author updates.
+- [Sitemap](https://joinvyx.com/sitemap.xml): Canonical URLs for the forum and public topics.
+- [Community giveaways](https://joinvyx.com/#giveaways): Current giveaway announcements and rules in the interactive app.
+
+Posts reflect the experience or views of their authors. Attribute statements to the individual author and link to the original topic.

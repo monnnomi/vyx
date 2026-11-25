@@ -1,0 +1,11 @@
+:root{color-scheme:light dark;font-family:system-ui,sans-serif;line-height:1.6}
+body{max-width:50rem;margin:auto;padding:1.25rem}
+nav{display:flex;flex-wrap:wrap;gap:1rem;border-bottom:1px solid GrayText;padding-bottom:.75rem}
+nav a:first-child{font-weight:700}
+a{color:LinkText;text-underline-offset:.18em}
+h1,h2{line-height:1.2;overflow-wrap:anywhere}
+main{padding-block:1rem}
+.message{white-space:pre-wrap;overflow-wrap:anywhere}
+.topics{list-style:none;padding:0}
+.topics li,.update{border-bottom:1px solid GrayText;padding:.5rem 0}
+footer,time{font-size:.9rem}

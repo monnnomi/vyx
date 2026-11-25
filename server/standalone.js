@@ -1,3 +1,4 @@
+import {servePublicForum} from './public-forum.js';
 import {serveOwnerPage} from './owner-interface.js';
 import http from 'node:http';
 import {readFile,stat} from 'node:fs/promises';
@@ -17,7 +18,7 @@ import news from '../api/news.js';
 import newsCron from '../api/news-cron.js';
 const root=resolve(new URL('../public/',import.meta.url).pathname);
 const routes={'/api/vyx':vyx,'/api/auth/x':auth,'/api/auth/callback/x':callback,'/api/admin':admin,'/api/presence':presence,'/api/media':media,'/api/farm':farm,'/api/farm-cron':farmCron,'/api/news':news,'/api/news-cron':newsCron};
-const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.webp':'image/webp','.png':'image/png','.jpg':'image/jpeg','.ico':'image/x-icon','.webmanifest':'application/manifest+json','.mp3':'audio/mpeg','.wav':'audio/wav','.woff2':'font/woff2','.ttf':'font/ttf'};
+const types={'.txt':'text/plain; charset=utf-8','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.webp':'image/webp','.png':'image/png','.jpg':'image/jpeg','.ico':'image/x-icon','.webmanifest':'application/manifest+json','.mp3':'audio/mpeg','.wav':'audio/wav','.woff2':'font/woff2','.ttf':'font/ttf'};
 // Pages reference local styles and scripts as plain paths. When serving a page,
 // each local .css/.js reference gains ?v=<content hash>; a request carrying ?v=
 // can then be cached for a year, because a changed file gets a new URL.
@@ -52,6 +53,8 @@ export function createStandaloneServer({handlers=routes,publicDirectory=root}={}
    if(route){await route(req,res);return;}
    if(path.startsWith('/api/')){res.statusCode=404;return res.end('Not found');}
    if(!['GET','HEAD'].includes(req.method)){res.statusCode=405;return res.end('Method not allowed');}
+   if(path==='/admin'||path==='/admin.html')res.setHeader('X-Robots-Tag','noindex, nofollow');
+   if(await servePublicForum(path,req,res))return;
    if(await serveOwnerPage(path,req,res))return;
    const decoded=decodeURIComponent(path==='/'?'/index.html':path==='/admin'?'/admin.html':path);
    const file=resolve(staticRoot,'.'+decoded);

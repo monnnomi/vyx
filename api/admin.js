@@ -5,6 +5,7 @@ import {adminOverview,requireAdmin} from '../server/admin.js';
 import {settleDueWindows,farmingAdmin} from '../server/farming.js';
 import {tokenAdmin,tokenAdminAction,distributorReader} from '../server/token-claims.js';
 import {blogCurationAdmin,saveBlogCurationSettings} from '../server/blog-curation-settings.js';
+import {selectBlogPost} from '../server/blog-curation.js';
 export function createAdminHandler(useDB=withDB,{tokenChain=()=>distributorReader(),blogFetcher=fetch}={}){return async function handler(req,res){
  try{
   if(!['GET','POST'].includes(req.method))fail(405,'Method not allowed.');
@@ -15,6 +16,7 @@ export function createAdminHandler(useDB=withDB,{tokenChain=()=>distributorReade
     sameOrigin(req);await limit(db,'admin:'+user.id,30);const input=await body(req);
     if(String(input?.action||'').startsWith('token-'))return json(res,200,await tokenAdminAction(db,input,tokenChain()));
     if(input.action==='blog-curation-settings')return json(res,200,await saveBlogCurationSettings(db,user,input,blogFetcher));
+    if(input.action==='blog-curation-select')return json(res,200,await selectBlogPost(db,user,input));
     return json(res,200,await moderate(db,user,input));
    }
    const action=url.searchParams.get('action');

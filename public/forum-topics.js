@@ -48,6 +48,7 @@ function topicMessageHTML(message,topic){
    ${chips}
    ${data.user?`<details class="topic-reaction-picker"><summary aria-label="Add reaction" title="Add reaction">☺＋</summary><div class="topic-emoji-grid">${messageReactionOptions.map(([emoji,label])=>`<button type="button" data-topic-react="${e(message.id)}" data-emoji="${e(emoji)}" aria-label="${e(label)}" aria-pressed="${reactions.some(r=>r.emoji===emoji&&r.mine)}">${e(emoji)}</button>`).join('')}</div></details>`:''}
    ${canReply?`<button type="button" class="text-link" data-topic-reply="${e(message.id)}">Reply</button>`:''}
+   ${data.curatedFeed&&data.user?.is_admin&&message.homepage_version?`<button type="button" class="text-link" data-blog-select="${e(message.id)}" data-blog-version="${e(message.homepage_version)}" data-blog-published="${Boolean(message.homepage_published)}">${message.homepage_published?'Remove from homepage':'Publish to homepage'}</button>`:''}
    ${own||topic.owner?`<details class="topic-message-menu"><summary aria-label="Message options">⋯</summary>
     ${own?`<form data-topic-action="topic-message-edit" data-message-id="${e(message.id)}">
      <label>Message <textarea name="body" required maxlength="3500">${e(message.body)}</textarea></label><button class="secondary">Save edit</button></form>`:''}
@@ -154,6 +155,21 @@ document.addEventListener('input',event=>{
  if(event.target.id==='topic-compose-text')topicDraft=event.target.value;
 });
 document.addEventListener('click',event=>{
+ const selection=event.target.closest('[data-blog-select]');
+ if(selection){
+  if(!data.user?.is_admin)return;
+  void performTopicAction(selection,async()=>{
+   const published=selection.dataset.blogPublished!=='true';
+   const response=await fetch('/api/admin',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'blog-curation-select',messageId:selection.dataset.blogSelect,version:selection.dataset.blogVersion,published})});
+   const result=await response.json();
+   if(!response.ok)throw Error(result.error||'The homepage could not be updated.');
+   if(page==='topics')await loadTopics();
+   await refresh();
+   toast(published?'Published to the homepage.':'Removed from the homepage.');
+  });
+  return;
+ }
  const button=event.target.closest('[data-topic-remove],[data-topics-more],[data-topic-reply],[data-topic-cancel-reply],[data-topic-react],[data-topic-jump]');
  if(!button||page!=='topics')return;
  if(button.hasAttribute('data-topic-reply')||button.hasAttribute('data-topic-cancel-reply')){

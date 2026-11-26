@@ -2,8 +2,9 @@ import {test,beforeEach,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {migrateForumTopics,createForumTopic,changeForumTopic} from '../server/forum-topics.js';
-import {migrateBlogCuration,curatedBlogFeed,runBlogCuration} from '../server/blog-curation.js';
+import {migrateForumTopics,createForumTopic,changeForumTopic,forumTopic} from '../server/forum-topics.js';
+import {migrateBlogCuration,curatedBlogFeed,runBlogCuration,selectBlogPost,blogPostVersion} from '../server/blog-curation.js';
+import {createAdminHandler} from '../api/admin.js';
 import {createHandler} from '../api/vyx.js';
 import {hash} from '../server/http.js';
 import {createNewsCronHandler} from '../api/news-cron.js';
@@ -48,6 +49,100 @@ async function update(owner,body){
 const assessment=(overrides={})=>({score:85,useful:true,spam:false,duplicate:false,reason:'Concrete first-hand findings and a reproducible explanation.',...overrides});
 const completion=review=>new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify(review)}}]}));
 const goodBody='I tested three public RPC endpoints against the same finalized block. Here are the request parameters, measured delays, and the steps that reproduced the timeout.';
+
+async function editor(){
+ const account=await blog();
+ account.user.x_id='987654';process.env.VYX_ADMIN_X_IDS=account.user.x_id;
+ await db.q('UPDATE users SET x_id=$2 WHERE id=$1',[account.user.id,account.user.x_id]);
+ return account.user;
+}
+async function selection(message,published=true){
+ const [row]=await db.q('SELECT * FROM forum_topic_messages WHERE id=$1',[message.id]);
+ return {messageId:row.id,version:blogPostVersion(row),published};
+}
+
+test('manual selections work without FLOP, preserve authorship and blog links, and can be removed',async()=>{
+ delete process.env.FLOP_API_KEY;
+ const admin=await editor(),author=await blog(),post=await update(author,goodBody);
+ const input=await selection(post);
+ await selectBlogPost(db,admin,input);await selectBlogPost(db,admin,input);
+ const feed=await curatedBlogFeed(db,admin);
+ assert.equal(feed.length,1);assert.equal(feed[0].body,goodBody);
+ assert.equal(feed[0].author.id,author.user.id);assert.equal(feed[0].source_topic.id,author.topic.id);
+ assert.equal(feed[0].selection_source,'manual');assert.equal(feed[0].homepage_version,input.version);
+ assert.equal((await curatedBlogFeed(db,null))[0].homepage_version,undefined);
+ const [record]=await db.q('SELECT * FROM blog_curations');
+ assert.equal(record.reviewer_id,admin.id);assert.equal(record.score,null);assert.equal(record.request_body,null);
+ const view=await forumTopic(db,admin,author.topic.id);
+ assert.equal(view.messages[0].homepage_published,true);
+ assert.equal((await forumTopic(db,author.user,author.topic.id)).messages[0].homepage_version,undefined);
+ await selectBlogPost(db,admin,{...input,published:false});
+ assert.equal((await curatedBlogFeed(db,null)).length,0);
+ assert.equal((await db.q('SELECT body FROM forum_topic_messages WHERE id=$1',[post.id]))[0].body,goodBody);
+ assert.equal((await runBlogCuration(db,()=>assert.fail('No FLOP call for a manual decision'))).status,'unconfigured');
+});
+
+test('manual selection rejects other users, replies, hidden authors and stale versions',async()=>{
+ const admin=await editor(),author=await blog(),reader=await blog(),post=await update(author,goodBody);
+ const input=await selection(post);
+ await assert.rejects(selectBlogPost(db,null,input),e=>e.status===401);
+ await assert.rejects(selectBlogPost(db,{...reader.user,handle:'monnnomi_',is_admin:true},input),e=>e.status===403);
+ await changeForumTopic(db,reader.user,'topic-message',{topicId:author.topic.id,body:'A reader reply.'});
+ const [reply]=await db.q("SELECT id FROM forum_topic_messages WHERE kind='reply'");
+ await assert.rejects(selectBlogPost(db,admin,await selection(reply)),e=>e.status===404);
+ await db.q('INSERT INTO member_controls VALUES($1,$2,true,false)',[author.user.id,admin.id]);
+ await assert.rejects(selectBlogPost(db,admin,input),e=>e.status===404);
+ await db.q('DELETE FROM member_controls');
+ await changeForumTopic(db,author.user,'topic-message-edit',{topicId:author.topic.id,messageId:post.id,body:'A changed post.'});
+ await assert.rejects(selectBlogPost(db,admin,input),e=>e.status===409);
+ assert.equal((await curatedBlogFeed(db,null)).length,0);
+});
+
+test('manual decisions survive automation and edited selections require another manual approval',async()=>{
+ const admin=await editor(),author=await blog(),post=await update(author,goodBody);
+ await selectBlogPost(db,admin,await selection(post));
+ await changeForumTopic(db,author.user,'topic-message-edit',{topicId:author.topic.id,messageId:post.id,body:'A revised author update.'});
+ assert.equal((await curatedBlogFeed(db,null)).length,0);
+ assert.equal((await runBlogCuration(db,()=>assert.fail('Manual selection must not be overwritten'))).reviewed,0);
+ await selectBlogPost(db,admin,await selection(post));
+ assert.equal((await curatedBlogFeed(db,null))[0].body,'A revised author update.');
+ await selectBlogPost(db,admin,await selection(post,false));
+ assert.equal((await runBlogCuration(db,()=>assert.fail('Manual removal must not be republished'))).reviewed,0);
+ await selectBlogPost(db,admin,await selection(post));
+ await changeForumTopic(db,author.user,'topic-message-delete',{topicId:author.topic.id,messageId:post.id});
+ assert.equal((await curatedBlogFeed(db,null)).length,0);
+});
+
+test('manual selection wins over an in-flight automatic review without losing its request evidence',async()=>{
+ const admin=await editor(),author=await blog(),post=await update(author,goodBody);
+ let manualTime;
+ await runBlogCuration(db,async()=>{
+  await selectBlogPost(db,admin,await selection(post));
+  [manualTime]=await db.q('SELECT request_id,request_body,credential_hash FROM blog_curations');
+  return completion(assessment({score:5,useful:false}));
+ });
+ const [record]=await db.q('SELECT * FROM blog_curations');
+ assert.equal(record.status,'approved');assert.equal(record.review_source,'manual');
+ assert.equal(record.request_id,manualTime.request_id);assert.equal(record.request_body,manualTime.request_body);
+ assert.equal(record.credential_hash,manualTime.credential_hash);
+ assert.equal((await curatedBlogFeed(db,null)).length,1);
+});
+
+test('manual publication API requires an administrator session and same-origin request',async()=>{
+ const admin=await editor(),author=await blog(),post=await update(author,goodBody),cookie='b'.repeat(43);
+ await db.q("INSERT INTO sessions VALUES($1,$2,now()+interval '1 hour')",[hash(cookie),admin.id]);
+ const handler=createAdminHandler(fn=>fn(db)),input={action:'blog-curation-select',...await selection(post)};
+ const call=async(headers)=>{
+  const res={setHeader(){},end(value){this.body=JSON.parse(value);}};
+  await handler({method:'POST',url:'/api/admin',body:input,headers:{'content-type':'application/json',...headers}},res);
+  return res;
+ };
+ assert.equal((await call({origin:'https://joinvyx.com'})).statusCode,401);
+ assert.equal((await call({origin:'https://other.example',cookie:'vyx_session='+cookie})).statusCode,403);
+ assert.equal((await curatedBlogFeed(db,null)).length,0);
+ assert.equal((await call({origin:'https://joinvyx.com',cookie:'vyx_session='+cookie})).statusCode,200);
+ assert.equal((await curatedBlogFeed(db,null)).length,1);
+});
 
 test('curation migration is repeatable and leaves existing blog content intact',async()=>{
  const owner=await blog();await update(owner,goodBody);

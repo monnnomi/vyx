@@ -160,6 +160,8 @@ test('invalid model output and high-scoring spam cannot publish',async()=>{
 });
 
 test('feed pagination keeps timestamp ties and applies following, mute and block rules',async()=>{
+ await assert.rejects(curatedBlogFeed(db,null,{cursor:'1'}),error=>error.status===400);
+ await assert.rejects(curatedBlogFeed(db,null,{cursor:'2026-11-26T10:00:00Z|invalid-id'}),error=>error.status===400);
  const owner=await blog(),viewer=await blog();
  for(let i=0;i<31;i++){
   const body=goodBody+' #'+i;

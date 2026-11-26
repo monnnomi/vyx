@@ -27,7 +27,8 @@ export async function curatedBlogFeed(db,viewer,{filter='all',cursor=null}={}){
  if(cursor){
   if(typeof cursor!=='string'||cursor.length>100)fail(400,'Invalid page cursor.');
   const parts=cursor.split('|');
-  if(parts.length>2||Number.isNaN(Date.parse(parts[0])))fail(400,'Invalid page cursor.');
+  const timestamp=/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::?\d{2})?)$/;
+  if(parts.length>2||!timestamp.test(parts[0])||Number.isNaN(Date.parse(parts[0])))fail(400,'Invalid page cursor.');
   before=parts[0];
   if(parts.length===2)beforeId=uuid(parts[1]);
  }

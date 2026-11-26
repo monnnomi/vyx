@@ -65,7 +65,7 @@ test('curation settings require an existing administrator and store a verified k
  const provider=async(url,options)=>{
   if(url.endsWith('/keys/me')){
    assert.equal(options.headers.Authorization,'Bearer flop_isolated-key');
-   return new Response(JSON.stringify({remaining_quota:10,expires_at:Date.now()+86400000}));
+   return new Response(JSON.stringify({remaining_quota:10,expires_at:Date.now()+86400000,model_allowlist:['Qwen/Qwen3-14B']}));
   }
   return new Response(JSON.stringify({data:[{id:input.model}]}));
  };
@@ -95,6 +95,8 @@ test('invalid, expired or wrong-model FLOP access cannot replace working setting
  await assert.rejects(saveBlogCurationSettings(db,owner,{...input,gateway:'https://unrelated.example/v1'}),error=>error.status===400);
  await assert.rejects(saveBlogCurationSettings(db,owner,input,async()=>new Response('{}',{status:401})),error=>error.status===409);
  await assert.rejects(saveBlogCurationSettings(db,owner,input,async url=>new Response(JSON.stringify(url.endsWith('/keys/me')?{remaining_quota:10,expires_at:Date.now()-1000}:{data:[]}))),error=>error.status===409);
+ await assert.rejects(saveBlogCurationSettings(db,owner,input,async url=>new Response(JSON.stringify(url.endsWith('/keys/me')?
+  {remaining_quota:10,expires_at:Date.now()+86400000,model_allowlist:['Qwen/Qwen2.5-0.5B-Instruct']}:{data:[{id:input.model}]}))),error=>error.status===409);
  assert.equal((await db.q('SELECT sealed_key FROM blog_curation_settings'))[0].sealed_key,null);
 });
 
@@ -109,6 +111,7 @@ test('only useful owner updates enter the homepage with their original author an
   assert.ok(options.headers['Idempotency-Key']);
   const request=JSON.parse(options.body),input=JSON.parse(request.messages[1].content);
   assert.equal(request.stream,false);
+  assert.ok(!('temperature' in request));
   return completion(assessment(input.post===goodBody?{}:{score:10,useful:false,reason:'A greeting with no substantive information.'}));
  });
  assert.equal(result.published,1);assert.equal(requests,2);

@@ -43,7 +43,7 @@ test('blog curation administration enforces owner sessions and same-origin write
  let lookups=0;
  const handler=createAdminHandler(fn=>fn(db),{blogFetcher:async url=>{
   lookups++;
-  return new Response(JSON.stringify(url.endsWith('/keys/me')?{remaining_quota:10,expires_at:Date.now()+86400000}:{data:[{id:'qwen/qwen3-14b'}]}));
+  return new Response(JSON.stringify(url.endsWith('/keys/me')?{remaining_quota:10,expires_at:Date.now()+86400000,model_allowlist:['Qwen/Qwen3-14B']}:{data:[{id:'qwen/qwen3-14b'}]}));
  }});
  const input={action:'blog-curation-settings',enabled:true,gateway:'https://api.flop.network/v1',model:'qwen/qwen3-14b',apiKey:'flop_private-test-key'};
  for(const [user,status] of [[null,401],[member,403]]){

@@ -125,7 +125,7 @@ async function reviewRequest(db,post,token,recent,config,fetcher,timeout){
   if(!['settled','released'].includes(receipt.state)||receipt.response_status!==200)throw Error('FLOP request is still unresolved.');
   return {id:post.request_id,body:post.request_body};
  }
- const body=JSON.stringify({model:config.model,temperature:0,max_tokens:384,stream:false,messages:[
+ const body=JSON.stringify({model:config.model,max_tokens:384,stream:false,messages:[
   {role:'system',content:rubric},
   {role:'user',content:JSON.stringify({blog:post.title,post:post.body,recent_selections:recent})}
  ]});

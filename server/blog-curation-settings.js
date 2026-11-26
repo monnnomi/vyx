@@ -86,6 +86,8 @@ export async function saveBlogCurationSettings(db,user,input,fetcher=fetch){
   if(!Number.isFinite(status.remaining_quota)||status.remaining_quota<=0)fail(409,'У ключа FLOP закончился доступный лимит.');
   if(status.expires_at!=null&&(!Number.isFinite(status.expires_at)||status.expires_at<=Date.now()))fail(409,'Срок действия ключа FLOP закончился.');
   if(status.model&&status.model!==model)fail(409,'Этот ключ FLOP выдан для другой модели.');
+  if(!Array.isArray(status.model_allowlist)||!status.model_allowlist.every(item=>typeof item==='string')||
+   !status.model_allowlist.some(item=>item.toLowerCase()===model.toLowerCase()))fail(409,'Ключ FLOP не разрешает выбранную модель.');
   if(!Array.isArray(catalog.data)||!catalog.data.some(item=>item.id===model))fail(409,'Указанной модели сейчас нет в каталоге этого шлюза.');
   sealed=sealCredential(apiKey,'blog-curation:'+gatewayURL);
   expires=status.expires_at==null?null:new Date(status.expires_at).toISOString();

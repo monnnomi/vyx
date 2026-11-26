@@ -1,6 +1,9 @@
 import {messageReactionEmojis} from './message-reactions.js';
 import {fail,text,uuid} from './http.js';
 import {assertInteraction,hiddenBy} from './social.js';
+import {isAdmin} from './admin.js';
+import {storedBlogSettings} from './blog-curation-settings.js';
+import {blogPostVersion} from './blog-curation.js';
 
 export async function migrateForumTopics(db) {
  await db.q(`CREATE TABLE IF NOT EXISTS forum_topics (
@@ -60,6 +63,16 @@ export async function forumTopic(db,user,id,offset) {
   LEFT JOIN users ru ON ru.id=r.author_id
   WHERE m.topic_id=$2 AND NOT ${hiddenBy('$1','m.author_id')}
   ORDER BY m.created_at DESC,m.id DESC LIMIT 31 OFFSET $3`,[user?.id??null,topic.id,pageOffset(offset)]);
+ if(isAdmin(user)&&await storedBlogSettings(db)){
+  const selections=await db.q(`SELECT c.message_id,c.status='approved' AND c.published_at IS NOT NULL
+   AND c.reviewed_body=m.body AND c.reviewed_edit IS NOT DISTINCT FROM m.edited_at AS published
+   FROM blog_curations c JOIN forum_topic_messages m ON m.id=c.message_id
+   WHERE m.topic_id=$1 AND m.id=ANY($2::uuid[])`,[topic.id,messages.map(message=>message.id)]);
+  for(const message of messages)if(message.kind==='update'&&message.author_id===topic.owner_id){
+   message.homepage_published=selections.some(row=>row.message_id===message.id&&row.published);
+   message.homepage_version=blogPostVersion(message);
+  }
+ }
  return {topic:{...topic,owner},messages:messages.slice(0,30),more:messages.length>30};
 }
 

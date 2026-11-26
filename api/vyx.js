@@ -83,7 +83,7 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
     await db.q('DELETE FROM sessions WHERE token_hash=$1',[hash(cookie(req,'vyx_session'))]);setCookie(res,'vyx_session','',0);return json(res,200,{ok:true});
    }
    const data=await body(req);
-   if(action==='post'&&await curatedFeedEnabled(db)&&!(isAdmin(user)&&giveawayTag.test(data.body??'')))fail(403,'Publish updates in your blog. The VYX bot selects posts for the homepage.');
+   if(action==='post'&&await curatedFeedEnabled(db)&&!(isAdmin(user)&&giveawayTag.test(data.body??'')))fail(403,'Publish updates in your blog. Selected blog updates appear on the homepage.');
    if(action==='topic-create')return json(res,200,await createForumTopic(db,user,data));
    if(['topic-settings','topic-message','topic-message-edit','topic-message-delete','topic-reaction'].includes(action))return json(res,200,await changeForumTopic(db,user,action,data));
    if(action==='giveaway-draw')return json(res,200,await drawGiveaway(db,user,data.id));

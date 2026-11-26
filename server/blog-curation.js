@@ -1,6 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {fail,hash,uuid} from './http.js';
 import {hiddenBy} from './social.js';
+import {isAdmin,requireAdmin} from './admin.js';
 import {migrateBlogCurationSettings,storedBlogSettings,blogGatewayCredential,curatedFeedEnabled} from './blog-curation-settings.js';
 
 export {curatedFeedEnabled};
@@ -16,6 +17,8 @@ export async function migrateBlogCuration(db){
   published_at timestamptz, checked_at timestamptz NOT NULL DEFAULT now(),
   request_id uuid NOT NULL, request_body text, gateway_url text, credential_hash text
  )`);
+ await db.q("ALTER TABLE blog_curations ADD COLUMN IF NOT EXISTS review_source text NOT NULL DEFAULT 'automatic' CHECK(review_source IN ('automatic','manual'))");
+ await db.q('ALTER TABLE blog_curations ADD COLUMN IF NOT EXISTS reviewer_id uuid REFERENCES users(id) ON DELETE SET NULL');
  await db.q('CREATE INDEX IF NOT EXISTS blog_curations_published ON blog_curations(published_at DESC,message_id DESC) WHERE status=\'approved\'');
  await db.q(`CREATE TABLE IF NOT EXISTS blog_curation_worker (
   id boolean PRIMARY KEY DEFAULT true CHECK(id), token uuid NOT NULL, locked_until timestamptz NOT NULL
@@ -35,7 +38,7 @@ export async function curatedBlogFeed(db,viewer,{filter='all',cursor=null}={}){
   if(parts.length===2)beforeId=uuid(parts[1]);
  }
  const rows=await db.q(`SELECT m.id,m.body,m.created_at AS source_created_at,
-  c.published_at AS created_at,c.published_at::text AS cursor_time,
+  c.published_at AS created_at,c.published_at::text AS cursor_time,c.review_source,m.edited_at,
   t.id AS topic_id,t.title AS topic_title,u.id AS user_id,u.name,u.handle,u.avatar_url,u.is_system
   FROM blog_curations c JOIN forum_topic_messages m ON m.id=c.message_id
   JOIN forum_topics t ON t.id=m.topic_id JOIN users u ON u.id=m.author_id
@@ -49,7 +52,39 @@ export async function curatedBlogFeed(db,viewer,{filter='all',cursor=null}={}){
  return rows.map(row=>({id:row.id,user_id:row.user_id,body:row.body,created_at:row.created_at,
   source_created_at:row.source_created_at,cursor:row.cursor_time+'|'+row.id,
   source_topic:{id:row.topic_id,title:row.topic_title},
+  selection_source:row.review_source,
+  ...(isAdmin(viewer)?{homepage_version:blogPostVersion(row)}:{}),
   author:{id:row.user_id,name:row.name,handle:row.handle,avatar_url:row.avatar_url,is_system:row.is_system}}));
+}
+
+export function blogPostVersion(message){
+ return hash(JSON.stringify([message.body,message.edited_at?new Date(message.edited_at).toISOString():null]));
+}
+
+export async function selectBlogPost(db,user,input){
+ requireAdmin(user);
+ const id=uuid(input.messageId);
+ if(typeof input.published!=='boolean'||typeof input.version!=='string')fail(400,'Choose a blog post and publication action.');
+ if(!await curatedFeedEnabled(db))fail(409,'Enable the selected blog feed before publishing to the homepage.');
+ return db.tx(async tx=>{
+  const [message]=await tx.q(`SELECT m.id,m.body,m.edited_at FROM forum_topic_messages m
+   JOIN forum_topics t ON t.id=m.topic_id WHERE m.id=$1 AND m.kind='update' AND m.author_id=t.owner_id
+   AND NOT ${hiddenBy('$2','m.author_id')} FOR UPDATE OF m`,[id,user.id]);
+  if(!message)fail(404,'Blog post not found.');
+  if(input.version!==blogPostVersion(message))fail(409,'This blog post has changed. Refresh it before selecting it.');
+  const token=randomUUID(),requestId=randomUUID();
+  await tx.q(`INSERT INTO blog_curations(message_id,reviewed_body,content_hash,reviewed_edit,status,model,
+   token,lease_until,request_id,published_at,review_source,reviewer_id,reason)
+   VALUES($1,$2,$3,$4,$5,'manual',$6,clock_timestamp(),$7,
+    CASE WHEN $5='approved' THEN clock_timestamp() ELSE NULL END,'manual',$8,'Selected by an administrator.')
+   ON CONFLICT(message_id) DO UPDATE SET reviewed_body=EXCLUDED.reviewed_body,content_hash=EXCLUDED.content_hash,
+    reviewed_edit=EXCLUDED.reviewed_edit,status=EXCLUDED.status,score=NULL,review_source='manual',reviewer_id=EXCLUDED.reviewer_id,
+    token=EXCLUDED.token,lease_until=clock_timestamp(),checked_at=clock_timestamp(),reason=EXCLUDED.reason,
+    published_at=CASE WHEN EXCLUDED.status='approved' THEN COALESCE(blog_curations.published_at,clock_timestamp()) ELSE NULL END`,
+   [id,message.body,hash(message.body.normalize('NFKC').trim().toLowerCase().replace(/\s+/g,' ')),message.edited_at,
+    input.published?'approved':'rejected',token,requestId,user.id]);
+  return {ok:true,published:input.published};
+ });
 }
 
 async function curationConfig(db){
@@ -90,7 +125,7 @@ async function claimPost(db,model,token,leaseMilliseconds){
    c.reviewed_body=m.body AND c.reviewed_edit IS NOT DISTINCT FROM m.edited_at AS same_version
    FROM forum_topic_messages m JOIN forum_topics t ON t.id=m.topic_id
    LEFT JOIN blog_curations c ON c.message_id=m.id
-   WHERE m.kind='update' AND m.author_id=t.owner_id AND
+   WHERE m.kind='update' AND m.author_id=t.owner_id AND (c.message_id IS NULL OR c.review_source='automatic') AND
     (c.message_id IS NULL OR c.reviewed_body<>m.body OR c.reviewed_edit IS DISTINCT FROM m.edited_at OR
      c.status='retry' AND c.retry_at<clock_timestamp() OR
      c.status='reviewing' AND c.lease_until<clock_timestamp())

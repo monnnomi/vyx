@@ -16,11 +16,12 @@
  function render(settings,message=''){
   const expires=settings.expiresAt?new Date(settings.expiresAt).toLocaleString('ru-RU'):null;
   box.innerHTML=`<header><div><h2>Куратор главной ленты</h2>
-   <p>Бот отбирает авторские записи из блогов. Порог качества — 75 из 100.</p></div></header>
+   <p>Откройте блог участника и нажмите «Опубликовать на главной» под авторской записью. На главной сохранятся автор, текст и ссылка на блог. Ручной отбор работает без FLOP.</p>
+   <a class="text-link" href="/#topics">Открыть блоги для ручного отбора →</a></div></header>
    <p>${settings.configured?'Доступ FLOP настроен.':expires?'Доступ FLOP истёк. Нужен действующий ключ.':'Для автоматического отбора нужен API-доступ FLOP.'}${expires?' Срок ключа: '+escape(expires)+'.':''}</p>
    <p>Опубликовано: ${Number(settings.counts.published)} · Ожидают проверки: ${Number(settings.counts.waiting)} · Отклонено: ${Number(settings.counts.rejected)}</p>
    <form data-blog-curation-settings>
-    <label><input name="enabled" type="checkbox" ${settings.enabled?'checked':''}> На главной публикует только бот</label>
+    <label><input name="enabled" type="checkbox" ${settings.enabled?'checked':''}> На главной — подборка записей из блогов</label>
     <label>Шлюз FLOP<input name="gateway" type="url" required value="${escape(settings.gateway)}" autocomplete="off"></label>
     <label>Модель<input name="model" required maxlength="160" value="${escape(settings.model)}" autocomplete="off"></label>
     <label>API-ключ FLOP<input name="apiKey" type="password" maxlength="4096" autocomplete="off" placeholder="${settings.configured?'Оставьте пустым, чтобы сохранить текущий ключ':'flop_…'}"></label>

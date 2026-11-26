@@ -42,7 +42,7 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
     if(action==='state')return systemResult(await state(db,user));
     if(action==='feed'){
      const options={filter:url.searchParams.get('filter')||'all',author:url.searchParams.has('author')?uuid(url.searchParams.get('author')):null,cursor:url.searchParams.get('cursor')||null};
-     const selected=curatedFeedEnabled()&&!options.author&&['all','following'].includes(options.filter);
+     const selected=!options.author&&['all','following'].includes(options.filter)&&await curatedFeedEnabled(db);
      return json(res,200,{posts:await (selected?curatedBlogFeed(db,user,options):feed(db,user,options))});
     }
     if(action==='comments')return json(res,200,{comments:await comments(db,url.searchParams.get('id'),user)});
@@ -83,7 +83,7 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
     await db.q('DELETE FROM sessions WHERE token_hash=$1',[hash(cookie(req,'vyx_session'))]);setCookie(res,'vyx_session','',0);return json(res,200,{ok:true});
    }
    const data=await body(req);
-   if(action==='post'&&curatedFeedEnabled()&&!(isAdmin(user)&&giveawayTag.test(data.body??'')))fail(403,'Publish updates in your blog. The VYX bot selects posts for the homepage.');
+   if(action==='post'&&await curatedFeedEnabled(db)&&!(isAdmin(user)&&giveawayTag.test(data.body??'')))fail(403,'Publish updates in your blog. The VYX bot selects posts for the homepage.');
    if(action==='topic-create')return json(res,200,await createForumTopic(db,user,data));
    if(['topic-settings','topic-message','topic-message-edit','topic-message-delete','topic-reaction'].includes(action))return json(res,200,await changeForumTopic(db,user,action,data));
    if(action==='giveaway-draw')return json(res,200,await drawGiveaway(db,user,data.id));

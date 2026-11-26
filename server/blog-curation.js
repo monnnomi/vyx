@@ -1,8 +1,9 @@
 import {randomUUID} from 'node:crypto';
 import {fail,hash,uuid} from './http.js';
 import {hiddenBy} from './social.js';
+import {migrateBlogCurationSettings,storedBlogSettings,blogGatewayCredential,curatedFeedEnabled} from './blog-curation-settings.js';
 
-export const curatedFeedEnabled=()=>process.env.VYX_CURATED_FEED==='1';
+export {curatedFeedEnabled};
 
 export async function migrateBlogCuration(db){
  await db.q(`CREATE TABLE IF NOT EXISTS blog_curations (
@@ -19,6 +20,7 @@ export async function migrateBlogCuration(db){
  await db.q(`CREATE TABLE IF NOT EXISTS blog_curation_worker (
   id boolean PRIMARY KEY DEFAULT true CHECK(id), token uuid NOT NULL, locked_until timestamptz NOT NULL
  )`);
+ await migrateBlogCurationSettings(db);
 }
 
 export async function curatedBlogFeed(db,viewer,{filter='all',cursor=null}={}){
@@ -50,11 +52,13 @@ export async function curatedBlogFeed(db,viewer,{filter='all',cursor=null}={}){
   author:{id:row.user_id,name:row.name,handle:row.handle,avatar_url:row.avatar_url,is_system:row.is_system}}));
 }
 
-function curationConfig(){
- const apiKey=process.env.FLOP_API_KEY;
- const model=process.env.VYX_BLOG_MODEL;
- if(!curatedFeedEnabled()||!apiKey||!model)return null;
- const baseURL=new URL(process.env.FLOP_GATEWAY_URL||'https://gateway.testnet.flop.network/v1');
+async function curationConfig(db){
+ const settings=await storedBlogSettings(db);
+ const enabled=settings?settings.enabled:process.env.VYX_CURATED_FEED==='1';
+ if(!enabled||(settings?.key_expires_at&&new Date(settings.key_expires_at)<=new Date()))return null;
+ const {apiKey,model,gateway}=blogGatewayCredential(settings);
+ if(!enabled||!apiKey||!model)return null;
+ const baseURL=new URL(gateway);
  if(baseURL.protocol!=='https:'||baseURL.username||baseURL.password)throw Error('Invalid FLOP gateway configuration.');
  const timeout=Number(process.env.VYX_BLOG_REQUEST_TIMEOUT_MS||3600000);
  if(!Number.isInteger(timeout)||timeout<1000||timeout>3600000)throw Error('Invalid FLOP request timeout.');
@@ -145,7 +149,7 @@ async function finishReview(db,post,token,review){
 }
 
 export async function runBlogCuration(db,fetcher=fetch){
- const config=curationConfig();
+ const config=await curationConfig(db);
  if(!config)return {status:'unconfigured',reviewed:0,published:0};
  const token=randomUUID();
  const leaseMilliseconds=config.timeout+60000;

@@ -9,6 +9,8 @@ import {createPresenceHandler,touchPresence} from '../api/presence.js';
 import {createHandler} from '../api/vyx.js';
 import {mutate} from '../server/service.js';
 import {hash,token} from '../server/http.js';
+import {migrateForumTopics} from '../server/forum-topics.js';
+import {migrateBlogCuration} from '../server/blog-curation.js';
 
 const pg=new PGlite();await pg.exec(await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'));
 const wrap=(p,time)=>({q:async(sql,args=[])=>{
@@ -35,6 +37,28 @@ test('admin API denies anonymous and normal authenticated users without returnin
   const r=await call(handler,{user,url:'/api/admin?admin=true&x_id=1001'});assert.equal(r.status,status);assert.deepEqual(Object.keys(r.data),['error']);assert.equal(r.headers['cache-control'],'no-store');
  }
  const ok=await call(handler,{user:owner});assert.equal(ok.status,200);assert.equal(ok.data.counts.connected,2);assert.equal(ok.data.users.length,2);
+});
+test('blog curation administration enforces owner sessions and same-origin writes without exposing credentials',async()=>{
+ await migrateForumTopics(db);await migrateBlogCuration(db);
+ let lookups=0;
+ const handler=createAdminHandler(fn=>fn(db),{blogFetcher:async url=>{
+  lookups++;
+  return new Response(JSON.stringify(url.endsWith('/keys/me')?{remaining_quota:10,expires_at:Date.now()+86400000}:{data:[{id:'qwen/qwen3-14b'}]}));
+ }});
+ const input={action:'blog-curation-settings',enabled:true,gateway:'https://api.flop.network/v1',model:'qwen/qwen3-14b',apiKey:'flop_private-test-key'};
+ for(const [user,status] of [[null,401],[member,403]]){
+  assert.equal((await call(handler,{user,url:'/api/admin?action=blog-curation'})).status,status);
+  assert.equal((await call(handler,{user,method:'POST',body:input})).status,status);
+ }
+ assert.equal((await call(handler,{user:owner,method:'POST',body:input,origin:'https://other.invalid'})).status,403);
+ assert.equal(lookups,0);
+ const saved=await call(handler,{user:owner,method:'POST',body:input});
+ assert.equal(saved.status,200);assert.equal(saved.data.configured,true);assert.equal(lookups,2);
+ const read=await call(handler,{user:owner,url:'/api/admin?action=blog-curation'});
+ assert.equal(read.status,200);assert.equal(read.headers['cache-control'],'no-store');
+ for(const value of [saved.data,read.data]){
+  assert.ok(!JSON.stringify(value).includes(input.apiKey));assert.ok(!('sealed_key' in value));
+ }
 });
 test('online counts deduplicate signed-in accounts and exclude expired activity',async()=>{
  const first=token(),second=token(),guest=token(),expired=token();

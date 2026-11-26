@@ -32,7 +32,7 @@ export async function drawGiveaway(db,user,postId) {
   if(!audience||!isAdmin(post))fail(404,'Giveaway not found.');
   const [prior]=await tx.q('SELECT winner_name,eligible_count FROM forum_giveaway_draws WHERE post_id=$1',[id]);
   if(prior)return prior;
-  const blogContribution=curatedFeedEnabled()?`OR EXISTS(SELECT 1 FROM forum_topic_messages m JOIN forum_topics t ON t.id=m.topic_id
+  const blogContribution=await curatedFeedEnabled(tx)?`OR EXISTS(SELECT 1 FROM forum_topic_messages m JOIN forum_topics t ON t.id=m.topic_id
    WHERE t.owner_id=u.id AND m.author_id=u.id AND m.kind='update' AND m.created_at<c.created_at)`:'';
   const entrants=await tx.q(`SELECT DISTINCT u.id,u.name FROM comments c JOIN users u ON u.id=c.user_id
     WHERE c.post_id=$1 AND u.id<>$2 AND u.x_id IS NOT NULL AND NOT u.is_system

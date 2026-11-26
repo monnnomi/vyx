@@ -50,7 +50,7 @@ export async function feed(db,viewer,{filter='all',author=null,cursor=null,query
 export async function state(db,user,now=null) {
  await settleDueWindows(db);
  if(!now)now=new Date((await db.q('SELECT clock_timestamp() AS now'))[0].now);
- const curated=curatedFeedEnabled();
+ const curated=await curatedFeedEnabled(db);
  const c=calendar(now),[people,posts,tasks,event]=await Promise.all([members(db,user,c.season),curated?curatedBlogFeed(db,user):feed(db,user),questState(db,user,now),halloweenState(db,user)]);
  let account=null;
  if(user){

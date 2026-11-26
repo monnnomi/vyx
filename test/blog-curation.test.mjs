@@ -7,6 +7,7 @@ import {migrateBlogCuration,curatedBlogFeed,runBlogCuration} from '../server/blo
 import {createHandler} from '../api/vyx.js';
 import {hash} from '../server/http.js';
 import {createNewsCronHandler} from '../api/news-cron.js';
+import {curatedFeedEnabled,blogCurationAdmin,saveBlogCurationSettings} from '../server/blog-curation-settings.js';
 
 const pg=new PGlite();
 const wrap=conn=>({q:async(sql,args=[])=>(await conn.query(sql,args)).rows,tx:fn=>conn.transaction(tx=>fn(wrap(tx)))});
@@ -24,7 +25,8 @@ const names=['VYX_CURATED_FEED','FLOP_API_KEY','FLOP_GATEWAY_URL','VYX_BLOG_MODE
 const previous=Object.fromEntries(names.map(name=>[name,process.env[name]]));
 after(async()=>{for(const name of names){if(previous[name]===undefined)delete process.env[name];else process.env[name]=previous[name];}await pg.close();});
 beforeEach(async()=>{
- await db.q('TRUNCATE users,forum_topics,forum_topic_messages,blog_curations,blog_curation_worker,member_controls,follows,sessions,rate_limits,posts,activity_events CASCADE');
+ await db.q('TRUNCATE users,forum_topics,forum_topic_messages,blog_curations,blog_curation_worker,blog_curation_settings,member_controls,follows,sessions,rate_limits,posts,activity_events CASCADE');
+ await db.q('INSERT INTO blog_curation_settings(id,enabled) VALUES(true,true)');
  process.env.VYX_CURATED_FEED='1';
  process.env.FLOP_API_KEY='isolated-test-key';
  process.env.FLOP_GATEWAY_URL='https://gateway.testnet.flop.network/v1';
@@ -53,7 +55,47 @@ test('curation migration is repeatable and leaves existing blog content intact',
  await migrateBlogCuration(db);await migrateBlogCuration(db);
  assert.deepEqual(await db.q('SELECT id,body FROM forum_topic_messages'),before);
  delete process.env.FLOP_API_KEY;
- assert.equal((await runBlogCuration({q(){assert.fail('An unconfigured bot does not use the database');}})).status,'unconfigured');
+ assert.equal((await runBlogCuration(db,()=>assert.fail('An unconfigured bot does not call FLOP'))).status,'unconfigured');
+});
+
+test('curation settings require an existing administrator and store a verified key encrypted',async()=>{
+ const owner={x_id:'123456',is_system:false};process.env.VYX_ADMIN_X_IDS=owner.x_id;
+ const input={enabled:true,gateway:'https://api.flop.network',model:'qwen/qwen3-14b',apiKey:'flop_isolated-key'};
+ await assert.rejects(saveBlogCurationSettings(db,{x_id:'somebody-else'},input),error=>error.status===403);
+ const provider=async(url,options)=>{
+  if(url.endsWith('/keys/me')){
+   assert.equal(options.headers.Authorization,'Bearer flop_isolated-key');
+   return new Response(JSON.stringify({remaining_quota:10,expires_at:Date.now()+86400000}));
+  }
+  return new Response(JSON.stringify({data:[{id:input.model}]}));
+ };
+ const saved=await saveBlogCurationSettings(db,owner,input,provider);
+ assert.equal(saved.configured,true);assert.equal(saved.gateway,'https://api.flop.network/v1');
+ assert.ok(!JSON.stringify(saved).includes(input.apiKey));
+ const [stored]=await db.q('SELECT sealed_key FROM blog_curation_settings');
+ assert.ok(stored.sealed_key);assert.ok(!stored.sealed_key.includes(input.apiKey));
+ const author=await blog();await update(author,goodBody);
+ await runBlogCuration(db,async(url,options)=>{
+  assert.equal(url,'https://api.flop.network/v1/chat/completions');
+  assert.equal(options.headers.Authorization,'Bearer flop_isolated-key');return completion(assessment());
+ });
+ assert.equal((await curatedBlogFeed(db,null)).length,1);
+ const summary=await blogCurationAdmin(db,owner);
+ assert.equal(summary.counts.published,1);assert.ok(!('sealed_key' in summary));
+ await db.q("UPDATE blog_curation_settings SET key_expires_at=clock_timestamp()-interval '1 second'");
+ assert.equal((await blogCurationAdmin(db,owner)).configured,false);
+ assert.equal((await runBlogCuration(db,()=>assert.fail('Expired access does not start inference'))).status,'unconfigured');
+ await saveBlogCurationSettings(db,owner,{...input,apiKey:'',enabled:false},()=>assert.fail('Disabling never depends on provider availability'));
+ assert.equal(await curatedFeedEnabled(db),false);
+});
+
+test('invalid, expired or wrong-model FLOP access cannot replace working settings',async()=>{
+ const owner={x_id:'123456',is_system:false};process.env.VYX_ADMIN_X_IDS=owner.x_id;
+ const input={enabled:true,gateway:'https://api.flop.network/v1',model:'qwen/qwen3-14b',apiKey:'flop_isolated-key'};
+ await assert.rejects(saveBlogCurationSettings(db,owner,{...input,gateway:'https://unrelated.example/v1'}),error=>error.status===400);
+ await assert.rejects(saveBlogCurationSettings(db,owner,input,async()=>new Response('{}',{status:401})),error=>error.status===409);
+ await assert.rejects(saveBlogCurationSettings(db,owner,input,async url=>new Response(JSON.stringify(url.endsWith('/keys/me')?{remaining_quota:10,expires_at:Date.now()-1000}:{data:[]}))),error=>error.status===409);
+ assert.equal((await db.q('SELECT sealed_key FROM blog_curation_settings'))[0].sealed_key,null);
 });
 
 test('only useful owner updates enter the homepage with their original author and blog link',async()=>{

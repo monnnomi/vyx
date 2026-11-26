@@ -15,6 +15,7 @@ import {isAdmin} from './admin.js';
 import {halloweenState,claimHalloween} from './events.js';
 import {mutateRoom} from './rooms.js';
 import {settleDueWindows,reserveLegacyReward,farmingOverview} from './farming.js';
+import {curatedBlogFeed,curatedFeedEnabled} from './blog-curation.js';
 
 export async function questState(){return [];}
 export async function members(db,viewer,season) {
@@ -49,7 +50,8 @@ export async function feed(db,viewer,{filter='all',author=null,cursor=null,query
 export async function state(db,user,now=null) {
  await settleDueWindows(db);
  if(!now)now=new Date((await db.q('SELECT clock_timestamp() AS now'))[0].now);
- const c=calendar(now),[people,posts,tasks,event]=await Promise.all([members(db,user,c.season),feed(db,user),questState(db,user,now),halloweenState(db,user)]);
+ const curated=curatedFeedEnabled();
+ const c=calendar(now),[people,posts,tasks,event]=await Promise.all([members(db,user,c.season),curated?curatedBlogFeed(db,user):feed(db,user),questState(db,user,now),halloweenState(db,user)]);
  let account=null;
  if(user){
   const [balance,inventory,history,counts,reputation,wallet,tokens]=await Promise.all([
@@ -63,7 +65,7 @@ export async function state(db,user,now=null) {
   ]);
   account={...publicUser(user),is_admin:isAdmin(user),...(ownerLocale(user)!==null?{owner_interface_locale:ownerLocale(user)}:{}),...balance[0],inventory:[0,1,2,3].map(t=>inventory.find(i=>i.tier===t)?.n||0),history,...counts[0],reputation,wallet,tokens};
  }
- return {calendar:c,mediaReady:mediaAvailable(),mediaLimits,user:account,members:people,posts,quests:tasks,event,farming:await farmingOverview(db,user),authReady:Boolean(process.env.X_CLIENT_ID&&process.env.X_CLIENT_SECRET&&process.env.VYX_APP_SECRET)};
+ return {calendar:c,curatedFeed:curated,mediaReady:mediaAvailable(),mediaLimits,user:account,members:people,posts,quests:tasks,event,farming:await farmingOverview(db,user),authReady:Boolean(process.env.X_CLIENT_ID&&process.env.X_CLIENT_SECRET&&process.env.VYX_APP_SECRET)};
 }
 export async function comments(db,post,viewer=null){
  uuid(post);return db.q(`SELECT c.id,c.body,c.created_at,u.id AS user_id,u.name,u.handle,${mediaProjection('c','comment_id')} FROM comments c JOIN users u ON u.id=c.user_id WHERE c.post_id=$1 AND NOT ${hiddenBy('$2','c.user_id')} ORDER BY c.created_at ASC LIMIT 100`,[post,viewer?.id||null]);

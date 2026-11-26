@@ -17,6 +17,8 @@ import {createFarmHandler} from '../api/farm.js';
 import {login} from '../server/oauth.js';
 import {saveTaskAccess,taskScopes} from '../server/x-task-access.js';
 import {campaignPosts} from '../server/x-tasks.js';
+import {migrateForumTopics,createForumTopic,changeForumTopic} from '../server/forum-topics.js';
+import {migrateBlogCuration} from '../server/blog-curation.js';
 const pg=new PGlite();
 await pg.exec(await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'));
 if(process.env.VYX_QA_RULES_V2==='1'){await pg.exec("UPDATE farm_rule_versions SET starts_at='2026-11-01T00:00:00Z' WHERE version=1; UPDATE farm_rule_versions SET starts_at='2026-11-01T00:00:01Z' WHERE version=2; UPDATE farm_windows SET rule_version=2");}
@@ -29,6 +31,16 @@ const a=await db.tx(tx=>login(tx,{id:aliceX,name:'QA Alice',username:'qa_alice',
 const b=await db.tx(tx=>login(tx,{id:'1002',name:'QA Bob',username:'qa_bob',avatar:''}));
 await db.q('INSERT INTO follows(follower_id,following_id) VALUES($1,$2),($2,$1)',[a.user.id,b.user.id]);
 await db.q('INSERT INTO posts(user_id,body) VALUES($1,$2)',[b.user.id,'A local QA story for checking the shared VYX interface.']);
+if(process.env.VYX_QA_CURATED_FEED==='1'){
+ process.env.VYX_CURATED_FEED='1';
+ await migrateForumTopics(db);await migrateBlogCuration(db);
+ const topic=await createForumTopic(db,b.user,{title:'QA Bob’s research blog',description:'Isolated interface fixtures.'});
+ const body='I compared public RPC responses against one finalized block. The experiment used identical parameters across three endpoints. One endpoint timed out, while the other two returned matching hashes. I recorded the requests and results so another developer can reproduce the test.';
+ await changeForumTopic(db,b.user,'topic-message',{topicId:topic.id,body});
+ const [message]=await db.q('SELECT id FROM forum_topic_messages WHERE topic_id=$1',[topic.id]);
+ await db.q(`INSERT INTO blog_curations(message_id,reviewed_body,content_hash,status,score,reason,model,token,lease_until,request_id,published_at)
+  VALUES($1,$2,'isolated-ui-fixture','approved',85,'Local fixture only.','isolated-fixture',$3,now(),$4,now())`,[message.id,body,randomUUID(),randomUUID()]);
+}
 if(process.env.VYX_QA_FARMING==='1'){
  qaClock='2026-11-01T04:00:00Z';
  const room=await mutate(db,a.user,'room-create',{name:'The Night Circle',description:'Autumn stories, late-night ideas and good company.',requestId:randomUUID()});

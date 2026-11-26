@@ -1,0 +1,222 @@
+import {test,beforeEach,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {PGlite} from '@electric-sql/pglite';
+import {migrateForumTopics,createForumTopic,changeForumTopic} from '../server/forum-topics.js';
+import {migrateBlogCuration,curatedBlogFeed,runBlogCuration} from '../server/blog-curation.js';
+import {createHandler} from '../api/vyx.js';
+import {hash} from '../server/http.js';
+import {createNewsCronHandler} from '../api/news-cron.js';
+
+const pg=new PGlite();
+const wrap=conn=>({q:async(sql,args=[])=>(await conn.query(sql,args)).rows,tx:fn=>conn.transaction(tx=>fn(wrap(tx)))});
+const db=wrap(pg);
+await pg.exec(`CREATE TABLE users(id uuid PRIMARY KEY,name text,handle text,avatar_url text,x_id text,is_system boolean NOT NULL DEFAULT false);
+ CREATE TABLE member_controls(user_id uuid,target_id uuid,blocked boolean,muted boolean);
+ CREATE TABLE follows(follower_id uuid,following_id uuid);
+ CREATE TABLE sessions(token_hash text,user_id uuid,expires_at timestamptz);
+ CREATE TABLE rate_limits(bucket text,window_start bigint,count integer,PRIMARY KEY(bucket,window_start));
+ CREATE TABLE posts(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid,body text,request_id uuid,created_at timestamptz DEFAULT now());
+ CREATE TABLE activity_events(user_id uuid,season text,day text,kind text,target text,PRIMARY KEY(user_id,season,day,kind,target));`);
+await migrateForumTopics(db);
+await migrateBlogCuration(db);
+const names=['VYX_CURATED_FEED','FLOP_API_KEY','FLOP_GATEWAY_URL','VYX_BLOG_MODEL','VYX_APP_SECRET','PUBLIC_APP_URL','CRON_SECRET','VYX_ADMIN_X_IDS'];
+const previous=Object.fromEntries(names.map(name=>[name,process.env[name]]));
+after(async()=>{for(const name of names){if(previous[name]===undefined)delete process.env[name];else process.env[name]=previous[name];}await pg.close();});
+beforeEach(async()=>{
+ await db.q('TRUNCATE users,forum_topics,forum_topic_messages,blog_curations,blog_curation_worker,member_controls,follows,sessions,rate_limits,posts,activity_events CASCADE');
+ process.env.VYX_CURATED_FEED='1';
+ process.env.FLOP_API_KEY='isolated-test-key';
+ process.env.FLOP_GATEWAY_URL='https://gateway.testnet.flop.network/v1';
+ process.env.VYX_BLOG_MODEL='qwen/qwen3-14b';
+ process.env.VYX_APP_SECRET='isolated-test-secret';
+ process.env.PUBLIC_APP_URL='https://joinvyx.com';
+});
+
+async function blog(){
+ const user={id:randomUUID()};
+ await db.q('INSERT INTO users(id,name,handle) VALUES($1,$2,$3)',[user.id,'A blog author','author_'+user.id.slice(0,6)]);
+ const topic=await createForumTopic(db,user,{title:'Research journal',description:'First-hand project notes'});
+ return {user,topic};
+}
+async function update(owner,body){
+ await changeForumTopic(db,owner.user,'topic-message',{topicId:owner.topic.id,body});
+ return (await db.q('SELECT id FROM forum_topic_messages WHERE topic_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1',[owner.topic.id]))[0];
+}
+const assessment=(overrides={})=>({score:85,useful:true,spam:false,duplicate:false,reason:'Concrete first-hand findings and a reproducible explanation.',...overrides});
+const completion=review=>new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:JSON.stringify(review)}}]}));
+const goodBody='I tested three public RPC endpoints against the same finalized block. Here are the request parameters, measured delays, and the steps that reproduced the timeout.';
+
+test('curation migration is repeatable and leaves existing blog content intact',async()=>{
+ const owner=await blog();await update(owner,goodBody);
+ const before=await db.q('SELECT id,body FROM forum_topic_messages');
+ await migrateBlogCuration(db);await migrateBlogCuration(db);
+ assert.deepEqual(await db.q('SELECT id,body FROM forum_topic_messages'),before);
+ delete process.env.FLOP_API_KEY;
+ assert.equal((await runBlogCuration({q(){assert.fail('An unconfigured bot does not use the database');}})).status,'unconfigured');
+});
+
+test('only useful owner updates enter the homepage with their original author and blog link',async()=>{
+ const owner=await blog(),reader=await blog();
+ const post=await update(owner,goodBody);await update(reader,'Good morning, who is bullish today?');
+ await changeForumTopic(db,reader.user,'topic-message',{topicId:owner.topic.id,body:'A reader reply is not a blog update.',replyTo:post.id});
+ let requests=0;
+ const result=await runBlogCuration(db,async(url,options)=>{
+  requests++;assert.equal(url,'https://gateway.testnet.flop.network/v1/chat/completions');
+  assert.equal(options.headers.Authorization,'Bearer isolated-test-key');
+  assert.ok(options.headers['Idempotency-Key']);
+  const request=JSON.parse(options.body),input=JSON.parse(request.messages[1].content);
+  assert.equal(request.stream,false);
+  return completion(assessment(input.post===goodBody?{}:{score:10,useful:false,reason:'A greeting with no substantive information.'}));
+ });
+ assert.equal(result.published,1);assert.equal(requests,2);
+ const feed=await curatedBlogFeed(db,null);
+ assert.equal(feed.length,1);assert.equal(feed[0].body,goodBody);
+ assert.equal(feed[0].author.id,owner.user.id);assert.equal(feed[0].source_topic.id,owner.topic.id);
+ assert.equal((await runBlogCuration(db,()=>assert.fail('Completed reviews are not repeated'))).reviewed,0);
+});
+
+test('exact normalized copies are skipped without a second inference request',async()=>{
+ const first=await blog(),second=await blog();
+ await update(first,goodBody);await update(second,goodBody.toUpperCase());
+ let requests=0;
+ const result=await runBlogCuration(db,async()=>{requests++;return completion(assessment());});
+ assert.equal(requests,1);assert.equal(result.published,1);
+ assert.equal((await curatedBlogFeed(db,null)).length,1);
+});
+
+test('edits hide the old selection until re-review and deletion removes it from the homepage',async()=>{
+ const owner=await blog(),post=await update(owner,goodBody);
+ await runBlogCuration(db,async()=>completion(assessment()));
+ await changeForumTopic(db,owner.user,'topic-message-edit',{topicId:owner.topic.id,messageId:post.id,body:'An updated explanation with exact request parameters and additional measured results.'});
+ assert.equal((await curatedBlogFeed(db,null)).length,0);
+ assert.equal((await runBlogCuration(db,async()=>completion(assessment()))).published,1);
+ assert.equal((await curatedBlogFeed(db,null)).length,1);
+ await changeForumTopic(db,owner.user,'topic-message-delete',{topicId:owner.topic.id,messageId:post.id});
+ assert.equal((await curatedBlogFeed(db,null)).length,0);
+ assert.equal((await db.q('SELECT * FROM blog_curations')).length,0);
+});
+
+test('an edit during inference cannot publish the body that was not reviewed',async()=>{
+ const owner=await blog(),post=await update(owner,goodBody);
+ let calls=0;
+ await runBlogCuration(db,async()=>{
+  if(calls++===0){
+   await changeForumTopic(db,owner.user,'topic-message-edit',{topicId:owner.topic.id,messageId:post.id,body:'Buy this token now!'});
+   return completion(assessment());
+  }
+  return completion(assessment({score:5,useful:false,spam:true,reason:'Pure promotion.'}));
+ });
+ assert.equal((await curatedBlogFeed(db,null)).length,0);
+});
+
+test('simultaneous worker runs make one inference request and publish once',async()=>{
+ const owner=await blog();await update(owner,goodBody);
+ let release,started,calls=0;
+ const gate=new Promise(resolve=>release=resolve),began=new Promise(resolve=>started=resolve);
+ const first=runBlogCuration(db,async()=>{calls++;started();await gate;return completion(assessment());});
+ await began;
+ assert.equal((await runBlogCuration(db,()=>assert.fail('A worker lease prevents a duplicate request'))).status,'already-running');
+ release();assert.equal((await first).published,1);assert.equal(calls,1);
+});
+
+test('lost responses are reconciled before replay, preserving the exact request and identity',async()=>{
+ const owner=await blog();await update(owner,goodBody);
+ let original;
+ assert.equal((await runBlogCuration(db,async(url,options)=>{original={url,options};throw Error('Connection lost after sending.');})).status,'waiting');
+ await db.q("UPDATE blog_curations SET retry_at=clock_timestamp()-interval '1 second'");
+ let lookups=0;
+ const pending=await runBlogCuration(db,async(url,options)=>{
+  lookups++;assert.ok(url.includes('/keys/me/receipts/'));assert.equal(options.method,undefined);
+  return new Response(JSON.stringify({state:'estimated',response_status:200}));
+ });
+ assert.equal(pending.published,0);assert.equal(lookups,1);
+ await db.q("UPDATE blog_curations SET retry_at=clock_timestamp()-interval '1 second'");
+ const recovered=await runBlogCuration(db,async(url,options)=>{
+  if(options.method!=='POST')return new Response(JSON.stringify({state:'settled',response_status:200}));
+  assert.equal(url,original.url);assert.equal(options.body,original.options.body);
+  assert.equal(options.headers['Idempotency-Key'],original.options.headers['Idempotency-Key']);
+  return completion(assessment());
+ });
+ assert.equal(recovered.published,1);
+});
+
+test('missing receipts and changed credentials do not trigger replacement paid requests',async()=>{
+ const owner=await blog();await update(owner,goodBody);
+ await runBlogCuration(db,async()=>{throw Error('Unknown outcome');});
+ await db.q("UPDATE blog_curations SET retry_at=clock_timestamp()-interval '1 second'");
+ await runBlogCuration(db,async(url,options)=>{assert.equal(options.method,undefined);return new Response('{}',{status:404});});
+ process.env.FLOP_API_KEY='a-different-test-key';
+ await db.q("UPDATE blog_curations SET retry_at=clock_timestamp()-interval '1 second'");
+ assert.equal((await runBlogCuration(db,()=>assert.fail('An old request cannot use new credentials'))).status,'waiting');
+});
+
+test('invalid model output and high-scoring spam cannot publish',async()=>{
+ const a=await blog(),b=await blog();await update(a,goodBody);await update(b,goodBody+' Additional text.');
+ let calls=0;
+ const result=await runBlogCuration(db,async()=>completion(calls++===0?{score:'100',useful:true}:assessment({score:100,spam:true})));
+ assert.equal(result.published,0);assert.equal((await curatedBlogFeed(db,null)).length,0);
+ await runBlogCuration(db,()=>assert.fail('A completed invalid review is not purchased repeatedly'));
+});
+
+test('feed pagination keeps timestamp ties and applies following, mute and block rules',async()=>{
+ const owner=await blog(),viewer=await blog();
+ for(let i=0;i<31;i++){
+  const body=goodBody+' #'+i;
+  const [message]=await db.q("INSERT INTO forum_topic_messages(topic_id,author_id,kind,body) VALUES($1,$2,'update',$3) RETURNING id",[owner.topic.id,owner.user.id,body]);
+  await db.q(`INSERT INTO blog_curations(message_id,reviewed_body,content_hash,status,model,token,lease_until,request_id,published_at)
+   VALUES($1,$2,$3,'approved','fixture',$4,now(),$5,'2026-11-26T10:00:00Z')`,[message.id,body,hash(body),randomUUID(),randomUUID()]);
+ }
+ const first=await curatedBlogFeed(db,null),second=await curatedBlogFeed(db,null,{cursor:first.at(-1).cursor});
+ assert.equal(first.length,30);assert.equal(second.length,1);assert.ok(!first.some(row=>row.id===second[0].id));
+ assert.equal((await curatedBlogFeed(db,viewer.user,{filter:'following'})).length,0);
+ await db.q('INSERT INTO follows VALUES($1,$2)',[viewer.user.id,owner.user.id]);
+ assert.equal((await curatedBlogFeed(db,viewer.user,{filter:'following'})).length,30);
+ await db.q('INSERT INTO member_controls VALUES($1,$2,false,true)',[viewer.user.id,owner.user.id]);
+ assert.equal((await curatedBlogFeed(db,viewer.user)).length,0);
+ await db.q('DELETE FROM member_controls');
+ await db.q('INSERT INTO member_controls VALUES($1,$2,true,false)',[owner.user.id,viewer.user.id]);
+ assert.equal((await curatedBlogFeed(db,viewer.user)).length,0);
+});
+
+test('direct homepage posting is denied at the API while owner blog updates still work',async()=>{
+ const owner=await blog(),cookie='a'.repeat(43);
+ await db.q("INSERT INTO sessions VALUES($1,$2,now()+interval '1 hour')",[hash(cookie),owner.user.id]);
+ const api=createHandler(fn=>fn(db));
+ const call=async(action,data)=>{
+  const res={setHeader(){},end(value){this.body=JSON.parse(value);}};
+  await api({method:'POST',url:'/api/vyx?action='+action,body:data,
+   headers:{origin:'https://joinvyx.com',cookie:'vyx_session='+cookie,'content-type':'application/json'}},res);
+  return res;
+ };
+ const denied=await call('post',{body:goodBody});
+ assert.equal(denied.statusCode,403);assert.match(denied.body.error,/Publish updates in your blog/);
+ assert.equal((await call('post',{body:'[giveaway:members] '+goodBody})).statusCode,403);
+ const published=await call('topic-message',{topicId:owner.topic.id,body:goodBody});
+ assert.equal(published.statusCode,200);
+ assert.equal((await curatedBlogFeed(db,null)).length,0);
+ process.env.VYX_ADMIN_X_IDS='123456';
+ await db.q("UPDATE users SET x_id='123456' WHERE id=$1",[owner.user.id]);
+ assert.equal((await call('post',{body:goodBody})).statusCode,403);
+ assert.equal((await call('post',{body:'[giveaway:members] '+goodBody})).statusCode,200);
+ assert.equal((await curatedBlogFeed(db,null)).length,0);
+});
+
+test('the existing scheduler starts a background review without waiting for long inference',async()=>{
+ const owner=await blog();await update(owner,goodBody);
+ process.env.CRON_SECRET='fixture-cron';
+ const pending=[];
+ let release,started;
+ const gate=new Promise(resolve=>release=resolve),began=new Promise(resolve=>started=resolve);
+ const fetcher=async()=>{started();await gate;return completion(assessment());};
+ const workerDB={...db,q:(sql,args)=>sql.includes('FROM x_task_access')?Promise.resolve([]):db.q(sql,args)};
+ const handler=createNewsCronHandler(fn=>fn(workerDB),fetcher,promise=>pending.push(promise));
+ const res={setHeader(){},end(value){this.body=JSON.parse(value);}};
+ await handler({method:'GET',headers:{authorization:'Bearer fixture-cron'}},res);
+ assert.equal(res.statusCode,200);assert.equal(res.body.status,'idle');
+ assert.equal(pending.length,1);
+ await began;
+ assert.equal((await curatedBlogFeed(db,null)).length,0);
+ release();await Promise.all(pending);
+ assert.equal((await curatedBlogFeed(db,null)).length,1);
+});

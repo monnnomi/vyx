@@ -18,6 +18,19 @@ test('all scripts initialize in page order and empty feeds explain the actual ac
  vm.runInContext("feedTab='following'",c);assert.match(c.socialFeed(),/Your feed starts with people/);
 });
 
+test('curated homepage sends authors to their blogs and keeps source text and attribution safe',()=>{
+ const c=setup();
+ vm.runInContext("data.curatedFeed=true;feedTab='all'",c);
+ const home=c.socialFeed();
+ assert.match(home,/Write in your blog/);assert.match(home,/Selected posts from member blogs/);
+ assert.doesNotMatch(home,/id="post-form"|id="post-input"/);
+ const html=c.postHTML({id:'message-fixture',body:'Original text <script>alert(1)</script>',source_created_at:'2026-11-26T10:00Z',
+  source_topic:{id:'topic-fixture',title:'Alice & research'},author:{id:'alice',name:'Alice',handle:'alice'}});
+ assert.match(html,/Selected by VYX bot/);assert.match(html,/topic=topic-fixture#topics/);
+ assert.match(html,/Alice &amp; research/);assert.match(html,/Original text &lt;script&gt;/);
+ assert.doesNotMatch(html,/data-post-view-id|data-like=|data-owner-edit=|<script>/);
+});
+
 test('message counters sit next to reactions and all 24 picker options match the server',()=>{
  const c=setup(),html=c.messageReactionsHTML({id:'message-fixture',view_count:12,reactions:[{emoji:'🚀',count:3,mine:true}]},'room');
  assert.match(html,/12 unique views/);assert.match(html,/message-view-number">12/);assert.match(html,/data-emoji="🚀"/);assert.match(html,/aria-pressed="true"/);assert.doesNotMatch(html,/viewers-list|user_id/);

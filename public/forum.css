@@ -98,3 +98,9 @@ body[data-interface="social"] .header-actions .points-pill { display: none; }
  .topic-bubble { max-width: 96%; }
  .topic-transcript { padding: 10px; }
 }
+
+.curated-blog-compose { display:flex; justify-content:flex-end; padding:1rem; }
+.curated-blog-source { display:flex; flex-wrap:wrap; gap:.5rem 1rem; align-items:center; margin-top:.75rem; font-size:.875rem; }
+.curated-blog-source span { color:var(--muted); }
+.curated-blog-source a { overflow-wrap:anywhere; }
+.curated-blog-post .post-name { color:var(--text); }

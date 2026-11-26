@@ -6,8 +6,10 @@ import {ownNftSelection,nftWhitelist} from '../server/nft-selection.js';
 import {referralBoard} from '../server/referrals.js';
 import {searchCommunity,memberProfile,postDetail,handleAvailability,memberPreferences,recordProductEvent} from '../server/social.js';
 import {tournamentState,checkTournamentEntry,registerTournamentPayment,scoreTournamentPost} from '../server/tournament.js';
-import {giveawayResults,drawGiveaway} from '../server/forum-giveaways.js';
+import {giveawayResults,drawGiveaway,giveawayTag} from '../server/forum-giveaways.js';
+import {isAdmin} from '../server/admin.js';
 import {forumTopics,forumTopic,createForumTopic,changeForumTopic} from '../server/forum-topics.js';
+import {curatedBlogFeed,curatedFeedEnabled} from '../server/blog-curation.js';
 import {withDB} from '../server/db.js';
 import {body,sameOrigin,session,fail,handleError,json,limit,ipKey,setCookie,cookie,hash,uuid} from '../server/http.js';
 import {state,feed,comments,conversations,messages,mutate} from '../server/service.js';
@@ -38,7 +40,11 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
     if(action==='post-detail')return json(res,200,await postDetail(db,user,url.searchParams.get('id')));
     if(action==='handle-availability')return json(res,200,await handleAvailability(db,user,url.searchParams.get('handle')||''));
     if(action==='state')return systemResult(await state(db,user));
-    if(action==='feed')return json(res,200,{posts:await feed(db,user,{filter:url.searchParams.get('filter')||'all',author:url.searchParams.has('author')?uuid(url.searchParams.get('author')):null,cursor:url.searchParams.get('cursor')||null})});
+    if(action==='feed'){
+     const options={filter:url.searchParams.get('filter')||'all',author:url.searchParams.has('author')?uuid(url.searchParams.get('author')):null,cursor:url.searchParams.get('cursor')||null};
+     const selected=!options.author&&['all','following'].includes(options.filter)&&await curatedFeedEnabled(db);
+     return json(res,200,{posts:await (selected?curatedBlogFeed(db,user,options):feed(db,user,options))});
+    }
     if(action==='comments')return json(res,200,{comments:await comments(db,url.searchParams.get('id'),user)});
     if(action==='rooms')return json(res,200,await listRooms(db,user,{filter:url.searchParams.get('filter')||'all',search:url.searchParams.get('search')||'',page:url.searchParams.get('page')||0}));
     if(action==='room-info')return json(res,200,await roomSummary(db,user,url.searchParams.get('id')));
@@ -77,6 +83,7 @@ export function createHandler(useDB=withDB,taskFetcher=fetch){return async funct
     await db.q('DELETE FROM sessions WHERE token_hash=$1',[hash(cookie(req,'vyx_session'))]);setCookie(res,'vyx_session','',0);return json(res,200,{ok:true});
    }
    const data=await body(req);
+   if(action==='post'&&await curatedFeedEnabled(db)&&!(isAdmin(user)&&giveawayTag.test(data.body??'')))fail(403,'Publish updates in your blog. The VYX bot selects posts for the homepage.');
    if(action==='topic-create')return json(res,200,await createForumTopic(db,user,data));
    if(['topic-settings','topic-message','topic-message-edit','topic-message-delete','topic-reaction'].includes(action))return json(res,200,await changeForumTopic(db,user,action,data));
    if(action==='giveaway-draw')return json(res,200,await drawGiveaway(db,user,data.id));

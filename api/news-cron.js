@@ -4,9 +4,11 @@ import {waitUntil} from '../server/background.js';
 import {withDB} from '../server/db.js';
 import {appURL,fail,handleError,hash,json} from '../server/http.js';
 import {runAutomaticTaskChecks,taskQueueHasWork} from '../server/x-task-queue.js';
+import {curatedFeedEnabled,runBlogCuration} from '../server/blog-curation.js';
 
 export function createNewsCronHandler(useDB=withDB,fetcher=fetch,background=waitUntil){
  async function run(db){
+  if(await curatedFeedEnabled(db))background(useDB(db=>runBlogCuration(db,fetcher)).catch(()=>console.error('VYX blog curation failed')));
   const tasks=await runAutomaticTaskChecks(db,fetcher);
   if(tasks.status!=='already-running'&&await taskQueueHasWork(db)){
    const result=await fetcher(new URL('/api/news-cron',appURL()).href,{method:'POST',redirect:'error',signal:AbortSignal.timeout(5000),headers:{Authorization:'Bearer '+process.env.CRON_SECRET}});

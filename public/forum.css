@@ -54,20 +54,27 @@ body[data-interface="social"] .header-actions .points-pill { display: none; }
 .topic-search { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
 .topic-search label { display: grid; gap: 4px; flex: 1 1 220px; }
 .forum-giveaway .topic-checkbox { display: flex; align-items: center; }
+body[data-interface="social"][data-page="topics"] #main-content:has(> .topic-chat) {
+ --topic-nav-height: 0px;
+ --topic-inset: 14px;
+ max-width: 1180px;
+ padding: var(--topic-inset) clamp(16px, 3vw, 36px);
+}
 .topic-chat {
- display: grid;
- grid-template-rows: auto minmax(120px, 1fr) auto;
- block-size: min(76vh, 800px);
- min-block-size: 420px;
+ display: flex;
+ flex-direction: column;
+ block-size: calc(100dvh - var(--topic-nav-height) - 2 * var(--topic-inset));
  padding: 0;
  overflow: hidden;
 }
+.topic-chat > :not(.topic-transcript) { flex-shrink: 0; }
 .topic-chat-header { padding: 12px 16px; border-bottom: 1px solid var(--line); max-block-size: 30vh; overflow: auto; }
 .topic-chat-header h1 { font-size: clamp(18px, 3vw, 25px); margin: 5px 0 0; overflow-wrap: anywhere; }
 .topic-chat-header p { margin: 4px 0 0; color: var(--muted); }
 .topic-about, .topic-settings { display: inline-block; margin: 6px 10px 0 0; vertical-align: top; }
 .topic-about[open], .topic-settings[open] { display: block; }
-.topic-transcript { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; background: var(--bg); }
+.topic-transcript { flex: 1 1 0; display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px; background: var(--bg); }
+.topic-transcript > * { flex-shrink: 0; }
 .topic-transcript > button { align-self: center; }
 .topic-bubble { display: flex; align-items: flex-start; gap: 8px; max-width: min(90%, 710px); align-self: flex-start; }
 .topic-bubble.is-own { align-self: flex-end; flex-direction: row-reverse; }
@@ -93,8 +100,15 @@ body[data-interface="social"] .header-actions .points-pill { display: none; }
 .topic-reply-preview > div { min-width: 0; }
 .forum-giveaway .topic-composer textarea { min-height: 44px; max-height: 22vh; }
 .topic-chat .topic-closed { padding: 4px 12px; color: var(--muted); }
+@media (max-width: 760px) {
+ body[data-interface="social"][data-page="topics"] #main-content:has(> .topic-chat) {
+  --topic-nav-height: calc(61px + env(safe-area-inset-bottom));
+  --topic-inset: 0px;
+  padding: 0;
+ }
+}
 @media (max-width: 560px) {
- .topic-chat { min-block-size: 350px; block-size: 72dvh; }
+ .topic-chat { border-radius: 0; }
  .topic-bubble { max-width: 96%; }
  .topic-transcript { padding: 10px; }
 }
@@ -106,6 +120,7 @@ body[data-interface="social"] .header-actions .points-pill { display: none; }
 .curated-blog-post .post-name { color:var(--text); }
 
 .topic-composer .media-draft, .forum-giveaway .topic-composer textarea { grid-column: 1 / -1; }
+.topic-composer .media-draft { max-block-size: 22dvh; overflow-y: auto; }
 .topic-composer .media-draft:empty { display: none; }
 .topic-composer > button[type="submit"] { grid-column: 2; }
 .topic-bubble .media-gallery { width: min(100%, 400px); }

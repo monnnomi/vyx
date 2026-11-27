@@ -19,8 +19,10 @@ await pg.exec(`CREATE TABLE users(id uuid PRIMARY KEY,name text,handle text,avat
  CREATE TABLE sessions(token_hash text,user_id uuid,expires_at timestamptz);
  CREATE TABLE rate_limits(bucket text,window_start bigint,count integer,PRIMARY KEY(bucket,window_start));
  CREATE TABLE posts(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid,body text,request_id uuid,created_at timestamptz DEFAULT now());
+ CREATE TABLE media_assets(id uuid,topic_message_id uuid,kind text,content_type text,byte_size int,status text,position int);
  CREATE TABLE activity_events(user_id uuid,season text,day text,kind text,target text,PRIMARY KEY(user_id,season,day,kind,target));`);
 await migrateForumTopics(db);
+await db.q('ALTER TABLE forum_topic_messages ADD COLUMN request_id uuid');
 await migrateBlogCuration(db);
 const names=['VYX_CURATED_FEED','FLOP_API_KEY','FLOP_GATEWAY_URL','VYX_BLOG_MODEL','VYX_APP_SECRET','PUBLIC_APP_URL','CRON_SECRET','VYX_ADMIN_X_IDS'];
 const previous=Object.fromEntries(names.map(name=>[name,process.env[name]]));

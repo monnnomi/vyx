@@ -17,7 +17,7 @@ import {createFarmHandler} from '../api/farm.js';
 import {login} from '../server/oauth.js';
 import {saveTaskAccess,taskScopes} from '../server/x-task-access.js';
 import {campaignPosts} from '../server/x-tasks.js';
-import {migrateForumTopics,createForumTopic,changeForumTopic} from '../server/forum-topics.js';
+import {migrateForumTopics,migrateForumTopicMedia,createForumTopic,changeForumTopic} from '../server/forum-topics.js';
 import {migrateBlogCuration} from '../server/blog-curation.js';
 const pg=new PGlite();
 await pg.exec(await readFile(new URL('../db/schema.sql',import.meta.url),'utf8'));
@@ -33,7 +33,7 @@ await db.q('INSERT INTO follows(follower_id,following_id) VALUES($1,$2),($2,$1)'
 await db.q('INSERT INTO posts(user_id,body) VALUES($1,$2)',[b.user.id,'A local QA story for checking the shared VYX interface.']);
 if(process.env.VYX_QA_CURATED_FEED==='1'){
  process.env.VYX_CURATED_FEED='1';
- await migrateForumTopics(db);await migrateBlogCuration(db);
+ await migrateForumTopics(db);await migrateForumTopicMedia(db);await migrateBlogCuration(db);
  const topic=await createForumTopic(db,b.user,{title:'QA Bob’s research blog',description:'Isolated interface fixtures.'});
  const body='I compared public RPC responses against one finalized block. The experiment used identical parameters across three endpoints. One endpoint timed out, while the other two returned matching hashes. I recorded the requests and results so another developer can reproduce the test.';
  await changeForumTopic(db,b.user,'topic-message',{topicId:topic.id,body});

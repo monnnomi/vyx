@@ -104,3 +104,8 @@ body[data-interface="social"] .header-actions .points-pill { display: none; }
 .curated-blog-source span { color:var(--muted); }
 .curated-blog-source a { overflow-wrap:anywhere; }
 .curated-blog-post .post-name { color:var(--text); }
+
+.topic-composer .media-draft, .forum-giveaway .topic-composer textarea { grid-column: 1 / -1; }
+.topic-composer .media-draft:empty { display: none; }
+.topic-composer > button[type="submit"] { grid-column: 2; }
+.topic-bubble .media-gallery { width: min(100%, 400px); }

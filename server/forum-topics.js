@@ -1,6 +1,7 @@
 import {messageReactionEmojis} from './message-reactions.js';
 import {fail,text,uuid} from './http.js';
 import {assertInteraction,hiddenBy} from './social.js';
+import {attachMedia,checkMediaRetry,mediaIds,mediaProjection} from './media.js';
 import {isAdmin} from './admin.js';
 import {storedBlogSettings} from './blog-curation-settings.js';
 import {blogPostVersion} from './blog-curation.js';
@@ -30,6 +31,28 @@ export async function migrateForumTopics(db) {
  await db.q('CREATE INDEX IF NOT EXISTS forum_topics_activity ON forum_topics(active_at DESC,id DESC)');
 }
 
+export async function migrateForumTopicMedia(db){
+ await db.tx(async tx=>{
+  await tx.q('ALTER TABLE forum_topic_messages ADD COLUMN IF NOT EXISTS request_id uuid');
+  await tx.q('CREATE UNIQUE INDEX IF NOT EXISTS forum_topic_messages_request ON forum_topic_messages(topic_id,author_id,request_id) WHERE request_id IS NOT NULL');
+  const [installed]=await tx.q("SELECT 1 FROM pg_constraint WHERE conrelid='media_assets'::regclass AND conname='media_assets_attached_parent'");
+  if(installed)return;
+  await tx.q(`ALTER TABLE media_assets ADD COLUMN IF NOT EXISTS topic_message_id uuid REFERENCES forum_topic_messages(id),
+   DROP CONSTRAINT IF EXISTS media_assets_scope_check,DROP CONSTRAINT IF EXISTS media_assets_check,DROP CONSTRAINT IF EXISTS media_assets_check1,
+   ADD CONSTRAINT media_assets_topic_scope CHECK(scope IN('post','comment','room','message','topic')),
+   ADD CONSTRAINT media_assets_single_parent CHECK(num_nonnulls(post_id,comment_id,room_message_id,message_id,topic_message_id)<=1),
+   ADD CONSTRAINT media_assets_attached_parent CHECK((status='attached')=(num_nonnulls(post_id,comment_id,room_message_id,message_id,topic_message_id)=1))`);
+  await tx.q(`CREATE FUNCTION detach_forum_topic_media() RETURNS trigger LANGUAGE plpgsql AS $$
+   BEGIN
+    UPDATE media_assets SET status='deleting',topic_message_id=NULL,expires_at=clock_timestamp() WHERE topic_message_id=OLD.id;
+    RETURN OLD;
+   END;
+  $$`);
+  await tx.q('CREATE TRIGGER detach_forum_topic_media BEFORE DELETE ON forum_topic_messages FOR EACH ROW EXECUTE FUNCTION detach_forum_topic_media()');
+  await tx.q('CREATE INDEX IF NOT EXISTS media_topic_message ON media_assets(topic_message_id,position) WHERE topic_message_id IS NOT NULL');
+ });
+}
+
 function pageOffset(value) {
  const offset=Number(value||0);
  if(!Number.isInteger(offset)||offset<0||offset>100000)fail(400,'Invalid topic page.');
@@ -54,6 +77,7 @@ export async function forumTopic(db,user,id,offset) {
  if(!topic)fail(404,'Topic not found.');
  const owner=topic.owner_id===user?.id;
  const messages=await db.q(`SELECT m.id,m.body,m.kind,m.author_id,m.created_at,m.edited_at,u.name,u.handle,u.avatar_url,
+  ${mediaProjection('m','topic_message_id')},
   r.id AS reply_id,left(r.body,140) AS reply_body,ru.name AS reply_name,
   COALESCE((SELECT jsonb_agg(jsonb_build_object('emoji',a.emoji,'count',a.n,'mine',a.mine) ORDER BY a.emoji)
    FROM (SELECT emoji,count(*)::int AS n,COALESCE(bool_or(user_id=$1),false) AS mine
@@ -106,8 +130,19 @@ export async function changeForumTopic(db,user,action,input) {
     if(!parent)fail(404,'The message you are replying to is unavailable.');
     await assertInteraction(tx,user.id,parent.author_id);
    }
-   await tx.q('INSERT INTO forum_topic_messages(topic_id,author_id,kind,body,reply_to) VALUES($1,$2,$3,$4,$5)',
-    [id,user.id,owner&&!replyTo?'update':'reply',text(input.body,1,3500),replyTo]);
+   const ids=mediaIds(input.mediaIds),content=text(input.body,ids.length?0:1,3500);
+   const requestId=input.requestId==null?null:uuid(input.requestId);
+   if(requestId){
+    const [previous]=await tx.q('SELECT id,body,reply_to FROM forum_topic_messages WHERE topic_id=$1 AND author_id=$2 AND request_id=$3',[id,user.id,requestId]);
+    if(previous){
+     if(previous.body!==content||previous.reply_to!==replyTo)fail(409,'Please start a new message request.');
+     await checkMediaRetry(tx,'topic',previous.id,ids);
+     return {ok:true};
+    }
+   }
+   const [message]=await tx.q('INSERT INTO forum_topic_messages(topic_id,author_id,kind,body,reply_to,request_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',
+    [id,user.id,owner&&!replyTo?'update':'reply',content,replyTo,requestId]);
+   await attachMedia(tx,user,'topic',id,message.id,ids);
    await tx.q('UPDATE forum_topics SET active_at=now() WHERE id=$1',[id]);
   }else{
    const messageId=uuid(input.messageId);
@@ -124,7 +159,8 @@ export async function changeForumTopic(db,user,action,input) {
     else await tx.q('DELETE FROM forum_topic_reactions WHERE message_id=$1 AND user_id=$2 AND emoji=$3',[messageId,user.id,emoji]);
    }else if(action==='topic-message-edit'){
     if(!author)fail(403,'Only the author can edit this message.');
-    await tx.q('UPDATE forum_topic_messages SET body=$2,edited_at=now() WHERE id=$1',[messageId,text(input.body,1,3500)]);
+    const [attached]=await tx.q("SELECT 1 FROM media_assets WHERE topic_message_id=$1 AND status='attached' LIMIT 1",[messageId]);
+    await tx.q('UPDATE forum_topic_messages SET body=$2,edited_at=now() WHERE id=$1',[messageId,text(input.body,attached?0:1,3500)]);
    }else if(action==='topic-message-delete'){
     if(!owner&&!author)fail(403,'Only the topic owner or author can remove this message.');
     await tx.q('DELETE FROM forum_topic_messages WHERE id=$1',[messageId]);

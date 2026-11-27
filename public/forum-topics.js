@@ -35,14 +35,15 @@ function forumTopicFields(topic={}){
 function topicMessageHTML(message,topic){
  const own=message.author_id===data.user?.id;
  const canReply=Boolean(data.user&&(topic.owner||topic.replies_open));
+ const attachments=message.media||[];
  const reactions=Array.isArray(message.reactions)?message.reactions:[];
- const quote=message.reply_id?`<button class="topic-quote" data-topic-jump="${e(message.reply_id)}"><strong>${e(message.reply_name)}</strong><span>${e(message.reply_body)}</span></button>`:'';
+ const quote=message.reply_id?`<button class="topic-quote" data-topic-jump="${e(message.reply_id)}"><strong>${e(message.reply_name)}</strong><span>${e(message.reply_body||'Attachment')}</span></button>`:'';
  const chips=reactions.map(r=>`<button type="button" class="topic-reaction" data-topic-react="${e(message.id)}" data-emoji="${e(r.emoji)}" aria-pressed="${Boolean(r.mine)}" ${data.user?'':'disabled'}>${e(r.emoji)} ${fmt(r.count)}</button>`).join('');
  return `<article id="topic-message-${e(message.id)}" class="topic-bubble ${own?'is-own':''}" tabindex="-1">
   ${avatar({name:message.name,avatar_url:message.avatar_url})}
   <div class="topic-bubble-content"><header><strong>${e(message.name)}</strong>
   <time datetime="${e(message.created_at)}">${e(date(message.created_at))}</time></header>
-  ${quote}<p class="topic-text">${e(message.body)}</p>
+  ${quote}${attachments.length?mediaHTML(attachments):''}${message.body?`<p class="topic-text">${e(message.body)}</p>`:''}
   ${message.edited_at?'<small>Edited</small>':''}
   <div class="topic-message-actions">
    ${chips}
@@ -51,7 +52,7 @@ function topicMessageHTML(message,topic){
    ${data.curatedFeed&&data.user?.is_admin&&message.homepage_version?`<button type="button" class="text-link" data-blog-select="${e(message.id)}" data-blog-version="${e(message.homepage_version)}" data-blog-published="${Boolean(message.homepage_published)}">${message.homepage_published?'Remove from homepage':'Publish to homepage'}</button>`:''}
    ${own||topic.owner?`<details class="topic-message-menu"><summary aria-label="Message options">⋯</summary>
     ${own?`<form data-topic-action="topic-message-edit" data-message-id="${e(message.id)}">
-     <label>Message <textarea name="body" required maxlength="3500">${e(message.body)}</textarea></label><button class="secondary">Save edit</button></form>`:''}
+     <label>Message <textarea name="body" ${attachments.length?'':'required'} maxlength="3500">${e(message.body)}</textarea></label><button class="secondary">Save edit</button></form>`:''}
     <button class="text-link" data-topic-remove="${e(message.id)}">Remove</button>
    </details>`:''}
   </div></div>
@@ -66,11 +67,14 @@ function renderForumTopic(){
   <form data-topic-action="topic-settings">${forumTopicFields(topic)}
   <label class="topic-checkbox"><input type="checkbox" name="repliesOpen" ${topic.replies_open?'checked':''}> Allow replies</label>
   <button class="secondary">Save settings</button></form></details>`:'';
- const composer=data.user&&(topic.owner||topic.replies_open)?`<form class="topic-composer" data-topic-action="topic-message">
-  ${topicReply?`<div class="topic-reply-preview"><div><strong>Replying to ${e(topicReply.name)}</strong><span>${e(topicReply.body.slice(0,140))}</span></div><button type="button" class="text-link" data-topic-cancel-reply aria-label="Cancel reply">×</button></div>`:''}
+ const mediaKey='topic:'+topic.id;
+ const composer=data.user&&(topic.owner||topic.replies_open)?`<form class="topic-composer" data-topic-action="topic-message" data-media-form="${mediaKey}">
+  ${topicReply?`<div class="topic-reply-preview"><div><strong>Replying to ${e(topicReply.name)}</strong><span>${e(topicReply.body.slice(0,140)||'Attachment')}</span></div><button type="button" class="text-link" data-topic-cancel-reply aria-label="Cancel reply">×</button></div>`:''}
   <label class="sr-only" for="topic-compose-text">Message</label>
   <textarea id="topic-compose-text" name="body" rows="2" required maxlength="3500" placeholder="${topic.owner&&!topicReply?'Write an update…':'Write a reply…'}">${e(topicDraft)}</textarea>
-  <button class="primary">Send</button></form>`:'';
+  ${mediaDraftHTML(mediaKey)}
+  ${mediaComposerHTML(mediaKey,'topic',topic.id)}
+  <button type="submit" class="primary">Send</button></form>`:'';
  const lastScroll=document.querySelector('.topic-transcript');
  const prior=lastScroll?{top:lastScroll.scrollTop,height:lastScroll.scrollHeight}:null;
  requestAnimationFrame(()=>{
@@ -128,18 +132,30 @@ document.addEventListener('submit',event=>{
  const form=event.target;
  if(!form.matches('[data-topic-action],[data-topic-search]'))return;
  event.preventDefault();
- void performTopicAction(form.querySelector('button'),async()=>{
+ const button=form.querySelector('button[type=submit],button.primary,button.secondary');
+ const sending=form.dataset.topicAction==='topic-message';
+ if(topicBusy)return;
+ if(sending)form.inert=true;
+ void performTopicAction(button,async()=>{
   const input=Object.fromEntries(new FormData(form));
   if(form.hasAttribute('data-topic-search'))topicsQuery=input.q.trim();
   else{
    const action=form.dataset.topicAction;
-   const result=await api(action,{...input,topicId:topicId(),messageId:form.dataset.messageId,replyTo:action==='topic-message'?topicReply?.id:undefined,
+   const id=topicId();
+   const key=form.dataset.mediaForm;
+   const replyTo=sending?topicReply?.id:undefined;
+   const attachments=sending?mediaSendIds(key):undefined;
+   const requestId=sending?mediaRequestId(key,JSON.stringify([input.body,replyTo]),attachments):undefined;
+   const result=await api(action,{...input,topicId:id,messageId:form.dataset.messageId,replyTo,mediaIds:attachments,requestId,
     repliesOpen:input.repliesOpen==='on'});
-   if(action==='topic-message'){topicReply=null;topicDraft='';topicScrollBottom=true;}
+   if(sending){
+    clearMediaDraft(key);
+    if(topicId()===id){topicReply=null;topicDraft='';topicScrollBottom=true;}
+   }
    if(action==='topic-create')history.replaceState({},'',forumTopicUrl(result.id));
   }
   await loadTopics();
- });
+ }).finally(()=>{if(sending)form.inert=false;});
 });
 
 function nextTopicReactions(previous,emoji,enabled){

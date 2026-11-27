@@ -1,9 +1,10 @@
 import {randomUUID,createHash} from 'node:crypto';
 import {fail,text,uuid,limit} from './http.js';
+import {assertInteraction,hiddenBy} from './member-controls.js';
 export const mediaLimits={maxPhotos:4,maxVideos:1,chunkBytes:2*1024*1024,imageBytes:10*1024*1024,videoBytes:50*1024*1024,dailyBytes:100*1024*1024,dailyFiles:20,storageBytes:512*1024*1024};
 export const mediaTypes={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','image/avif':'avif','video/mp4':'mp4','video/webm':'webm','video/quicktime':'mov'};
 export const mediaAvailable=()=>Boolean(process.env.MEDIA_STORAGE_DIR||process.env.BLOB_READ_WRITE_TOKEN);
-const parents={post:'post_id',comment:'comment_id',room:'room_message_id',message:'message_id'};
+const parents={post:'post_id',comment:'comment_id',room:'room_message_id',message:'message_id',topic:'topic_message_id'};
 export function mediaProjection(alias,column){
  if(!['p','m','c'].includes(alias)||!Object.values(parents).includes(column))throw new Error('Invalid media query.');
  return `COALESCE((SELECT jsonb_agg(jsonb_build_object('id',a.id,'kind',a.kind,'content_type',a.content_type,'byte_size',a.byte_size,'url','/api/media?action=file&id='||a.id::text) ORDER BY a.position) FROM media_assets a WHERE a.${column}=${alias}.id AND a.status='attached'),'[]'::jsonb) AS media`;
@@ -18,6 +19,13 @@ export async function authorizeUpload(db,user,scope,target){
  if(!Object.hasOwn(parents,scope))fail(400,'Choose where to share your file.');
  if(scope==='post'){if(target!=null)fail(400,'Start a new post attachment.');return;}
  uuid(target);
+ if(scope==='topic'){
+  const [topic]=await db.q('SELECT owner_id,replies_open FROM forum_topics WHERE id=$1',[target]);
+  if(!topic)fail(404,'Topic not found.');
+  await assertInteraction(db,user.id,topic.owner_id);
+  if(topic.owner_id!==user.id&&!topic.replies_open)fail(409,'The owner has closed replies.');
+  return;
+ }
  if(scope==='comment'){if(!(await db.q('SELECT 1 FROM posts WHERE id=$1',[target])).length)fail(404,'Post not found.');return;}
  if(scope==='room'){
   const rows=await db.q('SELECT 1 FROM room_members m JOIN rooms r ON r.id=m.room_id WHERE m.room_id=$1 AND m.user_id=$2 AND r.archived_at IS NULL',[target,user.id]);
@@ -100,6 +108,12 @@ export async function readableMedia(db,user,id){
  if(!a||!['ready','attached'].includes(a.status))fail(404,'Attachment not found.');
  if(a.status==='ready'){if(!user||a.owner_id!==user.id)fail(404,'Attachment not found.');return a;}
  if(a.post_id||a.comment_id)return a;
+ if(a.topic_message_id){
+  const [visible]=await db.q(`SELECT 1 FROM forum_topic_messages m JOIN forum_topics t ON t.id=m.topic_id
+   WHERE m.id=$1 AND NOT ${hiddenBy('$2','t.owner_id')} AND NOT ${hiddenBy('$2','m.author_id')}`,[a.topic_message_id,user?.id??null]);
+  if(!visible)fail(404,'Attachment not found.');
+  return a;
+ }
  if(!user?.x_id)fail(401,'Sign in with X to view this attachment.');
  if(a.room_message_id){
   const rows=await db.q(`SELECT 1 FROM room_messages m JOIN rooms r ON r.id=m.room_id JOIN room_members rm ON rm.room_id=r.id
